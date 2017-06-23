@@ -1,0 +1,40 @@
+// Comment
+/* Comment too */
+
+int fib(int n){
+    switch n { // Too many brackets?
+        case 0, 1 {
+            return 1;
+        }
+        case { // Default
+            return fib(n - 2) + fib(n - 1);
+        }
+    }
+}
+
+<int(int)> add_gen(int i){
+    return int(int a){
+        return a + i;
+    };
+}
+
+<int(int)>:sig add_or_fail(int i){ // More than 1 sig return is an error
+    if i < 0 {
+        raise 1; // Everything but sig is null or 0
+        // return null, 1; // Also valid
+    }
+    return int(int a){
+        return a + i; 
+    };// All sig are automatically 0
+    // return [...], 0; // Also valid
+}
+
+int main(string[]){
+    print(fib(11));
+    fun add_5 = add_gen(5);
+    print(add_5(10));
+    
+    fun add_minus_1 = add_or_fail(-1);
+    
+    return 0;
+}
