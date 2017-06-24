@@ -32,4 +32,7 @@
 *.app
 
 # Output folder
+.idea/
 out/
+cmake-build-debug/
+**/CMakeLists.txt
