@@ -94,7 +94,7 @@ enum class Symbol : char {
     /*THAN_LEFT, THAN_RIGHT*/
 };
 
-static const Trie<Keyword> string_to_keyword {
+static const trie<Keyword> string_to_keyword {
     {"void", Keyword::VOID}, {"byte", Keyword::BYTE}, {"char", Keyword::CHAR},
     {"short", Keyword::SHORT}, {"int", Keyword::INT}, {"long", Keyword::LONG},
     {"sig", Keyword::SIG}, {"float", Keyword::FLOAT}, {"double", Keyword::DOUBLE},
@@ -117,92 +117,48 @@ static const Trie<Keyword> string_to_keyword {
     {"try", Keyword::TRY}, {"catch", Keyword::CATCH}, {"and", Keyword::AND}, {"or", Keyword::OR}
 };
 
-static const Trie<Symbol>  string_to_symbol {
+static const trie<Symbol>  string_to_symbol {
     {"$", Symbol::COMPILER},
     
-    {"*", Symbol::POINTER},
-    {"*!", Symbol::UNIQUE_POINTER},
-    {"*?", Symbol::WEAK_POINTER},
+    {"*", Symbol::POINTER}, {"*!", Symbol::UNIQUE_POINTER}, {"*?", Symbol::WEAK_POINTER},
     {"*+", Symbol::SHARED_POINTER},
     
     {"---", Symbol::NOTHING},
     
-    {"++", Symbol::INCREMENT},
-    {"--", Symbol::DECREMENT},
+    {"++", Symbol::INCREMENT}, {"--", Symbol::DECREMENT},
     
-    {"+", Symbol::ADD},
-    {"-", Symbol::SUBSTRACT},
-    /*{"*", Symbol::MULTIPLY},*/
-    {"**", Symbol::POWER},
-    {"%", Symbol::MODULO},
+    {"+", Symbol::ADD}, {"-", Symbol::SUBSTRACT},/*{"*", Symbol::MULTIPLY},*/
+    {"**", Symbol::POWER}, {"%", Symbol::MODULO},
     
-    /*{"*", Symbol::ADDRESS},*/
-    {"@", Symbol::DEREFERENCE},
+    /*{"*", Symbol::ADDRESS},*/{"@", Symbol::DEREFERENCE},
     
-    {"!", Symbol::NOT},
-    {"&", Symbol::AND},
-    {"|", Symbol::OR},
-    {"^", Symbol::XOR},
+    {"!", Symbol::NOT}, {"&", Symbol::AND}, {"|", Symbol::OR}, {"^", Symbol::XOR},
     
-    {"!!", Symbol::LNOT},
-    {"&&", Symbol::LAND},
-    {"||", Symbol::LOR},
-    {"^^", Symbol::LXOR},
+    {"!!", Symbol::LNOT}, {"&&", Symbol::LAND}, {"||", Symbol::LOR}, {"^^", Symbol::LXOR},
     
-    {".", Symbol::ACCESS},
-    {"..", Symbol::CONCATENATE},
-    {"...", Symbol::SPREAD},
+    {".", Symbol::ACCESS}, {"..", Symbol::CONCATENATE}, {"...", Symbol::SPREAD},
     
-    {"?", Symbol::TERNARY_CHOICE},
-    {":", Symbol::TERNARY_CONDITION},
+    {"?", Symbol::TERNARY_CHOICE}, {":", Symbol::TERNARY_CONDITION},
     
-    {"@|", Symbol::BIT_SET},
-    {"@&", Symbol::BIT_CLEAR},
-    {"@?", Symbol::BIT_CHECK},
-    {"@^", Symbol::BIT_TOGGLE},
+    {"@|", Symbol::BIT_SET}, {"@&", Symbol::BIT_CLEAR}, {"@?", Symbol::BIT_CHECK}, {"@^", Symbol::BIT_TOGGLE},
     
-    {"<<", Symbol::SHIFT_LEFT},
-    {">>", Symbol::SHIFT_RIGHT},
-    {"<<<", Symbol::ROTATE_LEFT},
+    {"<<", Symbol::SHIFT_LEFT}, {">>", Symbol::SHIFT_RIGHT}, {"<<<", Symbol::ROTATE_LEFT},
     {">>>", Symbol::ROTATE_RIGHT},
     
-    {"==", Symbol::EQUALS},
-    {"!=", Symbol::NOT_EQUALS},
-    {">", Symbol::GREATER},
-    {">=", Symbol::GREATER_OR_EQUALS},
-    {"<", Symbol::LESS},
-    {"<=", Symbol::LESS_OR_EQUALS},
+    {"==", Symbol::EQUALS}, {"!=", Symbol::NOT_EQUALS}, {">", Symbol::GREATER},
+    {">=", Symbol::GREATER_OR_EQUALS}, {"<", Symbol::LESS}, {"<=", Symbol::LESS_OR_EQUALS},
     
-    {"=", Symbol::ASSIGN},
-    {"+=", Symbol::ADD_ASSIGN},
-    {"-=", Symbol::SUBTRACT_ASSIGN},
-    {"*=", Symbol::MULTIPLY_ASSIGN},
-    {"**=", Symbol::POWER_ASSIGN},
-    {"/=", Symbol::DIVIDE_ASSIGN},
-    {"&=", Symbol::AND_ASSIGN},
-    {"|=", Symbol::OR_ASSIGN},
-    {"^=", Symbol::XOR_ASSIGN},
-    {"<<=", Symbol::SHIFT_LEFT_ASSIGN},
-    {">>=", Symbol::SHIFT_RIGHT_ASSIGN},
-    {"<<<=", Symbol::ROTATE_LEFT_ASSIGN},
-    {">>>=", Symbol::ROTATE_RIGHT_ASSIGN},
-    {"..=", Symbol::CONCATENATE_ASSIGN},
-    {"@|=", Symbol::BIT_SET_ASSIGN},
-    {"@&=", Symbol::BIT_CLEAR_ASSIGN},
-    {"@^=", Symbol::BIT_TOGGLE_ASSIGN},
+    {"=", Symbol::ASSIGN}, {"+=", Symbol::ADD_ASSIGN}, {"-=", Symbol::SUBTRACT_ASSIGN},
+    {"*=", Symbol::MULTIPLY_ASSIGN}, {"**=", Symbol::POWER_ASSIGN}, {"/=", Symbol::DIVIDE_ASSIGN},
+    {"&=", Symbol::AND_ASSIGN}, {"|=", Symbol::OR_ASSIGN}, {"^=", Symbol::XOR_ASSIGN},
+    {"<<=", Symbol::SHIFT_LEFT_ASSIGN}, {">>=", Symbol::SHIFT_RIGHT_ASSIGN}, {"<<<=", Symbol::ROTATE_LEFT_ASSIGN},
+    {">>>=", Symbol::ROTATE_RIGHT_ASSIGN}, {"..=", Symbol::CONCATENATE_ASSIGN}, {"@|=", Symbol::BIT_SET_ASSIGN},
+    {"@&=", Symbol::BIT_CLEAR_ASSIGN}, {"@^=", Symbol::BIT_TOGGLE_ASSIGN},
     
-    {",", Symbol::COMMA},
-    {"~", Symbol::TILDE},
-    {";", Symbol::SEMICOLON},
-    /*{":", Symbol::COLON},*/
-    {"(", Symbol::LEFT_PAREN},
-    {")", Symbol::PAREN_RIGHT},
-    {"{", Symbol::BRACE_LEFT},
-    {"}", Symbol::BRACE_RIGHT},
-    {"[", Symbol::BRACKET_LEFT},
-    {"]", Symbol::BRACKET_RIGHT},
-    /*{"<", Symbol::THAN_LEFT},*/
-    /*{">", Symbol::THAN_RIGHT},*/
+    {",", Symbol::COMMA}, {"~", Symbol::TILDE},{";", Symbol::SEMICOLON},
+    /*{":", Symbol::COLON},*/{"(", Symbol::LEFT_PAREN}, {")", Symbol::PAREN_RIGHT},
+    {"{", Symbol::BRACE_LEFT}, {"}", Symbol::BRACE_RIGHT}, {"[", Symbol::BRACKET_LEFT},
+    {"]", Symbol::BRACKET_RIGHT},/*{"<", Symbol::THAN_LEFT},*//*{">", Symbol::THAN_RIGHT},*/
 };
 
 }

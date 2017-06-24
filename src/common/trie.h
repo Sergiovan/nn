@@ -8,19 +8,19 @@
 #include <type_traits>
 
 template<typename C>
-class Trie {
+class trie {
 public:
-    Trie(const char* str = "\0", std::optional<C> val = std::nullopt) {
+    trie(const char* str = "\0", std::optional<C> val = std::nullopt) {
         std::memset(nodes, 0, sizeof nodes);
         if(*str == '\0') {
             value = val;
         } else {
-            nodes[*str] = new Trie(str + 1, val);
+            nodes[*str] = new trie(str + 1, val);
             value = std::nullopt;
         }
     }
     
-    ~Trie() noexcept {
+    ~trie() noexcept {
         for(int i = 0; i < 255; i++) {
             if(nodes[i]){
                 delete nodes[i];
@@ -28,15 +28,15 @@ public:
         }
     }
     
-    Trie(const Trie& o) {
+    trie(const trie& o) {
         *this = o;
     }
     
-    Trie(Trie&& o) noexcept {
+    trie(trie&& o) noexcept {
         *this = o;
     }
     
-    Trie& operator=(const Trie& o) {
+    trie& operator=(const trie& o) {
         std::memset(nodes, 0, sizeof nodes);
         for(int i = 0; i < 255; i++) {
             if(o.nodes[i]){
@@ -47,14 +47,14 @@ public:
         return *this;
     }
     
-    Trie& operator=(Trie&& o) noexcept {
+    trie& operator=(trie&& o) noexcept {
         std::memcpy(nodes, o.nodes, sizeof nodes);
         std::memset(o.nodes, 0, sizeof o.nodes);
         value = std::move(o.value);
         return *this;
     }
     
-    Trie(std::initializer_list<std::pair<const char*, C>> init) {
+    trie(std::initializer_list<std::pair<const char*, C>> init) {
         std::memset(nodes, 0, sizeof nodes);
         value = std::nullopt;
         for(auto [str, val] : init) {
@@ -64,12 +64,12 @@ public:
 
     void add(const char* str, C value) noexcept {
         if(*str == '\0') {
-            Trie::value = value;
+            trie::value = value;
         } else {
             if(nodes[*str]) {
                 nodes[*str]->add(str + 1, value);
             } else {
-                nodes[*str] = new Trie(str + 1, value);
+                nodes[*str] = new trie(str + 1, value);
             }
         }
     }
@@ -86,6 +86,6 @@ public:
         }
     }
 private:
-    Trie<C>* nodes[255];
+    trie<C>* nodes[255];
     std::optional<C> value;
 };
