@@ -17,11 +17,13 @@ reader::reader(std::string str, bool is_file) {
             std::ifstream& s = std::get<1>(stream);
             if(!s || !s.is_open()) {
                 Logger::error("File", str, "could not be opened correctly");
+                finished = true;
             } else {
                 type = ReaderType::FILE;
             }
         } else {
             Logger::error("File", str, "does not exist!");
+            finished = true;
         }
     } else {
         stream = str;
@@ -73,10 +75,10 @@ char reader::peek() {
         return std::get<1>(stream).peek();
     } else if(type == ReaderType::STRING) {
         std::string& s = std::get<0>(stream);
-        if(index + 1 >= s.length()) {
+        if(index >= s.length()) {
             return EOF;
         } else {
-            return s.at(index + 1);
+            return s.at(index);
         }
     } else {
         Logger::error("A random bit toggles in the distance, and a hurricane destroys Myanmar...");

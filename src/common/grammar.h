@@ -11,9 +11,12 @@ enum class TokenType {
     KEYWORD,
     SYMBOL,
     IDENTIFIER,
+    COMPILER_IDENTIFIER,
     NUMBER,
     STRING,
-    CHARACTER
+    CHARACTER,
+    END_OF_FILE,
+    NONE
 };
 
 enum class Keyword : char {
@@ -37,7 +40,10 @@ enum class Keyword : char {
     NEW, DELETE,
 
     /* Reserved */
-    TRY, CATCH, AND, OR
+    TRY, CATCH, AND, OR,
+    
+    /* Invalid */
+    KEYWORD_INVALID
 };
 
 enum class Symbol : char {
@@ -92,6 +98,8 @@ enum class Symbol : char {
     BRACE_LEFT, BRACE_RIGHT,
     BRACKET_LEFT, BRACKET_RIGHT,
     /*THAN_LEFT, THAN_RIGHT*/
+    
+    SYMBOL_INVALID
 };
 
 static const trie<Keyword> string_to_keyword {
@@ -128,7 +136,7 @@ static const trie<Symbol>  string_to_symbol {
     {"++", Symbol::INCREMENT}, {"--", Symbol::DECREMENT},
     
     {"+", Symbol::ADD}, {"-", Symbol::SUBSTRACT},/*{"*", Symbol::MULTIPLY},*/
-    {"**", Symbol::POWER}, {"%", Symbol::MODULO},
+    {"**", Symbol::POWER}, {"/", Symbol::DIVIDE}, {"%", Symbol::MODULO},
     
     /*{"*", Symbol::ADDRESS},*/{"@", Symbol::DEREFERENCE},
     
