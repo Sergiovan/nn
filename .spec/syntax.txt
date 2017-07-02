@@ -163,9 +163,10 @@ b16number = ("0x" | "0X") , ([0-9a-fA-F]) ,{[0-9a-fA-F]})
 banumber  = digit , {digit}, ("l" , "L") , (letter | digit) , {letter | digit}
 string = "\"" , {any} , "\""
 char   = "'" , any , "'"
-array  = "[", [expression, {",", expression}], "]"
+array  = "[", [expression, {",", expression}, [","]], "]"
+struct_lit = "{", [(expression, {",", expression} | iden, "=", expression, {",", iden, "=", expression}), ","], "}"
 
-literal = number | b2number | b8number | b16number | banumber | string | char | array
+literal = number | b2number | b8number | b16number | banumber | string | char | array | struct_lit
 
 compileropts = dollar, "[", {compileriden, {",", compileriden}}, "]"
 
@@ -232,7 +233,7 @@ usingstmt = kwusing, iden , {opaccess, iden} , [kwas, iden] ";"
 
 namespacestmt = kwnamespace, iden, {opaccess, iden} , scope
 
-type = {kwqualifier}, (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {{kwqualifier}, spointer}, {"[", expression, "]"}
+type = {kwqualifier}, (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {{kwqualifier}, spointer}, {"[", expression, "]"}{"[", "]"}
 functype = "tfunction", ["<", type, {":", type}, "(", type, {",", type}, ")", ">"]
 
 declstmt = 	tvoid, functiondecl | 
@@ -263,7 +264,7 @@ structscopeinner = {usingstmt | declstmt}
 unionscope = "{", unionscopeinner, "}", [compileropts]
 unionscopeinner = {usingstmt | declstmt}
 
-enumscope = "{", iden, {",", iden}, "}", [compileropts]
+enumscope = "{", iden, {",", iden}, [","], "}", [compileropts]
 
 assstmt = assignment, ";"
 assignment 		  = iden, {",", iden}, assop, (expression | functionval), {",", (expression | functionval)}
