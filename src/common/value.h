@@ -3,8 +3,8 @@
 #include <variant>
 #include "convenience.h"
 
-class value {
+struct value {
     bool empty = false;
     u64 type = 0;
-    u64 value = 0;
+    u64 value;
 };
