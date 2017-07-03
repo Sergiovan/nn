@@ -2,22 +2,24 @@
 
 #include <variant>
 #include <vector>
+#include <utility>
 
 #include "convenience.h"
 #include "symbol_table.h"
 #include "value.h"
 
 enum class TypeType : u8 {
-    POINTER, FUNCTION, STRUCT_OR_UNION, ENUM, ARRAY, PRIMITIVE
+    POINTER, FUNCTION, STRUCT_OR_UNION,
+    ENUM, ARRAY, PRIMITIVE
+};
+
+enum class PrimitiveType : u8 {
+    INTEGER, REAL, BOOLEAN, CHARACTER,
+    STRING, VOID
 };
 
 enum class PointerType {
     NAKED, SHARED, WEAK, UNIQUE
-};
-
-enum class TypeFlag : u8 {
-    VOLATILE = 1 << 0,
-    CONST    = 1 << 1
 };
 
 struct type_ptr {
@@ -26,8 +28,8 @@ struct type_ptr {
 };
 
 struct type_func {
-    std::vector<u64> returns{};
-    std::vector<u64> args{};
+    std::vector<std::pair<u64, u8>> returns{};
+    std::vector<std::pair<u64, u8>> args{};
 };
 
 struct type_struct_union {
@@ -50,10 +52,15 @@ struct type_array {
     u64 of{0};
 };
 
-using type_union = std::variant<type_ptr, type_func, type_struct_union, type_enum, type_array>;
+struct type_primitive {
+    u8 size;
+    PrimitiveType type;
+};
+
+using type_union = std::variant
+    <type_ptr, type_func, type_struct_union, type_enum, type_array, type_primitive>;
 
 struct type {
-    u8 flags;
     TypeType type;
     type_union value;
 };
@@ -62,7 +69,7 @@ class type_table {
 public:
     type_table();
     
-    u64 add_type(type& t);
+    u64 add_type(type t);
 private:
     std::vector<type> types{};
 };

@@ -29,12 +29,15 @@ kwtype       = tvoid | tbyte | tchar | tshort | tint | tlong | tsig | tfloat | t
 
 qconst       = "const"
 qvolatile    = "volatile"
+qsigned 	 = "signed"
+qunsigned    = "unsigned"
 qpointer     = "*"
 qupointer    = "*!"
 qwpointer    = "*?"
 qspointer    = "*+"
 
 kwqualifier  = qconst | qvolatile
+kwsign		 = qsigned | qunsigned
 spointer     = qpointer | qupointer | qwpointer | qspointer 
 
 cif          = "if"
@@ -168,10 +171,7 @@ struct_lit = "{", [(expression, {",", expression} | iden, "=", expression, {",",
 
 literal = number | b2number | b8number | b16number | banumber | string | char | array | struct_lit
 
-compileropts = dollar, "[", {compileriden, {",", compileriden}}, "]"
-
-scope = "{", statements, "}", [compileropts]
-
+program = {usingstmt | namespacestmt | declstmt | importstmt}
 statements = {statement}
 statement = [compileriden],
 	ifstmt | 
@@ -192,6 +192,10 @@ statement = [compileriden],
 	assstmt |
 	expressionstmt |
 	scope
+	
+compileropts = dollar, "[", {compileriden, {",", compileriden}}, "]"
+
+scope = "{", statements, "}", [compileropts]
 
 ifstmt = ifsemi , ifstmt'
 ifsemi =  cif , (expression | {deoa, ";", })
@@ -213,7 +217,7 @@ switchstmt = cswitch , expression , {";" , expression} , switchscope
 switchscope = "{" , {casestmt} , "}"
 casestmt = ((kwcase , expression , {"," , expression}) | celse) , (ccontinue | scope | cdo, statement)
 
-returnstmt = creturn, expression, {",", expression}, ";"
+returnstmt = creturn, [expression, {",", expression} | tvoid], ";"
 
 raisestmt = craisem, expression, {",", expression}, ";"
 
@@ -229,11 +233,15 @@ continuestmt = ccontinue, ";"
 
 leavestmt = cleave, ";"
 
+importstmt = kwimport, (iden | string), [kwas, iden]
+
 usingstmt = kwusing, iden , {opaccess, iden} , [kwas, iden] ";"
 
 namespacestmt = kwnamespace, iden, {opaccess, iden} , scope
 
-type = {kwqualifier}, (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {{kwqualifier}, spointer}, {"[", expression, "]"}{"[", "]"}
+type_class = {kwqualifier}, [kwsign]
+
+type = type_class, (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {type_class, spointer}, {"[", expression, "]"}{"[", "]"}
 functype = "tfunction", ["<", type, {":", type}, "(", type, {",", type}, ")", ">"]
 
 declstmt = 	tvoid, functiondecl | 

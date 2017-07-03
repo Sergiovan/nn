@@ -26,7 +26,7 @@ enum class Keyword : char {
     STRUCT, UNION, ENUM, STRING, FUN, LET,
 
     /* Type modifiers */
-    CONST, VOLATILE,
+    CONST, VOLATILE, SIGNED, UNSIGNED,
 
     /* Control */
     IF, ELSE, FOR, WHILE,
@@ -110,7 +110,8 @@ static const trie<Keyword> string_to_keyword {
     {"enum", Keyword::ENUM}, {"string", Keyword::STRING}, {"fun", Keyword::FUN},
     {"let", Keyword::LET},
 
-    {"const", Keyword::CONST}, {"volatile", Keyword::VOLATILE},
+    {"const", Keyword::CONST}, {"volatile", Keyword::VOLATILE}, {"signed", Keyword::SIGNED},
+    {"unsigned", Keyword::UNSIGNED},
 
     {"if", Keyword::IF}, {"else", Keyword::ELSE}, {"for", Keyword::FOR},
     {"while", Keyword::WHILE}, {"do", Keyword::DO}, {"switch", Keyword::SWITCH},

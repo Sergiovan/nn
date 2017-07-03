@@ -11,11 +11,20 @@ enum class SymbolTableEntryType {
     TYPE, VARIABLE, FUNCTION, ALIAS
 };
 
+namespace TypeFlag {
+    constexpr u8 VOLATILE = 1 << 0;
+    constexpr u8 CONST    = 1 << 1;
+    constexpr u8 SIGNED   = 1 << 2;
+};
+
 struct st_entry_type {
+    u8 flags;
     u64 id;
 };
 struct st_entry_variable {
+    u8 flags;
     u64 id;
+    //u64 location;
 };
 
 struct st_entry_function {
