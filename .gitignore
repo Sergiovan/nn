@@ -36,3 +36,4 @@
 out/
 cmake-build-debug/
 **/CMakeLists.txt
+nbproject/
