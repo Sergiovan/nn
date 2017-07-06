@@ -15,7 +15,7 @@ public:
         if(*str == '\0') {
             value = val;
         } else {
-            nodes[*str] = new trie(str + 1, val);
+            nodes[(int) *str] = new trie(str + 1, val);
             value = std::nullopt;
         }
     }
@@ -66,10 +66,10 @@ public:
         if(*str == '\0') {
             trie::value = value;
         } else {
-            if(nodes[*str]) {
-                nodes[*str]->add(str + 1, value);
+            if(nodes[(int) *str]) {
+                nodes[(int) *str]->add(str + 1, value);
             } else {
-                nodes[*str] = new trie(str + 1, value);
+                nodes[(int) *str] = new trie(str + 1, value);
             }
         }
     }
@@ -78,8 +78,8 @@ public:
         if(*str == '\0') {
             return value;
         } else {
-            if(nodes[*str]) {
-                return nodes[*str]->get(str + 1);
+            if(nodes[(int) *str]) {
+                return nodes[(int) *str]->get(str + 1);
             } else {
                 return std::nullopt;
             }

@@ -20,13 +20,13 @@ token tokenizer::next() {
     char c = r.next();
     
     /* Remove all the useless crap */
-    while (is_a(c, whitespace) || (c == '#' || c == '/' && r.peek() == '/') || (c == '/' && r.peek() == '*')) {
+    while (is_a(c, whitespace) || (c == '#' || (c == '/' && r.peek() == '/')) || (c == '/' && r.peek() == '*')) {
         if(is_a(c, whitespace)) {
             /* Remove whitespace */
             do {
                 c = r.next();
             } while(is_a(c, whitespace)); // Will end in case of EOF
-        } else if(c == '#' || c == '/' && r.peek() == '/') {
+        } else if(c == '#' || (c == '/' && r.peek() == '/')) {
             /* Single line */
             while(r.next() != '\n' && !r.has_finished()); // Discard all input till newline or end
             c = r.next();

@@ -8,6 +8,7 @@
 class tokenizer {
 public:
     tokenizer(reader& r);
+    
     token next();
 private:
     inline bool is_a(char c, const std::regex& r) { //TODO Optimize?

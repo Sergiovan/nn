@@ -6,7 +6,7 @@ using namespace Grammar;
 parser::parser(globals& g) : t(nullptr), g(g) { }
 
 ast* parser::parse(tokenizer& t) {
-    *parser::t = t;
+    parser::t = &t;
     c = t.next();
     n = t.next();
 }
