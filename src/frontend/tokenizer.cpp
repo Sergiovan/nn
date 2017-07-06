@@ -1,5 +1,6 @@
 #include "tokenizer.h"
 
+#include "common/util.h"
 #include "common/logger.h"
 
 tokenizer::tokenizer(reader& r) : r(r) {}
@@ -111,9 +112,13 @@ token tokenizer::next() {
     
     /* Char literals */
     if(c == '\'') {
-        //TODO UTF-8, EOF
-        t.value += r.next();
-        r.next(); // Discard '
+        char utf = r.next();
+        unsigned char len = Util::utf8_length(utf) - 1;
+        t.value += utf;
+        for(unsigned char i = 0; i < std::min(len, (unsigned char) 3); ++i) {
+          t.value += r.next();
+        }
+        r.next(); // Discard ' //TODO Fukin make sure it's a '
         
         t.tokenType = TokenType::CHARACTER;
         return t;
