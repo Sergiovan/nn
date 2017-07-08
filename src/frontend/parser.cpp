@@ -19,7 +19,15 @@ token parser::next() noexcept {
 }
 
 bool parser::test(TokenType type, int lookahead) noexcept {
-        return (lookahead ? n : c).tokenType == type; // I am a monster
+    return (lookahead ? n : c).tokenType == type; // I am a monster
+}
+
+bool parser::is(TokenType type) {
+    return test(type, 0);
+}
+
+bool parser::peek(TokenType type) {
+    return test(type, 1);
 }
 
 void parser::require(TokenType type) {
@@ -27,3 +35,5 @@ void parser::require(TokenType type) {
         throw parser_exception{};
     }
 }
+
+
