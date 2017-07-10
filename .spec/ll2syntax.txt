@@ -147,6 +147,21 @@ opbitsetassign    = "@|="
 opbitclearassign  = "@&="
 opbittoggleassign = "@^="
 
+stmtend = ";"
+vardeclend = "~"
+comma = ","
+oparen = "("
+cparen = ")"
+obracket = "["
+cbracket = "]"
+obrace = "{"
+cbrace = "}"
+numberseparator = "."
+quote = "'"
+dquote = "\""
+othan = "<"
+cthan = ">"
+
 unop     = opinc | opdec | opsub | opaddress | opat | opnot | oplnot | opspread
 preunop  = opinc | opdec | opsub | opaddress | opat | opnot | oplnot
 postunop = opinc | opdec | opspread
@@ -159,22 +174,22 @@ operator = unop | binop | assop
 iden   = identifier_legal , {identifier_legal | digit}
 compileriden = dollar, identifier_legal, {identifier_legal | digit}
 
-number = digit , {digit} , ["." , digit , {digit}]
+number = digit , {digit} , [numberseparator , digit , {digit}]
 b2number  = ("0b" | "0B") , ([01]) , {[01]}
 b8number  = ("0o" | "0O") , ([0-7]) , {[0-7]}
 b16number = ("0x" | "0X") , ([0-9a-fA-F]) ,{[0-9a-fA-F]})
 banumber  = digit , {digit}, ("l" , "L") , (letter | digit) , {letter | digit}
-string = "\"" , {any} , "\""
-char   = "'" , any , "'"
-array  = "[", [expression, {",", expression}, [","]], "]"
-struct_lit = "{", [(expression, {",", expression} | iden, "=", expression, {",", iden, "=", expression}), ","], "}"
+string = dquote , {any} , dquote
+char   = quote, any, quote
+array  = obracket, [expression, {comma, expression}, [comma]], cbracket
+struct_lit = obrace, [(expression, {comma, expression} | iden, assop, expression, {comma, iden, assop, expression}), comma], cbrace
 
 literal = number | b2number | b8number | b16number | banumber | string | char | array | struct_lit
 
 program = {usingstmt | namespacestmt | declstmt | importstmt}
-statements = {statement}
+
 statement = [compileriden],
-	ifstmt | 
+  ( ifstmt | 
 	forstmt | 
 	whilestmt | 
 	switchstmt |
@@ -191,166 +206,151 @@ statement = [compileriden],
 	declstmt | 
 	assstmt |
 	expressionstmt |
-	scope
+	scope )
 	
-compileropts = dollar, "[", {compileriden, {",", compileriden}}, "]"
+(* Can replace a whole scope *)
+scopestatement = 
+  ( ifstmt |
+	forstmt |
+	whilestmt | 
+	switchstmt | 
+	returnstmt |
+	raisestmt | 
+	gotostmt | 
+	breakstmt | 
+	continuestmt | 
+	leavestmt |
+	assstmt | 
+	expressionstmt |
+	scope )
 
-scope = "{", statements, "}", [compileropts]
+compileropts = dollar, obracket, compileriden, {comma, compileriden}, [comma], cbracket
+scope = obrace, {statement}, cbrace, [compileropts]
+	
+ifstmt = cif, {fexpression, stmtend}, expression, (cdo, scopestatement | ifscope)
+ifscope = scope, [celse, scopestatement]
 
-ifstmt = ifsemi , ifstmt'
-ifsemi =  cif , (expression | {deoa, ";", })
-ifstmt' = cdo , statement | scope , [elsestmt]
-elsestmt = celse , scope | celse , ifsemi , scope , [elsestmt]
-
-forstmt = cfor , forcond , forstmt'
+forstmt = cfor, forcond, (cdo, scopestatement | scope)
+(* Note: Written in not LL2 for clarity, easily convertible *)
 forcond = 
-	deoa , (";", [expression], ";", [expressionorassignment], {";", [expressionorassignment]} | "," , expression, ["," , expression]) | 
-	";" , [expression], ";" [expressionorassignment], {";", [expressionorassignment]} | 
-	(type | tlet), iden, optthen, expression
-forstmt' = scope | cdo , statement
+  ( [fexpression], stmtend, [expression], stmtend, [mexpression] |
+	(type | tlet), iden, optthen, expression |
+	[type | tlet], iden, assop, expression, comma, expression, [comma, expression] )
 
-whilestmt = whilesemi , whilestmt'
-whilesemi = cwhile , expression , {";" , expression}
-whilestmt' = cdo , statement | scope
+whilestmt = cwhile, {fexpression, stmtend}, expression, (cdo, scopestatement | scope)
 
-switchstmt = cswitch , expression , {";" , expression} , switchscope
-switchscope = "{" , {casestmt} , "}"
-casestmt = ((kwcase , expression , {"," , expression}) | celse) , (ccontinue | scope | cdo, statement)
+switchstmt = cswitch, {fexpression, stmtend}, expression, switchscope
+switchscope = obrace, {casestmt}, cbrace
+casestmt = (kwcase, expression, {comma, expression}, [comma] | celse), (ccontinue | scope | cdo, scopestatement)
 
-returnstmt = creturn, [expression, {",", expression} | tvoid], ";"
+returnstmt = creturn, [expression, {comma, expression}, [comma] | tvoid], stmtend
 
-raisestmt = craise, expression, {",", expression}, ";"
+raisestmt = craise, expression, {comma, expression}, [comma], stmtend
 
-gotostmt = cgoto, iden, ";"
+gotostmt = cgoto, iden, stmtend
 
-labelstmt = clabel, iden, ";"
+labelstmt = clabel, iden, stmtend
 
-deferstmt = cdefer, expression, ";"
+deferstmt = cdefer, expression, stmtend
 
-breakstmt = cbreak, ";"
+breakstmt = cbreak, stmtend
 
-continuestmt = ccontinue, ";"
+continuestmt = ccontinue, stmtend
 
-leavestmt = cleave, ";"
+leavestmt = cleave, stmtend
 
-importstmt = kwimport, (iden | string), [kwas, iden]
+importstmt = kwimport, (iden | string), [kwas, iden], stmtend
 
-usingstmt = kwusing, iden , {opaccess, iden} , [kwas, iden] ";"
+usingstmt = kwusing, iden, {opaccess, iden}, [kwas, iden], stmtend
 
-namespacestmt = kwnamespace, iden, {opaccess, iden} , scope
+namespacestmt = kwnamespace, iden, {opaccess, iden}, scope
 
-type_class = {kwqualifier}, [kwsign]
+varclass = {kwqualifier}, [kwsign]
+type = (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {varclass, spointer}, {obracket, expression, cbracket}{obracket, cbracket}
+functype = tfunction, [othan, type, {optthen, type}, oparen, [type, {comma, type}, [comma]], cparen, cthan]
 
-type = type_class, (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {type_class, spointer}, {"[", expression, "]"}{"[", "]"}
-functype = tfunction, ["<", type, {":", type}, "(", type, {",", type}, ")", ">"]
+declstmt = ( vardecl, {vardeclend, vardecl}, stmtend | funcdecl | structdecl | uniondecl | enumdecl )
 
-declstmt = 	tvoid, functiondecl | 
-			tlet, funcorvardecl | 
-			type, (":", type, {":", type}, functiondecl | funcorvardecl) | 
-			tstruct, iden, (structscope | ";") | 
-			tunion, iden, (unionscope | ";") |
-			tenum, iden, (enumscope | ";")
+declstructstmt = ( vardeclstruct, {vardeclend, vardeclstruct}, stmtend | funcdecl | structdecl | uniondecl | enumdecl )
 
-(* Ambiguity resolved by symbol table *)
-funcorvardecl = iden, (vardeclnoass, ";" | assignmentval, vardeclnoass, ";" | functionparams, (scope | ";"))
-functiondecl = iden, functionparams, (scope | ";")
-functionparams = "(", [functionparam, {",", functionparam}] ")"
-functionparam = type, [iden, ["=", expression]],
+vardecl = [varclass], (type | tlet), iden, {comma, [[varclass], type], iden}, [assop, aexpression, {comma, aexpression}]
 
-functionval = (tvoid | type, {":", type}), [iden], scope
+vardeclstruct = [varclass], (type | tlet), iden, [optthen, number], {comma, [[varclass], type], iden, [optthen, number]}, [assop, aexpression, {comma, aexpression}]
 
-(* Ambiguity resolved by symbol table *)
-vardecl = iden, vardecl'
-vardecl' = (vardeclnoass | assignmentval, vardeclnoass))
-vardeclnoass = "~", [type], vardecl | ",", vardecl
+funcdecl = (type, {optthen, type} | tvoid | tlet), iden, oparen, [parameter, {comma, parameter}, [comma]], cparen, (scope | stmtend)
+parameter = type, [iden, [assop, aexpression]]
 
-vardef	= type, iden, {",", [type], iden}, opequals, (expression | nosthing | functionval), {",", (expression | snothing | functionval)}
+funcval = (type, {optthen, type} | tvoid | tlet), [iden], oparen, [parameter, {comma, parameter}, [comma]], cparen, scope
 
-structscope = "{", structscopeinner, "}", [compileropts]
-structscopeinner = {usingstmt | declstmt}
+structdecl = tstruct, iden, structscope, [compileropts]
+structscope = obrace, {usingstmt | declstructstmt}, cbrace
 
-unionscope = "{", unionscopeinner, "}", [compileropts]
-unionscopeinner = {usingstmt | declstmt}
+uniondecl = tunion, iden, unionscope, [compileropts]
+unionscope = obrace, {usingstmt | declstmt}, cbrace
 
-enumscope = "{", iden, {",", iden}, [","], "}", [compileropts]
+enumdecl = tenum, iden, enumscope, [compileropts]
+enumscope = obrace, [iden, {comma, iden}, [comma]], cbrace
 
-assstmt = assignment, ";"
-assignment 		  = iden, {",", iden}, assop, (expression | functionval), {",", (expression | functionval)}
-assignmentval     = "=", (expression | snothing | functionval), {",", (expression | snothing | functionval)}
 
-expressionstmt = expression , ";"
-expression = e16
+assstmt = assignment, stmtend
+assignment = iden, {comma, iden}, assop, aexpression, {comma, aexpression}
 
-e16   = e15, [e16']
-e16'  = optcond, e16, optthen, e16
+expressionstmt = expression, stmtend
+expression = e17
+
+e17   = e16, [e17']
+e17'  = optcond, e17, optthen, e17
+
+e16   = e15, {e16'}
+e16'  = (opequals | opnequals),  e15
 
 e15   = e14, {e15'}
-e15'  = (opequals | opnequals),  e14
+e15'  = (oplt | opleqt | opgt | opgeqt), e14
 
 e14   = e13, {e14'}
-e14'  = (oplt | opleqt | opgt | opgeqt), e13
+e14'  = oplxor, e13
 
 e13   = e12, {e13'}
-e13'  = oplxor, e12
+e13'  = oplor, e12
 
 e12   = e11, {e12'}
-e12'  = oplor, e11
+e12'  = opland, e11
 
 e11   = e10, {e11'}
-e11'  = opland, e10
+e11'  = opxor, e10
 
 e10   = e9, {e10'}
-e10'  = opxor, e9
+e10'  = opor, e9
 
 e9    = e8, {e9'}
-e9'   = opor, e8
+e9'   = opand, e8
 
 e8    = e7, {e8'}
-e8'   = opand, e7
+e8'	  = (opbitset | opbitclear | opbitcheck | opbittoggle), e7
 
 e7    = e6, {e7'}
-e7'	  = (opbitset | opbitclear | opbitcheck | opbittoggle), e6
+e7'	  = (opbitshiftl | opbitshiftr | oprotatel | oprotater), e6
 
 e6    = e5, {e6'}
-e6'	  = (opbitshiftl | opbitshiftr | oprotatel | oprotater), e5
+e6'	  = (opadd | opsub | opconcat), e5
 
 e5    = e4, {e5'}
-e5'	  = (opadd | opsub | opconcat), e4
+e5'	  = (opmul | opdiv | opmod), e4
 
-e4    = e3, {e4'}
-e4'	  = (opmul | opdiv | opmod), e3
+e4    = e3, [e4']
+e4'   = (oppow | opconcat), e4
 
-e3    = e2, [e3']
-e3'   = (oppow | opconcat), e3
+e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | "<", type, ">" | opat | opaddress) e3 | e2
 
-e2    = (opinc | opdec | opadd | opsub | opnot | oplnot | "<", type, ">" | opat | opaddress) e2 | e1.5
-
-e1.5  = e1, {e1.5'}
-e1.5' = (opspread)
+e2  = e1, {e2'}
+e2' = (opspread)
 
 e1    = ee, {e1'}
 e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden), {opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}, ee
 
 ee 	  = "(", (expression | functionval), ")" | literal | iden
 
-argument  = (expression | snothing | functionval) | iden, "=", (expression | functionval) (* LL(2) lookahead for = *)
-expressionorassignment = expression | assignment (* LL(2), lookahead for , or = *)
-deoa = vardef | expression | assignment (* LL(2), lookeahead for , or = *)
-
-------------- Operator precedence --------------
-1: a++ a-- a() a[] a.b 
-1.5: a...
-2: ++a --a +a -a !a !!a <type>a @a #a
-3: a**b a..b
-4: a*b a/b a%b
-5: a+b a-b
-6: a<<b a>>b a<<<b a>>>b
-7: a@|b a@&b a@?b a@^b
-8: a&b
-9: a|b 
-10: a^b 
-11: a&&b 
-12: a||b 
-13: a^^b 
-14: a<b a<=b a>b a>=b
-15: a==b a!=b 
+argument = aexpression | iden, "=", aexpression
+fexpression = expression | vardecl | assignment
+mexpression = expression | assignment
+aexpression = (expression | snothing | funcval)
