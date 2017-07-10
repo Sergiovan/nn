@@ -127,6 +127,28 @@ token tokenizer::next() {
     /* Symbols */
     if(is_a(c, symbol)) {
         std::string sym(1, c);
+                t.value += c;
+            }
+            c = r.next();
+        } while(c != '"' && !r.has_finished());
+        
+        t.tokenType = TokenType::STRING;
+        return t;
+    }
+    
+    /* Char literals */
+    if(c == '\'') {
+        char utf = r.next();
+        unsigned char len = Util::utf8_length(utf) - 1;
+        t.value += utf;
+        for(unsigned char i = 0; i < std::min(len, (unsigned char) 3); ++i) {
+          t.value += r.next();
+        }
+        r.next(); // Discard ' //TODO Fukin make sure it's a '
+        
+        t.tokenType = TokenType::CHARACTER;
+        return t;
+    }
         auto s = string_to_symbol.get(sym.c_str());
         if(s) {
             t.value = sym;
