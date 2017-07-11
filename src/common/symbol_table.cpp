@@ -12,7 +12,7 @@ bool symbol_table::has(std::string& value) const noexcept {
     return values.get(value.c_str()).has_value();
 }
 
-st_entry& symbol_table::search(std::string& value) const {
+st_entry* symbol_table::search(std::string& value) const {
     auto ret = values.get(value.c_str());
     return *ret;
 }

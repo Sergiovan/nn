@@ -4,8 +4,9 @@
 #include <variant>
 #include <vector>
 
-#include "trie.h"
 #include "convenience.h"
+#include "trie.h"
+#include "type.h"
 
 enum class SymbolTableEntryType {
     TYPE, VARIABLE, FUNCTION
@@ -23,14 +24,13 @@ struct st_entry_type {
 };
 struct st_entry_variable {
     uid id;
-    // value data;
+    value data;
     vflags flags;
     bool defined;
-    
 };
 
 struct st_entry_function {
-    // std::vector<ftype> overloads;
+    std::vector<overload> overloads;
 };
 
 
@@ -50,7 +50,7 @@ public:
     symbol_table(std::weak_ptr<symbol_table>&& parent);
     
     bool has(std::string& value) const noexcept;
-    st_entry& search(std::string& value) const;
+    st_entry* search(std::string& value) const;
 private:
     std::weak_ptr<symbol_table> parent;
     trie<st_entry*> values;

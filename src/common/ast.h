@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "convenience.h"
-#include "value.h"
 #include "grammar.h"
 
 struct ast;
@@ -18,7 +17,7 @@ enum class NodeType : u8 {
 struct ast_node_none {};
 
 struct ast_node_value {
-    value val;
+    //value val;
 };
 
 struct ast_node_unary {
@@ -42,15 +41,9 @@ struct ast_node_block {
     std::vector<ast*> stmts;
 };
 
-struct function_param_opts {
-    std::string name;
-    bool def_val = false;
-    value val;
-};
-
 struct ast_node_function {
-    u64 type;
-    std::vector<function_param_opts> param_opts;
+    uid type;
+    ast* block;
 };
 
 using ast_node = std::variant
