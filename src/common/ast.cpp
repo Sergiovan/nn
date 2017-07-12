@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "type.h"
 
 ast_node_string::~ast_node_string() {
     delete chars;
@@ -122,3 +123,19 @@ ast_node_function& ast::get_function() {
     return std::get<11>(*node);
 }
 
+uid ast::get_type() {
+    switch(type) {
+        case NodeType::NONE: [[fallthrough]];
+        case NodeType::BLOCK: return 0;
+        case NodeType::SYMBOL: return get_symbol().symbol->get_type();
+        case NodeType::BYTE: return get_byte().type;
+        case NodeType::WORD: return get_word().type;
+        case NodeType::DWORD: return get_dword().type;
+        case NodeType::QWORD: return get_qword().type;
+        case NodeType::STRING: return TypeID::STRING;
+        case NodeType::ARRAY: return get_array().type;
+        case NodeType::PRE_UNARY: [[fallthrough]];
+        case NodeType::POST_UNARY: return get_unary().type;
+        case NodeType::FUNCTION: return get_function().type;
+    }
+}

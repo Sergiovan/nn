@@ -2,8 +2,9 @@
 
 #include <variant>
 
-#include "ast.h"
 #include "convenience.h"
+
+struct ast;
 
 struct value {
     ast* data; 

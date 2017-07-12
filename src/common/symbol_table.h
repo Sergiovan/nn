@@ -41,6 +41,8 @@ struct st_entry {
     SymbolTableEntryType type;
     
     st_entry();
+    
+    uid get_type();
 };
 
 class symbol_table {

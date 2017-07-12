@@ -5,8 +5,8 @@
 
 #include "convenience.h"
 #include "grammar.h"
+#include "symbol_table.h"
 
-struct st_entry;
 struct ast;
 
 enum class NodeType : u8 {
@@ -54,6 +54,7 @@ struct ast_node_array {
     ast** elements;
     u64 length;
     uid type;
+    uid etype;
     
     ~ast_node_array();
 };
@@ -61,6 +62,7 @@ struct ast_node_array {
 struct ast_node_unary {
     Grammar::Symbol op;
     ast* node;
+    uid type;
     
     ~ast_node_unary();
     void clean();
@@ -70,6 +72,7 @@ struct ast_node_binary {
     Grammar::Symbol op;
     ast* left;
     ast* right;
+    uid type;
     
     ~ast_node_binary();
     void clean();
@@ -121,4 +124,5 @@ struct ast {
     ast_node_block& get_block();
     ast_node_function& get_function();
     
+    uid get_type();
 };

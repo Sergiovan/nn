@@ -6,6 +6,9 @@
 #include <utility>
 
 #include "value.h"
+#include "trie.h"
+
+struct ast_node_function;
 
 struct field {
     uid type;
@@ -116,5 +119,5 @@ using types_union = std::variant
 
 struct type {
     TypeType type;
-    types_union value;
+    types_union data;
 };

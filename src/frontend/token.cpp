@@ -1,11 +1,11 @@
 #include "token.h"
 
-long long token::to_long() {
+u64 token::to_long() {
     // TODO Literals
     return std::atoll(value.c_str());
 }
 
-long double token::to_double() {
+double token::to_double() {
     // TODO ????
     return std::atof(value.c_str());
 }

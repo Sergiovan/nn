@@ -2,6 +2,14 @@
 
 st_entry::st_entry() : entry(st_entry_variable{0}), type(SymbolTableEntryType::VARIABLE) {}
 
+uid st_entry::get_type() {
+    switch(type) {
+        case SymbolTableEntryType::TYPE: return std::get<0>(entry).id;
+        case SymbolTableEntryType::VARIABLE: return std::get<1>(entry).id;
+        case SymbolTableEntryType::FUNCTION: return TypeID::FUN;
+    }
+}
+
 symbol_table::symbol_table() : parent() {}
 
 symbol_table::symbol_table(std::nullptr_t) : parent() {}

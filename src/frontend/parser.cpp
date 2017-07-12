@@ -110,19 +110,28 @@ ast* parser::character() {
     auto len = c.value.length();
     u32 ch = 0;
     std::memcpy(&ch, &next().value[0], len);
-    return new ast(ast_node_dword{ch, TypeID::CHAR});
+    return new ast(ast_node_dword{ch});
 }
 
 ast* parser::array() {
     require(Symbol::BRACKET_LEFT); // [
     ast* ret = new ast{ast_node_array{nullptr, 0}};
     std::vector<ast*> elems;
+    uid type = 0;
     do {
         next(); // [ , 
         if(is(Symbol::BRACKET_RIGHT)) { // ]
             break;
         } else {
-            elems.push_back(expression());
+            ast* exp = expression();
+            if(type == 0) {
+                type = exp->get_type();
+            } else {
+                if(type != exp->get_type()) {
+                    throw parser_exception(); // TODO Many many things
+                }
+            }
+            elems.push_back(exp);
         }
     } while (is(Symbol::COMMA));
     require(Symbol::BRACKET_RIGHT);
