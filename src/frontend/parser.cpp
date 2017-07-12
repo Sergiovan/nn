@@ -40,7 +40,7 @@ void parser::require(TokenType type) {
 
 ast* parser::iden() {
     require(TokenType::IDENTIFIER);
-    return new ast{ast_node_symbol{&g.get_symbol_table().search(next().value)}};
+    return new ast{ast_node_symbol{g.get_symbol_table().search(next().value)}};
 }
 
 ast* parser::compileriden() {
@@ -70,7 +70,7 @@ ast* parser::character() {
     auto len = c.value.length();
     u32 ch = 0;
     std::memcpy(&ch, &next().value[0], len);
-    return new ast(ast_node_dword{ch, char_id});
+    return new ast(ast_node_dword{ch, 0/*char_id*/});
 }
 
 ast* parser::array() {

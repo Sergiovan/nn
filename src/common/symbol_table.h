@@ -51,6 +51,7 @@ public:
     
     bool has(std::string& value) const noexcept;
     st_entry* search(std::string& value) const;
+    st_entry* search(std::string&& value) const;
 private:
     std::weak_ptr<symbol_table> parent;
     trie<st_entry*> values;

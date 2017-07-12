@@ -5,8 +5,8 @@
 
 #include "convenience.h"
 #include "grammar.h"
-#include "symbol_table.h"
 
+struct st_entry;
 struct ast;
 
 enum class NodeType : u8 {
