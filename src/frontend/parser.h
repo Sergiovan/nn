@@ -9,6 +9,8 @@ class parser_exception : std::exception {
     // TODO Stuff, of course
 };
 
+/* CONVENTION: Each parsing function expects to start on its first token, and 
+   should end after its last token, unless exceptions occur */
 class parser {
 public:
     parser(globals& g);
@@ -16,9 +18,20 @@ public:
     
     token next() noexcept;
     bool test(Grammar::TokenType type, int lookahead = 0) noexcept; // Just 0 and 1 for now
+    bool test(Grammar::Keyword keyword, int lookahead = 0) noexcept; // Just 0 and 1 for now
+    bool test(Grammar::Symbol symbol, int lookahead = 0) noexcept; // Just 0 and 1 for now
+    
     bool is(Grammar::TokenType type);
+    bool is(Grammar::Keyword keyword);
+    bool is(Grammar::Symbol symbol);
+    
     bool peek(Grammar::TokenType type);
+    bool peek(Grammar::Keyword keyword);
+    bool peek(Grammar::Symbol symbol);
+    
     void require(Grammar::TokenType type);
+    void require(Grammar::Keyword keyword);
+    void require(Grammar::Symbol symbol);
     
     ast* iden();
     ast* compileriden();
@@ -27,7 +40,7 @@ public:
     ast* string();
     ast* character();
     ast* array();
-    ast* strict_lit();
+    ast* struct_lit();
     ast* literal();
     
     ast* program();

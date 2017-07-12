@@ -50,6 +50,29 @@ enum class PrimitiveType : u8 {
     __LDOUBLE, CHAR, STRING, BOOL, SIG, FUN, LET
 };
 
+namespace TypeID {
+  constexpr uid VOID = 0;
+  
+  constexpr uid BYTE = 1;
+  constexpr uid SHORT = 2;
+  constexpr uid INT = 3;
+  constexpr uid LONG = 4;
+  
+  constexpr uid FLOAT = 5;
+  constexpr uid DOUBLE = 6;
+  constexpr uid __LDOUBLE = 7;
+  
+  constexpr uid CHAR = 8;
+  constexpr uid STRING = 9;
+  
+  constexpr uid BOOL = 10;
+  
+  constexpr uid SIG = 11;
+  
+  constexpr uid FUN = 12;
+  constexpr uid LET = 13;
+}
+
 enum class PointerType {
     NAKED, SHARED, WEAK, UNIQUE
 };

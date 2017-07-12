@@ -2,6 +2,8 @@
 #include "common/type_table.h"
 #include "common/convenience.h"
 
+#include <vector>
+
 using namespace Grammar;
 
 
@@ -24,16 +26,54 @@ bool parser::test(TokenType type, int lookahead) noexcept {
     return (lookahead ? n : c).tokenType == type; // I am a monster
 }
 
+bool parser::test(Keyword keyword, int lookahead) noexcept {
+    token& t = lookahead ? n : c;
+    return t.tokenType == TokenType::KEYWORD && t.to_keyword() == keyword;
+}
+
+bool parser::test(Symbol symbol, int lookahead) noexcept {
+    token& t = lookahead ? n : c;
+    return t.tokenType == TokenType::SYMBOL && t.to_symbol() == symbol;
+}
+
 bool parser::is(TokenType type) {
     return test(type, 0);
+}
+
+bool parser::is(Keyword keyword) {
+    return test(keyword, 0);
+}
+
+bool parser::is(Symbol symbol) {
+    return test(symbol, 0);
 }
 
 bool parser::peek(TokenType type) {
     return test(type, 1);
 }
 
+bool parser::peek(Keyword keyword) {
+    return test(keyword, 1);
+}
+
+bool parser::peek(Symbol symbol) {
+    return test(symbol, 1);
+}
+
 void parser::require(TokenType type) {
-    if(n.tokenType != type) {
+    if(!is(type)) {
+        throw parser_exception{};
+    }
+}
+
+void parser::require(Keyword keyword) {
+    if(!is(keyword)) {
+        throw parser_exception{};
+    }
+}
+
+void parser::require(Symbol symbol) {
+    if(!is(symbol)) {
         throw parser_exception{};
     }
 }
@@ -54,7 +94,7 @@ ast* parser::compileriden() {
 
 ast* parser::number() {
     require(TokenType::NUMBER);
-    
+    return new ast{ast_node_qword{next().to_long(), TypeID::LONG}};
 }
 
 ast* parser::string() {
@@ -70,14 +110,31 @@ ast* parser::character() {
     auto len = c.value.length();
     u32 ch = 0;
     std::memcpy(&ch, &next().value[0], len);
-    return new ast(ast_node_dword{ch, 0/*char_id*/});
+    return new ast(ast_node_dword{ch, TypeID::CHAR});
 }
 
 ast* parser::array() {
-    return nullptr; //TODO Expression
+    require(Symbol::BRACKET_LEFT); // [
+    ast* ret = new ast{ast_node_array{nullptr, 0}};
+    std::vector<ast*> elems;
+    do {
+        next(); // [ , 
+        if(is(Symbol::BRACKET_RIGHT)) { // ]
+            break;
+        } else {
+            elems.push_back(expression());
+        }
+    } while (is(Symbol::COMMA));
+    require(Symbol::BRACKET_RIGHT);
+    next();
+    auto& arr = ret->get_array();
+    arr.length = elems.size();
+    arr.elements = new ast*[arr.length];
+    std::memcpy(arr.elements, &elems[0], arr.length * sizeof(ast*));
+    return ret;
 }
 
-ast* parser::strict_lit() {
+ast* parser::struct_lit() {
     return nullptr; //TODO Expression
 }
 

@@ -25,22 +25,22 @@ struct ast_node_symbol {
 
 struct ast_node_byte {
     u8 data;
-    u64 type;
+    uid type;
 };
 
 struct ast_node_word {
     u16 data;
-    u64 type;
+    uid type;
 };
 
 struct ast_node_dword {
     u32 data;
-    u64 type;
+    uid type;
 };
 
 struct ast_node_qword {
     u64 data;
-    u64 type;
+    uid type;
 };
 
 struct ast_node_string {
@@ -51,8 +51,9 @@ struct ast_node_string {
 };
 
 struct ast_node_array {
-    ast* elements;
+    ast** elements;
     u64 length;
+    uid type;
     
     ~ast_node_array();
 };
