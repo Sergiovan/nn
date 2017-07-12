@@ -8,6 +8,21 @@
 #include "symbol_table.h"
 #include "value.h"
 
+constexpr u8 void_id = 0;
+
+constexpr u8 byte_id = 1;
+constexpr u8 short_id = 2;
+constexpr u8 int_id = 3;
+constexpr u8 long_id = 4;
+
+constexpr u8 float_id = 5;
+constexpr u8 double_id = 6;
+
+constexpr u8 char_id = 7;
+constexpr u8 string_id = 8;
+
+constexpr u8 bool_id = 9;
+
 enum class TypeType : u8 {
     POINTER, FUNCTION, STRUCT_OR_UNION,
     ENUM, ARRAY, PRIMITIVE

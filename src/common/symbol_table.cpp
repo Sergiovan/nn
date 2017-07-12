@@ -16,3 +16,8 @@ st_entry& symbol_table::search(std::string& value) const {
     auto ret = values.get(value.c_str());
     return *ret;
 }
+
+st_entry& symbol_table::search(std::string&& value) const {
+    auto ret = values.get(value.c_str());
+    return *ret;
+}

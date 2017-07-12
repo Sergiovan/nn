@@ -4,9 +4,9 @@
 #include "convenience.h"
 
 struct value {
-    bool empty = false;
+    u64 value;
+    u64 type = 0;
     u8 flags = 0;
     u8 bitsize = 0;
-    u64 type = 0;
-    u64 value;
+    bool empty = false;
 };

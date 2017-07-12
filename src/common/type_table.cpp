@@ -18,20 +18,20 @@ type_enum::~type_enum() {
 
 type_table::type_table() {
     /* Add all required default types here */
-    add_type(type{TypeType::PRIMITIVE, type_primitive{0, PrimitiveType::VOID}}); // Void
+    add_type(type{TypeType::PRIMITIVE, type_primitive{0, PrimitiveType::VOID}}); // Void - 0
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{1, PrimitiveType::INTEGER}}); // Byte
-    add_type(type{TypeType::PRIMITIVE, type_primitive{2, PrimitiveType::INTEGER}}); // Short
-    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::INTEGER}}); // Int
-    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::INTEGER}}); // Long
+    add_type(type{TypeType::PRIMITIVE, type_primitive{1, PrimitiveType::INTEGER}}); // Byte - 1
+    add_type(type{TypeType::PRIMITIVE, type_primitive{2, PrimitiveType::INTEGER}}); // Short - 2
+    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::INTEGER}}); // Int - 3
+    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::INTEGER}}); // Long - 4
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::REAL}}); // Float
-    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::REAL}}); // Float
+    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::REAL}}); // Float - 5
+    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::REAL}}); // Double - 6
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::CHARACTER}}); // Char
-    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::STRING}}); // String
+    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::CHARACTER}}); // Char - 7
+    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::STRING}}); // String - 8
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{1, PrimitiveType::BOOLEAN}}); // Bool
+    add_type(type{TypeType::PRIMITIVE, type_primitive{1, PrimitiveType::BOOLEAN}}); // Bool - 9
 }
 
 u64 type_table::add_type(type t) {

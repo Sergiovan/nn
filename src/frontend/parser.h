@@ -23,6 +23,7 @@ public:
     ast* iden();
     ast* compileriden();
     
+    ast* number();
     ast* string();
     ast* character();
     ast* array();
