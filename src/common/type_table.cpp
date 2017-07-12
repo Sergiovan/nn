@@ -1,40 +1,28 @@
 #include "type_table.h"
 
-type_struct_union::type_struct_union() {
-    elem_names = new symbol_table;
-}
-
-type_struct_union::~type_struct_union() {
-    delete elem_names;
-}
-
-type_enum::type_enum() {
-    enum_names = new trie<u64>;
-}
-
-type_enum::~type_enum() {
-    delete enum_names;
-}
-
 type_table::type_table() {
     /* Add all required default types here */
-    add_type(type{TypeType::PRIMITIVE, type_primitive{0, PrimitiveType::VOID}}); // Void - 0
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::VOID}}); // Void
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{1, PrimitiveType::INTEGER}}); // Byte - 1
-    add_type(type{TypeType::PRIMITIVE, type_primitive{2, PrimitiveType::INTEGER}}); // Short - 2
-    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::INTEGER}}); // Int - 3
-    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::INTEGER}}); // Long - 4
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::BYTE}}); // Byte
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::SHORT}}); // Short
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::INT}}); // Int
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::LONG}}); // Long
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::REAL}}); // Float - 5
-    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::REAL}}); // Double - 6
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::FLOAT}}); // Float
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::DOUBLE}}); // Double
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::__LDOUBLE}}); // Long doube
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{4, PrimitiveType::CHARACTER}}); // Char - 7
-    add_type(type{TypeType::PRIMITIVE, type_primitive{8, PrimitiveType::STRING}}); // String - 8
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::CHAR}}); // Char
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::STRING}}); // String
     
-    add_type(type{TypeType::PRIMITIVE, type_primitive{1, PrimitiveType::BOOLEAN}}); // Bool - 9
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::BOOL}}); // Bool
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::SIG}}); // Sig
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::FUN}}); // Fun
+    add_type(type{TypeType::PRIMITIVE, type_primitive{PrimitiveType::LET}}); // Let
 }
 
-u64 type_table::add_type(type t) {
+uid type_table::add_type(type t) {
     types.push_back(t);
     return types.size() - 1;
 }

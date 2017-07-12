@@ -4,11 +4,12 @@
 #include <variant>
 #include <vector>
 
-#include "trie.h"
 #include "convenience.h"
+#include "trie.h"
+#include "type.h"
 
 enum class SymbolTableEntryType {
-    TYPE, VARIABLE, FUNCTION, ALIAS
+    TYPE, VARIABLE, FUNCTION
 };
 
 namespace TypeFlag {
@@ -18,25 +19,22 @@ namespace TypeFlag {
 };
 
 struct st_entry_type {
-    u64 id;
+    uid id;
+    bool defined;
 };
 struct st_entry_variable {
-    u8 bitsize = 0;
-    u8 flags;
-    u64 id;
-    //u64 location;
+    uid id;
+    value data;
+    vflags flags;
+    bool defined;
 };
 
 struct st_entry_function {
-    std::vector<u64> overloads;
+    std::vector<overload> overloads;
 };
 
-struct st_entry_alias {
-    SymbolTableEntryType type;
-    u64 id;
-};
 
-using st_entry_union = std::variant<st_entry_type, st_entry_variable, st_entry_function, st_entry_alias>;
+using st_entry_union = std::variant<st_entry_type, st_entry_variable, st_entry_function>;
 
 struct st_entry {
     st_entry_union entry;
@@ -52,9 +50,8 @@ public:
     symbol_table(std::weak_ptr<symbol_table>&& parent);
     
     bool has(std::string& value) const noexcept;
-    st_entry& search(std::string& value) const;
-    st_entry& search(std::string&& value) const;
+    st_entry* search(std::string& value) const;
 private:
     std::weak_ptr<symbol_table> parent;
-    trie<st_entry> values;
+    trie<st_entry*> values;
 };
