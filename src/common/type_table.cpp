@@ -26,3 +26,11 @@ uid type_table::add_type(type t) {
     types.push_back(t);
     return types.size() - 1;
 }
+
+type& type_table::get_type(uid id) {
+    return types[id];
+}
+
+type& type_table::operator[](uid id) {
+    return get_type(id);
+}

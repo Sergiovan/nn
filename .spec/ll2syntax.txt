@@ -273,7 +273,9 @@ declstmt = ( vardecl, {vardeclend, vardecl}, stmtend | funcdecl | structdecl | u
 
 declstructstmt = ( vardeclstruct, {vardeclend, vardeclstruct}, stmtend | funcdecl | structdecl | uniondecl | enumdecl )
 
-vardecl = [varclass], (type | tlet), iden, {comma, [[varclass], type], iden}, [assop, aexpression, {comma, aexpression}]
+vardeclperiod = [varclass], (type | tlet), iden, {comma, [[varclass], type], iden}
+
+vardecl = vardeclperiod, [assop, aexpression, {comma, aexpression}]
 
 vardeclstruct = [varclass], (type | tlet), iden, [optthen, number], {comma, [[varclass], type], iden, [optthen, number]}, [assop, aexpression, {comma, aexpression}]
 
@@ -293,7 +295,7 @@ enumscope = obrace, [iden, {comma, iden}, [comma]], cbrace
 
 
 assstmt = assignment, stmtend
-assignment = iden, {comma, iden}, assop, aexpression, {comma, aexpression}
+assignment = expression, {comma, expression}, assop, aexpression, {comma, aexpression}
 
 expressionstmt = expression, stmtend
 expression = e17
@@ -348,9 +350,12 @@ e2' = (opspread)
 e1    = ee, {e1'}
 e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden), {opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}, ee
 
-ee 	  = "(", (expression | functionval), ")" | literal | iden
+ee 	  = "(", (expression | funcval), ")" | literal | iden
 
 argument = aexpression | iden, "=", aexpression
 fexpression = expression | vardecl | assignment
 mexpression = expression | assignment
 aexpression = (expression | snothing | funcval)
+
+(* Written in holy shit what *)
+forcond = 

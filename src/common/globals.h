@@ -16,9 +16,13 @@ class globals {
 public:
     globals();
     
+    void init();
+    
     symbol_table& get_symbol_table();
+    void set_symbol_table(symbol_table* st);
+    void set_symbol_table(symbol_table& st);
     type_table& get_type_table();
 private:
-    symbol_table st;
+    symbol_table* st;
     type_table tt;
 };

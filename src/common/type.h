@@ -54,26 +54,26 @@ enum class PrimitiveType : u8 {
 };
 
 namespace TypeID {
-  constexpr uid VOID = 0;
-  
-  constexpr uid BYTE = 1;
-  constexpr uid SHORT = 2;
-  constexpr uid INT = 3;
-  constexpr uid LONG = 4;
-  
-  constexpr uid FLOAT = 5;
-  constexpr uid DOUBLE = 6;
-  constexpr uid __LDOUBLE = 7;
-  
-  constexpr uid CHAR = 8;
-  constexpr uid STRING = 9;
-  
-  constexpr uid BOOL = 10;
-  
-  constexpr uid SIG = 11;
-  
-  constexpr uid FUN = 12;
-  constexpr uid LET = 13;
+    constexpr uid VOID = 0;
+    
+    constexpr uid BYTE = 1;
+    constexpr uid SHORT = 2;
+    constexpr uid INT = 3;
+    constexpr uid LONG = 4;
+    
+    constexpr uid FLOAT = 5;
+    constexpr uid DOUBLE = 6;
+    constexpr uid __LDOUBLE = 7;
+    
+    constexpr uid CHAR = 8;
+    constexpr uid STRING = 9;
+    
+    constexpr uid BOOL = 10;
+    
+    constexpr uid SIG = 11;
+    
+    constexpr uid FUN = 12;
+    constexpr uid LET = 13;
 }
 
 enum class PointerType {
@@ -120,4 +120,12 @@ using types_union = std::variant
 struct type {
     TypeType type;
     types_union data;
+    
+    type_ptr& get_ptr();
+    type_func& get_func();
+    type_struct& get_struct();
+    type_union& get_union();
+    type_enum& get_enum();
+    type_array& get_array();
+    type_primitive& get_primitive();
 };

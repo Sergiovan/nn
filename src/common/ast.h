@@ -12,7 +12,7 @@ struct ast;
 enum class NodeType : u8 {
     NONE, SYMBOL,
     BYTE, WORD, DWORD, QWORD,
-    STRING, ARRAY,
+    STRING, ARRAY, STRUCT,
     PRE_UNARY, POST_UNARY, BINARY,
     BLOCK, FUNCTION
 };
@@ -21,6 +21,7 @@ struct ast_node_none {};
 
 struct ast_node_symbol {
     st_entry* symbol;
+    std::string name;
 };
 
 struct ast_node_byte {
@@ -54,15 +55,22 @@ struct ast_node_array {
     ast** elements;
     u64 length;
     uid type;
-    uid etype;
     
     ~ast_node_array();
+};
+
+struct ast_node_struct {
+    ast** elements;
+    uid type;
+    
+    ~ast_node_struct();
 };
 
 struct ast_node_unary {
     Grammar::Symbol op;
     ast* node;
     uid type;
+    bool assignable = false;
     
     ~ast_node_unary();
     void clean();
@@ -73,6 +81,7 @@ struct ast_node_binary {
     ast* left;
     ast* right;
     uid type;
+    bool assignable = false;
     
     ~ast_node_binary();
     void clean();
@@ -80,6 +89,7 @@ struct ast_node_binary {
 
 struct ast_node_block {
     std::vector<ast*> stmts;
+    symbol_table* st = nullptr;
 };
 
 struct ast_node_function {
@@ -92,7 +102,7 @@ using ast_node = std::variant
         ast_node_byte, ast_node_word, ast_node_dword, ast_node_qword,
         ast_node_string, ast_node_array,
         ast_node_unary, ast_node_binary,
-        ast_node_block, ast_node_function>;
+        ast_node_block, ast_node_function, ast_node_struct>;
 
 struct ast {
     NodeType type;
@@ -110,6 +120,7 @@ struct ast {
     ast(ast_node_binary node);
     ast(ast_node_block node);
     ast(ast_node_function node);
+    ast(ast_node_struct node);
     
     ast_node_none& get_none();
     ast_node_symbol& get_symbol();
@@ -123,6 +134,7 @@ struct ast {
     ast_node_binary& get_binary();
     ast_node_block& get_block();
     ast_node_function& get_function();
+    ast_node_struct& get_struct();
     
     uid get_type();
 };

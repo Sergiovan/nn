@@ -9,6 +9,10 @@ ast_node_array::~ast_node_array() {
     delete elements;
 }
 
+ast_node_struct::~ast_node_struct() {
+    delete elements;
+}
+
 ast_node_unary::~ast_node_unary() {
     delete node;
 }
@@ -75,6 +79,8 @@ ast::ast(ast_node_function node) : type(NodeType::FUNCTION), node(new ast_node(n
 
 }
 
+ast::ast(ast_node_struct node) : type(NodeType::STRUCT), node(new ast_node(node)) { }
+
 ast_node_none& ast::get_none() {
     return std::get<0>(*node);
 }
@@ -121,6 +127,10 @@ ast_node_block& ast::get_block() {
 
 ast_node_function& ast::get_function() {
     return std::get<11>(*node);
+}
+
+ast_node_struct& ast::get_struct() {
+    return std::get<12>(*node);
 }
 
 uid ast::get_type() {

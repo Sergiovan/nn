@@ -13,6 +13,9 @@ public:
     type_table();
     
     uid add_type(type t);
+    type& get_type(uid id);
+    
+    type& operator[](uid id);
 private:
     std::vector<type> types{};
 };

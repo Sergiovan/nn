@@ -61,7 +61,7 @@ enum class Symbol : char {
 
     INCREMENT, DECREMENT,
 
-    ADD, SUBSTRACT, /*MULTIPLY,*/ POWER,
+    ADD, SUBTRACT, /*MULTIPLY,*/ POWER,
     DIVIDE, MODULO,
 
     /*ADDRESS,*/ DEREFERENCE,
@@ -94,10 +94,15 @@ enum class Symbol : char {
     BIT_CLEAR_ASSIGN, BIT_TOGGLE_ASSIGN,
 
     COMMA, TILDE, SEMICOLON, /*COLON,*/
-    LEFT_PAREN, PAREN_RIGHT,
+    PAREN_LEFT, PAREN_RIGHT,
     BRACE_LEFT, BRACE_RIGHT,
     BRACKET_LEFT, BRACKET_RIGHT,
     /*THAN_LEFT, THAN_RIGHT*/
+    
+    /* NOT SYMBOLS, JUST FOR AST PURPOSES */
+    KWIF, KWELSE, KWFOR, KWWHILE, KWSWITCH,
+    KWRETURN, KWRAISE, KWGOTO, KWLABEL,
+    KWCASE,
     
     SYMBOL_INVALID
 };
@@ -136,7 +141,7 @@ static const trie<Symbol>  string_to_symbol {
     
     {"++", Symbol::INCREMENT}, {"--", Symbol::DECREMENT},
     
-    {"+", Symbol::ADD}, {"-", Symbol::SUBSTRACT},/*{"*", Symbol::MULTIPLY},*/
+    {"+", Symbol::ADD}, {"-", Symbol::SUBTRACT},/*{"*", Symbol::MULTIPLY},*/
     {"**", Symbol::POWER}, {"/", Symbol::DIVIDE}, {"%", Symbol::MODULO},
     
     /*{"*", Symbol::ADDRESS},*/{"@", Symbol::DEREFERENCE},
@@ -165,7 +170,7 @@ static const trie<Symbol>  string_to_symbol {
     {"@&=", Symbol::BIT_CLEAR_ASSIGN}, {"@^=", Symbol::BIT_TOGGLE_ASSIGN},
     
     {",", Symbol::COMMA}, {"~", Symbol::TILDE},{";", Symbol::SEMICOLON},
-    /*{":", Symbol::COLON},*/{"(", Symbol::LEFT_PAREN}, {")", Symbol::PAREN_RIGHT},
+    /*{":", Symbol::COLON},*/{"(", Symbol::PAREN_LEFT}, {")", Symbol::PAREN_RIGHT},
     {"{", Symbol::BRACE_LEFT}, {"}", Symbol::BRACE_RIGHT}, {"[", Symbol::BRACKET_LEFT},
     {"]", Symbol::BRACKET_RIGHT},/*{"<", Symbol::THAN_LEFT},*//*{">", Symbol::THAN_RIGHT},*/
 };

@@ -9,6 +9,11 @@ class parser_exception : std::exception {
     // TODO Stuff, of course
 };
 
+/* For things that should not be possible */
+class parser_error : std::exception {
+
+};
+
 /* CONVENTION: Each parsing function expects to start on its first token, and 
    should end after its last token, unless exceptions occur */
 class parser {
@@ -32,6 +37,9 @@ public:
     void require(Grammar::TokenType type);
     void require(Grammar::Keyword keyword);
     void require(Grammar::Symbol symbol);
+    
+    inline symbol_table& st() { return g.get_symbol_table(); };
+    inline type_table& tt() { return g.get_type_table(); };
     
     ast* iden();
     ast* compileriden();
@@ -92,7 +100,8 @@ public:
     
     ast* declstructstmt();
     
-    ast* varstmt();
+    ast* vardeclperiod();
+    ast* vardecl();
     
     ast* vardeclstruct();
     
@@ -111,7 +120,7 @@ public:
     ast* enumscope();
     
     ast* assstmt();
-    ast* assignment();
+    ast* assignment(ast* assignee = nullptr);
     
     ast* expressionstmt();
     ast* expression();
@@ -173,7 +182,35 @@ public:
     ast* mexpression();
     ast* aexpression();
 private:
+    
+    bool is_type();
+    bool is_varclass();
+    bool is_literal();
+    bool is_expression();
+    bool is_fexpression();
+    
+    bool boolean(uid type);
+    
     tokenizer* t;
     globals& g;
     token c, n;
+    uid context = 0; // What we are expecting
+    
+    struct symbol_guard {
+        symbol_guard(globals& g);
+        ~symbol_guard();
+        
+        symbol_table* nst;
+        symbol_table* ost;
+        
+        globals& g;
+    };
+    
+    struct context_guard {
+        context_guard(uid& context);
+        ~context_guard();
+        
+        uid& context;
+        uid pcontext;
+    };
 };

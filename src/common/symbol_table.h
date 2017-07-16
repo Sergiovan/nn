@@ -9,7 +9,7 @@
 #include "type.h"
 
 enum class SymbolTableEntryType {
-    TYPE, VARIABLE, FUNCTION
+    TYPE, VARIABLE, FUNCTION // Maybe namespaces as well?
 };
 
 namespace TypeFlag {
@@ -31,6 +31,8 @@ struct st_entry_variable {
 
 struct st_entry_function {
     std::vector<overload> overloads;
+    
+    st_entry_function(overload o);
 };
 
 
@@ -41,6 +43,7 @@ struct st_entry {
     SymbolTableEntryType type;
     
     st_entry();
+    st_entry(st_entry_union value, SymbolTableEntryType type);
     
     uid get_type();
 };
@@ -49,12 +52,16 @@ class symbol_table {
 public:
     symbol_table();
     symbol_table(std::nullptr_t);
-    symbol_table(std::weak_ptr<symbol_table>&& parent);
+    symbol_table(symbol_table* parent);
     
-    bool has(std::string& value) const noexcept;
-    st_entry* search(std::string& value) const;
-    st_entry* search(std::string&& value) const;
+    bool has(std::string& name) const noexcept;
+    st_entry* search(std::string& name) const;
+    st_entry* search(std::string&& name) const;
+    
+    st_entry* add_type(std::string& name, uid id, bool defined = true);
+    st_entry* add_variable(std::string& name, uid type, value data = {nullptr}, vflags flags = 0, bool defined = false);
+    st_entry* add_function(std::string& name, overload o);
 private:
-    std::weak_ptr<symbol_table> parent;
+    symbol_table* parent;
     trie<st_entry*> values;
 };
