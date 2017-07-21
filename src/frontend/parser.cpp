@@ -8,6 +8,34 @@
 using namespace Grammar;
 
 
+parser_exception::parser_exception() : message("Something went so wrong an error was not even "
+"properly implemented for it") {
+
+}
+
+parser_exception::parser_exception(tokenizer& t, std::string message, int cb, int cf, int max_chars) {
+    std::stringstream ss;
+    ss << "Error at " << t.get_line_context() << " -> " << message;
+    ss << "\n" << t.get_line(cb, cf, max_chars);
+    message = ss.str();
+}
+
+const char* parser_exception::what() const noexcept {
+    return message.c_str();
+}
+
+parser_error::parser_error() : message("This should never ever happen") {
+
+}
+
+parser_error::parser_error(std::string str) : message(str) {
+    
+}
+
+const char* parser_error::what() const noexcept {
+    return message.c_str();
+}
+
 parser::parser(globals& g) : t(nullptr), g(g) { }
 
 ast* parser::parse(tokenizer& t) {
@@ -90,7 +118,7 @@ ast* parser::iden() {
 
 ast* parser::compileriden() {
     if(c.value[0] != '$'){
-        throw parser_error();
+        throw parser_error("Compiler iden did not start with $");
     }
     //TODO ??????
     next();
@@ -135,7 +163,7 @@ ast* parser::array() {
                 context = exp->get_type();
             } else {
                 if(context != exp->get_type()) {
-                    throw parser_exception(); // TODO Many many things
+                    throw parser_exception(*t, "Array element was not of expected type", c.value.length()); // TODO name type
                 }
             }
             elems.push_back(exp);
@@ -156,7 +184,7 @@ ast* parser::array() {
         if(arr_type->type == SymbolTableEntryType::TYPE) {
             arr.type = arr_type->get_type();
         } else {
-            throw parser_error(); // TODO This is not possible
+            throw parser_error("Type of array was not a type"); 
         }
     } else {
         uid id = tt().add_type(type{TypeType::ARRAY, type_array{context}});
@@ -207,14 +235,14 @@ ast* parser::struct_lit() {
                 }
     
                 if(!found) {
-                    throw parser_exception();
+                    throw parser_exception(*t, Util::stringify(qm->get_symbol().name, "does not name a field")); // TODO Name struct
                 }
                 
                 values[i] = expression();
                 context = TypeID::LET;
             } else {
                 if(named) {
-                    throw parser_exception(); // TODO
+                    throw parser_exception(*t, "Named struct literals may not have unnamed elements");
                 }
                 values[elem] = qm;
                 context = struc_type.fields[elem + 1 == values.size() ? 0 : elem + 1].type;
@@ -247,7 +275,7 @@ ast* parser::literal() {
     } else if(is(Symbol::BRACKET_LEFT)) {
         return array();
     } else {
-        throw parser_error(); // TODO
+        throw parser_error("literal() called on non-literal");
     }
 }
 
@@ -278,7 +306,7 @@ ast* parser::program() {
         }
     }
     if(broken) {
-        throw parser_error();
+        throw parser_exception(*t, "Top-level statement is not using, namespace or declaration");
     }
 }
 
@@ -322,7 +350,7 @@ ast* parser::statement() {
     } else if(is(Symbol::BRACE_LEFT)) {
         ret = scope();
     } else if(is_literal()) {
-        throw parser_exception(); // TODO Not allowed at the start of a statement, I think
+        throw parser_exception(*t, "Literals not allowed at the start of a statement");
     } else if(is_expression()) {
         ast* exp = expression();
         if(is(Symbol::ASSIGN) || is(Symbol::COMMA)) {
@@ -333,7 +361,7 @@ ast* parser::statement() {
         require(Symbol::SEMICOLON);
         next();
     } else {
-        throw parser_exception(); // TODO Of course todo
+        throw parser_exception(*t, Util::stringify("Unexpected token:", c.value), c.value.length());
     }
     return ret;
 }
@@ -363,7 +391,7 @@ ast* parser::scopestatement() {
     } else if(is(Symbol::BRACE_LEFT)) {
         ret = scope();
     } else if(is_literal()) {
-        throw parser_exception(); // TODO Not allowed at the start of a statement, I think
+        throw parser_exception(*t, "Literals not allowed at the start of a statement");
     } else if(is_expression()) {
         ast* exp = expression();
         if(is(Symbol::ASSIGN) || is(Symbol::COMMA)) {
@@ -374,7 +402,7 @@ ast* parser::scopestatement() {
         require(Symbol::SEMICOLON);
         next();
     } else {
-        throw parser_exception(); // TODO Of course todo
+        throw parser_exception(*t, Util::stringify("Unexpected token:", c.value), c.value.length());
     }
     return ret;
 }
@@ -430,7 +458,7 @@ ast* parser::ifstmt() {
     } while(is(Symbol::SEMICOLON));
     
     if(!boolean(stmts[stmts.size() - 1]->get_type())) {
-        parser_exception(); // TODO
+        parser_exception(*t, "Last statement of if condition does not resolve to a boolean");
     }
     
     if(is(Symbol::BRACE_LEFT)) {
@@ -439,7 +467,7 @@ ast* parser::ifstmt() {
         next();
         ifast->get_binary().right = scopestatement();
     } else {
-        throw parser_exception(); //TODO Oi!
+        throw parser_exception(*t, "Expected '{' or 'do' after if condition"); //TODO Oi!
     }
     return ifast;
 }
@@ -473,7 +501,7 @@ ast* parser::forstmt() {
         next();
         forast->get_binary().right = scopestatement();
     } else {
-        throw parser_exception(); //TODO Oi!
+        throw parser_exception(*t, "Expected '{' or 'do' after for condition");
     }
     
     return forast;
@@ -514,7 +542,7 @@ ast* parser::forcond() {
         }
         case -1: [[fallthrough]];
         default:
-            throw parser_exception(); //TODO
+            throw parser_exception(*t, "Invalid for condition format"); //TODO
     }
 }
 
@@ -535,7 +563,7 @@ ast* parser::whilestmt() {
     } while(is(Symbol::SEMICOLON));
     
     if(!boolean(stmts[stmts.size() - 1]->get_type())) {
-        parser_exception(); // TODO
+        parser_exception(*t, "Last statement in while condition does not resolve to a boolean");
     }
     
     if(is(Symbol::BRACE_LEFT)) {
@@ -544,7 +572,7 @@ ast* parser::whilestmt() {
         next();
         whileast->get_binary().right = scopestatement();
     } else {
-        throw parser_exception(); //TODO Oi!
+        throw parser_exception(*t, "Expected '{' or 'do' after while condition");
     }
     return whileast;
 }
@@ -953,6 +981,7 @@ bool parser::boolean(uid type) {
         case TypeType::ENUM: [[fallthrough]];
         case TypeType::ARRAY: return false;
     }
+    return false;
 }
 
 parser::symbol_guard::symbol_guard(globals& g) : g(g) {

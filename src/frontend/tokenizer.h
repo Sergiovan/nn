@@ -9,6 +9,9 @@ class tokenizer {
 public:
     tokenizer(reader& r);
     
+    std::string get_line(int context_back = -1, int context_forwards = -1, int max_chars = -1);
+    std::string get_line_context();
+    
     token next();
 private:
     inline bool is_a(char c, const std::regex& r) { //TODO Optimize?

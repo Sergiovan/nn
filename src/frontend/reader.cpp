@@ -12,6 +12,7 @@ reader::reader(std::string str, bool is_file) {
         } catch(...) {
             exists = false;
         }
+        filename = std::filesystem::path(str.c_str()).filename().string();
         if(exists) {
             stream = std::ifstream(str, std::ifstream::in | std::ifstream::binary);
             std::ifstream& s = std::get<1>(stream);
@@ -27,6 +28,7 @@ reader::reader(std::string str, bool is_file) {
         }
     } else {
         stream = str;
+        filename = "<user input>";
         type = ReaderType::STRING;
     }
 }
@@ -100,4 +102,50 @@ unsigned long reader::get_column() {
 
 bool reader::has_finished() {
     return finished;
+}
+
+std::string reader::get_file_line(int context_back, int context_forward, int max_chars) {
+    std::string str;
+    if(type == ReaderType::STRING) {
+        str = std::get<0>(stream);
+    } else {
+        auto& fs = std::get<1>(stream);
+        fs.seekg(index - column + 1);
+        std::getline(fs, str);
+        fs.seekg(index);
+    }
+    if(str.length() < max_chars) {
+           return str;
+       } else {
+           int ll = column;
+           int rl = column;
+           ll -= context_back > -1 ? context_back : 0;
+           rl += context_forward > -1 ? context_forward: 0;
+           int total = rl - ll;
+           if(total >= max_chars) {
+               total = max_chars;
+           }
+           int addage = (max_chars - total) / 2;
+           ll -= addage;
+           rl += addage;
+           if(ll < 0) {
+               rl += -ll;
+               ll = 0;
+           } 
+           if(rl >= str.length()) {
+               ll -= rl - (str.length() + 1);
+               rl = str.length() - 1;
+           }
+           return str.substr(ll, rl - ll);
+       }
+}
+
+std::string reader::get_file_name() {
+    return filename;
+}
+
+std::string reader::get_file_position() {
+    std::stringstream ss;
+    ss << filename << ":" << line << ":" << column;
+    return ss.str();
 }

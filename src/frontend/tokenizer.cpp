@@ -5,6 +5,14 @@
 
 tokenizer::tokenizer(reader& r) : r(r) {}
 
+std::string tokenizer::get_line(int context_back, int context_forward, int max_chars) {
+    return r.get_file_line(context_back, context_forward, max_chars);
+}
+
+std::string tokenizer::get_line_context() {
+    return r.get_file_position();
+}
+
 token tokenizer::next() {
     using namespace Grammar;
     

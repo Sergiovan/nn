@@ -6,12 +6,22 @@
 #include "common/grammar.h"
 
 class parser_exception : std::exception {
-    // TODO Stuff, of course
+public:
+    parser_exception();
+    parser_exception(tokenizer& t, std::string message, int cb = -1, int cf = -1, int max_chars = 80);
+    
+    virtual const char * what() const noexcept;
+    std::string message;
 };
 
 /* For things that should not be possible */
 class parser_error : std::exception {
-
+public:
+    parser_error();
+    parser_error(std::string str);
+    
+    virtual const char * what() const noexcept;
+    std::string message;
 };
 
 /* CONVENTION: Each parsing function expects to start on its first token, and 
