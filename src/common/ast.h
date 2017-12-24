@@ -26,22 +26,22 @@ struct ast_node_symbol {
 
 struct ast_node_byte {
     u8 data;
-    uid type;
+    ptype type;
 };
 
 struct ast_node_word {
     u16 data;
-    uid type;
+    ptype type;
 };
 
 struct ast_node_dword {
     u32 data;
-    uid type;
+    ptype type;
 };
 
 struct ast_node_qword {
     u64 data;
-    uid type;
+    ptype type;
 };
 
 struct ast_node_string {
@@ -54,14 +54,14 @@ struct ast_node_string {
 struct ast_node_array {
     ast** elements;
     u64 length;
-    uid type;
+    ptype type;
     
     ~ast_node_array();
 };
 
 struct ast_node_struct {
     ast** elements;
-    uid type;
+    ptype type;
     
     ~ast_node_struct();
 };
@@ -69,7 +69,7 @@ struct ast_node_struct {
 struct ast_node_unary {
     Grammar::Symbol op;
     ast* node;
-    uid type;
+    ptype type;
     bool assignable = false;
     
     ~ast_node_unary();
@@ -80,7 +80,7 @@ struct ast_node_binary {
     Grammar::Symbol op;
     ast* left;
     ast* right;
-    uid type;
+    ptype type;
     bool assignable = false;
     
     ~ast_node_binary();
@@ -93,7 +93,7 @@ struct ast_node_block {
 };
 
 struct ast_node_function {
-    uid type;
+    ptype type;
     ast* block;
 };
 
@@ -135,6 +135,6 @@ struct ast {
     ast_node_block& get_block();
     ast_node_function& get_function();
     ast_node_struct& get_struct();
-    
-    uid get_type();
+
+    ptype get_type();
 };

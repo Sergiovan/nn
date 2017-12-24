@@ -1,0 +1,47 @@
+symbol table:
+ name -> symbol
+symbol:
+ * type: type
+ * variable: type + data
+ * function: overload[]
+ * namespace: symbol table
+type: 
+ * primitive: some number
+ * pointer: pointer type + type
+ * struct: name? + sfield[] <-> trie<int>
+ * union: name? + field[] <-> trie<int>
+ * enum: name? + trie<int>
+ * funct: name? + type[] + parameter[]
+overload -> type + data
+primitive: 
+ * void
+ * byte
+ * short
+ * int
+ * long
+ * float
+ * double
+ * long double
+ * char
+ * string
+ * bool
+ * sig
+ * fun
+ * let
+pointer type:
+ * naked
+ * unique
+ * shared
+ * weak
+field:
+ * type
+ * data?
+sfield:
+ * type
+ * data?
+ * bitfield?
+parameter:
+ * type
+ * name?
+ * data?
+ * variable length?

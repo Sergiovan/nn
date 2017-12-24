@@ -12,7 +12,7 @@ reader::reader(std::string str, bool is_file) {
         } catch(...) {
             exists = false;
         }
-        filename = std::filesystem::path(str.c_str()).filename().string();
+        filename = fs::path(str.c_str()).filename().string();
         if(exists) {
             stream = std::ifstream(str, std::ifstream::in | std::ifstream::binary);
             std::ifstream& s = std::get<1>(stream);
@@ -114,7 +114,7 @@ std::string reader::get_file_line(int context_back, int context_forward, int max
         std::getline(fs, str);
         fs.seekg(index);
     }
-    if(str.length() < max_chars) {
+    if(str.length() < (unsigned) max_chars) {
            return str;
        } else {
            int ll = column;
@@ -132,7 +132,7 @@ std::string reader::get_file_line(int context_back, int context_forward, int max
                rl += -ll;
                ll = 0;
            } 
-           if(rl >= str.length()) {
+           if((unsigned) rl >= str.length()) {
                ll -= rl - (str.length() + 1);
                rl = str.length() - 1;
            }

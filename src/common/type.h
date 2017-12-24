@@ -6,46 +6,42 @@
 #include <utility>
 
 #include "value.h"
-#include "trie.h"
+#include "convenience.h"
 
 struct ast_node_function;
 
+struct ptype {
+    uid type{0};
+    vflags flags{0};
+};
+
 struct field {
-    uid type;
-    std::string name;
-    value data;
-    vflags flags;
-    bool has_value = false, is_bitfield = false;
+    ptype type;
 };
 
-struct ufield {
-    uid type;
-    std::string name;
-    vflags flags;
-};
-
-struct ffield {
-    uid type;
-    std::string name;
-    value data;
-    vflags flags;
-    bool has_name = true, has_value = false;
-};
-
-struct nnreturn {
-    uid type;
-    vflags flags;
+struct sfield {
+    ptype type;
+    value data{nullptr}; // TODO It's a pointer
+    u8 bits{64};
+    bool is_bitfield = false;
 };
 
 struct overload {
-    uid type;
-    bool defined;
-    ast_node_function* function;
+    ptype type;
+    ast_node_function* function{nullptr};
+    bool generic{false};
+};
+
+struct parameter {
+    ptype type;
+    std::string name{""};
+    value data = nullptr; // TODO It's a pointer
+    bool var_length = false;
 };
 
 enum class TypeType : u8 {
-    POINTER, FUNCTION, STRUCT, UNION,
-    ENUM, ARRAY, PRIMITIVE
+    PRIMITIVE, POINTER, STRUCT,
+    UNION, ENUM, FUNCTION
 };
 
 enum class PrimitiveType : u8 {
@@ -80,42 +76,41 @@ enum class PointerType {
     NAKED, SHARED, WEAK, UNIQUE
 };
 
-struct type_ptr {
-    PointerType type{PointerType::NAKED};
-    uid at{0};
-    vflags flags; // Flags of what is being pointed at
+struct type_primitive {
+    PrimitiveType type{PrimitiveType::VOID};
 };
 
-struct type_func {
-    std::vector<nnreturn> returns{};
-    std::vector<ffield> args{};
+struct type_ptr {
+    PointerType type{PointerType::NAKED};
+    vflags flags{0};
+    ptype at;
 };
 
 struct type_struct {
-    std::vector<field> fields;
+    std::vector<sfield> fields;
+    trie<u64> field_names;
+    std::string name{""};
 };
 
 struct type_union {
-    std::vector<ufield> fields;
+    std::vector<field> fields;
+    trie<u64> field_names;
+    std::string name{""};
 };
 
 struct type_enum {
-    trie<u16>* enum_names = nullptr;
-    
-    type_enum();
-    ~type_enum();
+    trie<u64> enum_names;
+    std::string name{""};
 };
 
-struct type_array {
-    uid of{0};
-};
-
-struct type_primitive {
-    PrimitiveType type;
+struct type_func {
+    std::vector<ptype> returns{};
+    std::vector<parameter> args{};
+    std::string name{""};
 };
 
 using types_union = std::variant
-    <type_ptr, type_func, type_struct, type_union, type_enum, type_array, type_primitive>;
+    <type_primitive, type_ptr, type_struct, type_union, type_enum, type_func>;
 
 struct type {
     TypeType type;
@@ -126,6 +121,5 @@ struct type {
     type_struct& get_struct();
     type_union& get_union();
     type_enum& get_enum();
-    type_array& get_array();
     type_primitive& get_primitive();
 };

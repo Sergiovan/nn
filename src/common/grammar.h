@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 
-#include "trie.h"
+#include "convenience.h"
 
 namespace Grammar {
 
@@ -100,7 +100,8 @@ enum class Symbol : char {
     /*THAN_LEFT, THAN_RIGHT*/
     
     /* NOT SYMBOLS, JUST FOR AST PURPOSES */
-    KWIF, KWELSE, KWFOR, KWWHILE, KWSWITCH,
+    KWIF, KWELSE, KWFOR, KWFORCLASSIC, KWFOREACH, KWFORLUA,
+    KWWHILE, KWSWITCH,
     KWRETURN, KWRAISE, KWGOTO, KWLABEL,
     KWCASE,
     

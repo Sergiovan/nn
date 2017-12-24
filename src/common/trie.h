@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef false
+
 #include <cstring>
 #include <string>
 #include <map>
@@ -89,3 +91,9 @@ private:
     trie<C>* nodes[255];
     std::optional<C> value;
 };
+
+#else
+
+#include "convenience.h"
+
+#endif

@@ -1,6 +1,8 @@
 #pragma once
 
-#ifndef __WIN32__
+#include "os.h"
+
+#ifdef __WIN32__
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0500
 #endif

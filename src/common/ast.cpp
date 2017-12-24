@@ -133,19 +133,22 @@ ast_node_struct& ast::get_struct() {
     return std::get<12>(*node);
 }
 
-uid ast::get_type() {
+ptype ast::get_type() {
     switch(type) {
         case NodeType::NONE: [[fallthrough]];
-        case NodeType::BLOCK: return 0;
-        case NodeType::SYMBOL: return get_symbol().symbol->get_type();
+        case NodeType::BLOCK: return {0};
+        case NodeType::SYMBOL: return {get_symbol().symbol->get_type()};
         case NodeType::BYTE: return get_byte().type;
         case NodeType::WORD: return get_word().type;
         case NodeType::DWORD: return get_dword().type;
         case NodeType::QWORD: return get_qword().type;
-        case NodeType::STRING: return TypeID::STRING;
+        case NodeType::STRING: return {TypeID::STRING, 0};
         case NodeType::ARRAY: return get_array().type;
+        case NodeType::STRUCT: return get_struct().type;
         case NodeType::PRE_UNARY: [[fallthrough]];
         case NodeType::POST_UNARY: return get_unary().type;
+        case NodeType::BINARY: return get_binary().type;
         case NodeType::FUNCTION: return get_function().type;
     }
+    return {0};
 }

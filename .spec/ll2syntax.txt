@@ -275,7 +275,8 @@ declstructstmt = ( vardeclstruct, {vardeclend, vardeclstruct}, stmtend | funcdec
 
 vardeclperiod = [varclass], (type | tlet), iden, {comma, [[varclass], type], iden}
 
-vardecl = vardeclperiod, [assop, aexpression, {comma, aexpression}]
+vardecl = vardeclperiod, [vardeclass]
+vardeclass = assop, aexpression, {comma, aexpression}
 
 vardeclstruct = [varclass], (type | tlet), iden, [optthen, number], {comma, [[varclass], type], iden, [optthen, number]}, [assop, aexpression, {comma, aexpression}]
 
@@ -356,6 +357,3 @@ argument = aexpression | iden, "=", aexpression
 fexpression = expression | vardecl | assignment
 mexpression = expression | assignment
 aexpression = (expression | snothing | funcval)
-
-(* Written in holy shit what *)
-forcond = 

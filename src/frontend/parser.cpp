@@ -1,22 +1,25 @@
-#include "parser.h"
-#include "common/type_table.h"
-#include "common/convenience.h"
+//
+// Created by sergi on 24-Dec-17.
+//
 
-#include <vector>
+#include <common/ast.h>
+#include <common/logger.h>
 #include <common/util.h>
+#include "parser.h"
+
+#define CTX_GUARD context_guard ctxg{*this};
 
 using namespace Grammar;
 
-
 parser_exception::parser_exception() : message("Something went so wrong an error was not even "
-"properly implemented for it") {
+                                                       "properly implemented for it") {
 
 }
 
-parser_exception::parser_exception(tokenizer& t, std::string message, int cb, int cf, int max_chars) {
+parser_exception::parser_exception(tokenizer* t, std::string message, int cb, int cf, int max_chars) {
     std::stringstream ss;
-    ss << "Error at " << t.get_line_context() << " -> " << message;
-    ss << "\n" << t.get_line(cb, cf, max_chars);
+    ss << "Error at " << t->get_line_context() << " -> " << message;
+    ss << "\n" << t->get_line(cb, cf, max_chars);
     message = ss.str();
 }
 
@@ -29,237 +32,208 @@ parser_error::parser_error() : message("This should never ever happen") {
 }
 
 parser_error::parser_error(std::string str) : message(str) {
-    
+
 }
 
 const char* parser_error::what() const noexcept {
     return message.c_str();
 }
 
-parser::parser(globals& g) : t(nullptr), g(g) { }
+context_guard::context_guard(parser& p) : p(p) {}
+context_guard::~context_guard() {
+    p.pop_ctx();
+}
+
+parser::parser(globals& g) : g(g), cx() {}
 
 ast* parser::parse(tokenizer& t) {
     parser::t = &t;
-    c = t.next();
-    n = t.next();
-    
+
     g.init();
+    cx.push({g.get_symbol_table(), 0});
+    next();
+
+    //TODO
 }
 
 token parser::next() noexcept {
-    token r = c;
-    c = n;
-    n = t->next();
-    return r;
+    token tmp = c;
+    c = t->next();
+    return tmp;
 }
 
-bool parser::test(TokenType type, int lookahead) noexcept {
-    return (lookahead ? n : c).tokenType == type; // I am a monster
+bool parser::is(TokenType type) noexcept {
+    return c.tokenType == type;
 }
 
-bool parser::test(Keyword keyword, int lookahead) noexcept {
-    token& t = lookahead ? n : c;
-    return t.tokenType == TokenType::KEYWORD && t.to_keyword() == keyword;
+bool parser::is(Keyword keyword) noexcept {
+    return c.tokenType == TokenType::KEYWORD && c.to_keyword() == keyword;
 }
 
-bool parser::test(Symbol symbol, int lookahead) noexcept {
-    token& t = lookahead ? n : c;
-    return t.tokenType == TokenType::SYMBOL && t.to_symbol() == symbol;
+bool parser::is(Grammar::Symbol symbol) noexcept {
+    return c.tokenType == TokenType::SYMBOL && c.to_symbol() == symbol;
 }
 
-bool parser::is(TokenType type) {
-    return test(type, 0);
+bool parser::peek(TokenType type, u32 lookahead) noexcept {
+    return t->peek(lookahead).tokenType == type;
 }
 
-bool parser::is(Keyword keyword) {
-    return test(keyword, 0);
+bool parser::peek(Keyword keyword, u32 lookahead) noexcept {
+    token tok = t->peek(lookahead);
+    return tok.tokenType == TokenType::KEYWORD && tok.to_keyword() == keyword;
 }
 
-bool parser::is(Symbol symbol) {
-    return test(symbol, 0);
+bool parser::peek(Symbol symbol, u32 lookahead) noexcept {
+    token tok = t->peek(lookahead);
+    return tok.tokenType == TokenType::SYMBOL && tok.to_symbol() == symbol;
 }
 
-bool parser::peek(TokenType type) {
-    return test(type, 1);
-}
-
-bool parser::peek(Keyword keyword) {
-    return test(keyword, 1);
-}
-
-bool parser::peek(Symbol symbol) {
-    return test(symbol, 1);
-}
-
-void parser::require(TokenType type) {
+void parser::require(TokenType type, std::string message) {
     if(!is(type)) {
-        throw parser_exception{};
+        throw parser_exception(t, message);
     }
 }
 
-void parser::require(Keyword keyword) {
+void parser::require(Keyword keyword, std::string message) {
     if(!is(keyword)) {
-        throw parser_exception{};
+        throw parser_exception(t, message);
     }
 }
 
-void parser::require(Symbol symbol) {
+void parser::require(Symbol symbol, std::string message) {
     if(!is(symbol)) {
-        throw parser_exception{};
+        throw parser_exception(t, message);
     }
 }
 
-// Actual parser stuff
+context& parser::pop_ctx() {
+    auto& top = cx.top();
+    cx.pop();
+    return top;
+}
+
+void parser::push_ctx(ptype type, symbol_table *st) {
+    if(!st) {
+        st = cx.top().st;
+    }
+    cx.push({st, type});
+}
 
 ast* parser::iden() {
-    require(TokenType::IDENTIFIER);
-    return new ast{ast_node_symbol{g.get_symbol_table().search(next().value)}};
+    require(TokenType::IDENTIFIER, "Expected identifier");
+    return new ast{ast_node_symbol{st().search(next().value)}};
 }
 
 ast* parser::compileriden() {
-    if(c.value[0] != '$'){
-        throw parser_error("Compiler iden did not start with $");
-    }
-    //TODO ??????
-    next();
-    return nullptr;
+    return nullptr; // TODO everything
 }
 
 ast* parser::number() {
-    require(TokenType::NUMBER);
-    return new ast{ast_node_qword{next().to_long(), TypeID::LONG}};
+    require(TokenType::NUMBER, "Expected number");
+    return new ast{ast_node_qword{next().to_long(), TypeID::LONG}}; //TODO fit to number
 }
 
 ast* parser::string() {
-    require(TokenType::STRING);
+    require(TokenType::STRING, "Expected string");
     auto len = c.value.length();
     u8* str = new u8[len];
     std::memcpy(str, &next().value[0], len);
-    return new ast(ast_node_string{str, len});
+    return new ast{ast_node_string{str, len}}; // TODO real unicode length
 }
 
 ast* parser::character() {
-    require(TokenType::CHARACTER);
+    require(TokenType::CHARACTER, "Expected character");
     auto len = c.value.length();
     u32 ch = 0;
     std::memcpy(&ch, &next().value[0], len);
-    return new ast(ast_node_dword{ch});
+    return new ast(ast_node_dword{ch}); // TODO Check unicode in tokenizer?
 }
 
 ast* parser::array() {
-    require(Symbol::BRACKET_LEFT); // [
+    require(Symbol::BRACKET_LEFT, "Expected [ to start array"); // [
     ast* ret = new ast{ast_node_array{nullptr, 0, 0}};
+
     std::vector<ast*> elems;
-    context_guard cg{context};
-    
-    context = tt()[context].get_array().of; //TODO Throws
+    push_ctx(tt()[etype().type].get_ptr().at); // TODO can throw
+    CTX_GUARD;
     do {
-        next(); // [ , 
-        if(is(Symbol::BRACKET_RIGHT)) { // ]
+        next(); // [ ,
+        if(is(Symbol::BRACE_RIGHT)) { // ]
             break;
         } else {
             ast* exp = expression();
-            if(context == TypeID::LET) {
-                context = exp->get_type();
-            } else {
-                if(context != exp->get_type()) {
-                    throw parser_exception(*t, "Array element was not of expected type", c.value.length()); // TODO name type
-                }
+            if(etype().type == TypeID::LET) {
+                etype() = exp->get_type();
+            } else if (etype().type != exp->get_type().type) {  // TODO Type comparison
+                throw parser_exception(t, "Array element was not of expected type", c.value.length());
             }
             elems.push_back(exp);
         }
-    } while (is(Symbol::COMMA));
-    require(Symbol::BRACKET_RIGHT);
+    } while(is(Symbol::COMMA)); // ,
+    require(Symbol::BRACE_RIGHT, "Expected ] to end array");
     next();
-    
+
     auto& arr = ret->get_array();
     arr.length = elems.size();
     arr.elements = new ast*[arr.length];
     std::memcpy(arr.elements, &elems[0], arr.length * sizeof(ast*));
-    symbol_table& st = parser::st();
-    std::string arr_type_name = Util::stringify(context, "[]");
-    st_entry* arr_type = st.search(arr_type_name);
-    
-    if(arr_type) {
-        if(arr_type->type == SymbolTableEntryType::TYPE) {
-            arr.type = arr_type->get_type();
-        } else {
-            throw parser_error("Type of array was not a type"); 
-        }
-    } else {
-        uid id = tt().add_type(type{TypeType::ARRAY, type_array{context}});
-        st.add_type(arr_type_name, id, true);
-        arr.type = id;
-    }
+
     return ret;
 }
 
 ast* parser::struct_lit() {
-    require(Symbol::BRACE_LEFT); // {
+    require(Symbol::BRACE_LEFT, "Expected { to start struct"); // {
     ast* ret = new ast{ast_node_struct{}};
     ast_node_struct& struc = ret->get_struct();
-    context_guard cg{context}; // TODO Throws
-    
-    struc.type = context;
-    
-    type_struct& struc_type = tt()[context].get_struct(); // TODO Throws
-    
+    struc.type = etype();
+    push_ctx(); // TODO This struct in symbol table temporarily
+    CTX_GUARD;
+
+    type_struct& struc_type = tt()[struc.type.type].get_struct();
+
     std::vector<ast*> values{struc_type.fields.size()};
-    for(u32 i = 0; i < struc_type.fields.size(); ++i) {
-        if(struc_type.fields[i].has_value) {
+    for(u32 i = 0; i < values.size(); ++i) { // TODO Convenient way to do this
+        if(struc_type.fields[i].data) {
             values[i] = new ast;
-            std::memcpy(values[i], struc_type.fields[i].data.data, sizeof(ast));
+            std::memcpy(values[i], struc_type.fields[i].data, sizeof(ast*));
         }
     }
-    
+
     u32 elem = 0;
     bool named = false;
-    context = TypeID::LET;
-    do { // TODO Missing values
+    etype().type = TypeID::VOID;
+    do {
         next(); // { ,
-        ast* qm = expression();
-        if(named || (elem == 0 && qm->type == NodeType::SYMBOL)) {
-            if(is(Symbol::ASSIGN)) {
-                named = true;
-                next();
-                
-                u32 i = 0;
-                
-                bool found = false;
-                for(; i < struc_type.fields.size(); ++i) {
-                    if(struc_type.fields[i].name == qm->get_symbol().name) {
-                        found = true;
-                        context = struc_type.fields[i].type;
-                        break;
-                    }
-                }
-    
-                if(!found) {
-                    throw parser_exception(*t, Util::stringify(qm->get_symbol().name, "does not name a field")); // TODO Name struct
-                }
-                
-                values[i] = expression();
-                context = TypeID::LET;
+        if(named || peek(Symbol::ASSIGN)) { // =
+            named = true;
+            std::string name = c.value; // Must be the name of a field
+            next(); // Field name
+            require(Symbol::ASSIGN, "Expected = for named assignment"); // =
+            next();
+
+            auto fpos = struc_type.field_names.find(name);
+            if(fpos != struc_type.field_names.end()) { // TODO Can throw
+                u64 pos = fpos->second;
+                etype() = struc_type.fields[pos].type;
+                values[pos] = expression();
+                etype() = {TypeID::LET};
             } else {
-                if(named) {
-                    throw parser_exception(*t, "Named struct literals may not have unnamed elements");
-                }
-                values[elem] = qm;
-                context = struc_type.fields[elem + 1 == values.size() ? 0 : elem + 1].type;
+                throw parser_exception(t, "Name does not name a field"); // TODO
             }
         } else {
-            values[elem] = qm;
-            context = struc_type.fields[elem + 1 == values.size() ? 0 : elem + 1].type;
+            etype() = struc_type.fields[elem].type;
+            values[elem] = expression();
+            etype() = {TypeID::VOID};
         }
-        elem++;
-    } while(is(Symbol::COMMA)); // ,
-    require(Symbol::BRACE_RIGHT);
+        ++elem;
+    } while(is(Symbol::COMMA));
+
+    require(Symbol::BRACE_RIGHT); // }
     next();
-    
-    
+
     struc.elements = new ast*[values.size()];
     std::memcpy(struc.elements, &values[0], values.size() * sizeof(ast*));
-    
+
     return ret;
 }
 
@@ -284,6 +258,7 @@ ast* parser::program() {
     ast* ret = new ast{ast_node_block{}};
     ast_node_block& block = ret->get_block();
     block.st = &st();
+
     while(true) {
         try {
             if(is(Keyword::USING)) {
@@ -291,7 +266,7 @@ ast* parser::program() {
             } else if(is(Keyword::NAMESPACE)) {
                 block.stmts.push_back(namespacestmt());
             } else if(is_type() || is_varclass() || is(Keyword::LET) || is(Keyword::STRUCT) || is(Keyword::UNION) ||
-                      is(Keyword::ENUM)) {
+                                   is(Keyword::ENUM)) {
                 block.stmts.push_back(declstmt());
             } else if(is(Keyword::IMPORT)) {
                 block.stmts.push_back(importstmt());
@@ -299,22 +274,24 @@ ast* parser::program() {
                 break;
             } else {
                 broken = true;
-                break;
+                break; // TODO Don't break, panic instead
             }
         } catch(parser_exception& ex) {
-            // TODO
+            Logger::error(ex.what()); // TODO
         }
     }
     if(broken) {
-        throw parser_exception(*t, "Top-level statement is not using, namespace or declaration");
+        throw parser_exception(t, "Top level statement is not using, namespace or declaration");
     }
+
+    return ret;
 }
 
 ast* parser::statement() {
     if (is(TokenType::COMPILER_IDENTIFIER)) {
         compileriden();
     }
-    
+
     ast* ret;
     if(is(Keyword::IF)) {
         ret = ifstmt();
@@ -349,19 +326,15 @@ ast* parser::statement() {
         ret = declstmt();
     } else if(is(Symbol::BRACE_LEFT)) {
         ret = scope();
-    } else if(is_literal()) {
-        throw parser_exception(*t, "Literals not allowed at the start of a statement");
-    } else if(is_expression()) {
-        ast* exp = expression();
-        if(is(Symbol::ASSIGN) || is(Symbol::COMMA)) {
-            ret = assignment(exp);
+    } else if(is_expression()) { // Can be expression OR assignment
+        t->peek_until(Symbol::SEMICOLON);
+        if(t->search_lookahead(Symbol::ASSIGN) != -1) {
+            ret = assstmt();
         } else {
-            ret = exp;
+            ret = expressionstmt();
         }
-        require(Symbol::SEMICOLON);
-        next();
     } else {
-        throw parser_exception(*t, Util::stringify("Unexpected token:", c.value), c.value.length());
+        throw parser_exception(t, Util::stringify("Unexpected token:", c.value), c.value.length());
     }
     return ret;
 }
@@ -390,25 +363,21 @@ ast* parser::scopestatement() {
         ret = leavestmt();
     } else if(is(Symbol::BRACE_LEFT)) {
         ret = scope();
-    } else if(is_literal()) {
-        throw parser_exception(*t, "Literals not allowed at the start of a statement");
     } else if(is_expression()) {
-        ast* exp = expression();
-        if(is(Symbol::ASSIGN) || is(Symbol::COMMA)) {
-            ret = assignment(exp);
+        t->peek_until(Symbol::SEMICOLON);
+        if(t->search_lookahead(Symbol::ASSIGN) != -1) {
+            ret = assstmt();
         } else {
-            ret = exp;
+            ret = expressionstmt();
         }
-        require(Symbol::SEMICOLON);
-        next();
     } else {
-        throw parser_exception(*t, Util::stringify("Unexpected token:", c.value), c.value.length());
+        throw parser_exception(t, Util::stringify("Unexpected token:", c.value), c.value.length());
     }
     return ret;
 }
 
 ast* parser::compileropts() {
-    require(Symbol::COMPILER);
+    require(Symbol::COMPILER, "Whops"); // TODO
     next();
     require(Symbol::BRACKET_LEFT);
     do {
@@ -419,67 +388,75 @@ ast* parser::compileropts() {
 }
 
 ast* parser::scope() {
-    require(Symbol::BRACE_LEFT);
+    require(Symbol::BRACE_LEFT, "Expected { to start scope"); // {
     ast* ret = new ast{ast_node_block{}};
-    ast_node_block& block = ret->get_block();
-    
-    symbol_guard sg{g};
-    symbol_table* bst = new symbol_table{sg.nst};
-    g.set_symbol_table(bst);
-    block.st = bst;
-    
-    next(); // }
+    auto& block = ret->get_block();
+
+    push_ctx(etype(), new symbol_table{&st()});
+    CTX_GUARD;
+
+    next(); // {
     do {
         try {
             block.stmts.push_back(statement());
         } catch(parser_exception& ex) {
-            // TODO
+            Logger::error(ex.what()); // TODO
         }
-    } while(!is(Symbol::BRACE_RIGHT));
-    next(); // }
-    
+    } while(!is(Symbol::BRACE_RIGHT)); // }
+
+    require(Symbol::BRACE_RIGHT); // }
+    next();
+
     return ret;
 }
 
 ast* parser::ifstmt() {
-    require(Keyword::IF);
+    require(Keyword::IF, "Expected if"); // if
     next();
-    
+
     ast* ifast = new ast{ast_node_binary{Symbol::KWIF, nullptr, nullptr, 0, false}};
     ifast->get_binary().left = new ast{ast_node_block{}};
-    
-    symbol_guard sg{g};
+
+    auto& expected = etype();
+
+    push_ctx({TypeID::LET}, new symbol_table{&st()});
+    CTX_GUARD;
     ast* left_block = ifast->get_binary().left;
-    left_block->get_block().st = sg.nst;
+    left_block->get_block().st = &st();
+
     auto& stmts = left_block->get_block().stmts;
-    
+
     do {
         stmts.push_back(fexpression());
-    } while(is(Symbol::SEMICOLON));
-    
+    } while(is(Symbol::SEMICOLON)); // ;
+
     if(!boolean(stmts[stmts.size() - 1]->get_type())) {
-        parser_exception(*t, "Last statement of if condition does not resolve to a boolean");
+        throw parser_exception(t, "Last statement of if is not a boolean");
     }
-    
-    if(is(Symbol::BRACE_LEFT)) {
+
+    etype() = expected;
+
+    if(is(Symbol::BRACE_LEFT)) { // {
         ifast->get_binary().right = ifscope();
     } else if(is(Keyword::DO)) {
-        next();
+        next(); // do
         ifast->get_binary().right = scopestatement();
     } else {
-        throw parser_exception(*t, "Expected '{' or 'do' after if condition"); //TODO Oi!
+        throw parser_exception(t, "Expected { or do to start if");
     }
+
     return ifast;
 }
 
 ast* parser::ifscope() {
-    require(Symbol::BRACE_LEFT);
+    require(Symbol::BRACE_LEFT, "Expected { to start if scope"); // {
     ast* scopeast = scope();
+
     if(is(Keyword::ELSE)) {
-        next();
+        next(); // else
         ast* elseast = new ast{ast_node_binary{Symbol::KWELSE, nullptr, nullptr, 0, false}};
         ast_node_binary& binary = elseast->get_binary();
-        
+
         binary.left = scopeast;
         binary.right = scopestatement();
         return elseast;
@@ -489,420 +466,74 @@ ast* parser::ifscope() {
 }
 
 ast* parser::forstmt() {
-    require(Keyword::FOR);
+    require(Keyword::FOR, "Expected for");
     next(); // for
-    
-    symbol_guard sg{g};
-    ast* forast = forcond();
-    
+
+    push_ctx(etype(), new symbol_table{&st()});
+    CTX_GUARD;
+    ast* forast = new ast{ast_node_binary{Symbol::KWFOR, nullptr, nullptr, 0, false}};
+    forast->get_binary().left = forcond();
+
     if(is(Symbol::BRACE_LEFT)) {
         forast->get_binary().right = scope();
     } else if(is(Keyword::DO)) {
-        next();
+        next(); // do
         forast->get_binary().right = scopestatement();
     } else {
-        throw parser_exception(*t, "Expected '{' or 'do' after for condition");
+        throw parser_exception(t, "Expected { or do after for condition");
     }
-    
+
     return forast;
 }
 
-// TODO Other 2 forms of for
 ast* parser::forcond() {
     int type = -1;
+
+    ast* forcondast = new ast{ast_node_unary{Symbol::SYMBOL_INVALID, nullptr, 0, false}};
+    forcondast->get_unary().node = new ast{ast_node_block{{}, &st()}};
+    auto& stmts = forcondast->get_unary().node->get_block().stmts;
+    ast* vardeclperiodast = nullptr;
+    ast* vardeclassast = nullptr;
+    ast* assignmentast = nullptr;
+    ast* fexpressionast = nullptr;
+
     if(is(Symbol::SEMICOLON)) {
-        type = 0 ; // ; expression ; expression
-    } else if(is_fexpression()) {
         type = 0;
-    }
-    
-    switch(type) {
-        case 0: {
-            ast* classicast = new ast{ast_node_block{}};
-            auto& block = classicast->get_block();
-            block.st = &st();
-            if(is(Symbol::SEMICOLON)) {
-                block.stmts.push_back(new ast);
-            } else {
-                block.stmts.push_back(fexpression());
-            }
-            next(); // ;
-            if(is(Symbol::SEMICOLON)) {
-                block.stmts.push_back(new ast);
-            } else {
-                block.stmts.push_back(expression());
-            }
-            next(); // ;
+    } else if(is_type() || is(Keyword::LET)) {
+        vardeclperiodast = vardeclperiod();
+        if(is(Symbol::COLON)) {
+            type = 1;
+        } else {
+            vardeclassast = vardeclass();
             if(is(Symbol::BRACE_LEFT) || is(Keyword::DO)) {
-                block.stmts.push_back(new ast);
+                type = 2;
             } else {
-                block.stmts.push_back(mexpression());
+                type = 0;
             }
-            return classicast;
         }
-        case -1: [[fallthrough]];
-        default:
-            throw parser_exception(*t, "Invalid for condition format"); //TODO
-    }
-}
-
-ast* parser::whilestmt() {
-    require(Keyword::WHILE);
-    next();
-    
-    ast* whileast = new ast{ast_node_binary{Symbol::KWWHILE, nullptr, nullptr, 0, false}};
-    whileast->get_binary().left = new ast{ast_node_block{}};
-    
-    symbol_guard sg{g};
-    ast* left_block = whileast->get_binary().left;
-    left_block->get_block().st = sg.nst;
-    auto& stmts = left_block->get_block().stmts;
-    
-    do {
-        stmts.push_back(fexpression());
-    } while(is(Symbol::SEMICOLON));
-    
-    if(!boolean(stmts[stmts.size() - 1]->get_type())) {
-        parser_exception(*t, "Last statement in while condition does not resolve to a boolean");
-    }
-    
-    if(is(Symbol::BRACE_LEFT)) {
-        whileast->get_binary().right = scope();
-    } else if(is(Keyword::DO)) {
-        next();
-        whileast->get_binary().right = scopestatement();
+    } else if(is(TokenType::IDENTIFIER)) {
+        assignmentast = assignment();
+        if(is(Symbol::BRACE_LEFT) || is(Keyword::DO)) {
+            type = 2;
+        } else {
+            type = 0;
+        }
     } else {
-        throw parser_exception(*t, "Expected '{' or 'do' after while condition");
+        type = 0;
+        fexpressionast = fexpression();
     }
-    return whileast;
-}
 
-ast* parser::switchstmt() {
-    require(Keyword::SWITCH);
-    next();
-    
-    ast* switchast = new ast{ast_node_binary{Symbol::KWSWITCH, nullptr, nullptr, 0, false}};
-    switchast->get_binary().left = new ast{ast_node_block{}};
-    
-    symbol_guard sg{g};
-    ast* left_block = switchast->get_binary().left;
-    left_block->get_block().st = sg.nst;
-    auto& stmts = left_block->get_block().stmts;
-    
-    do {
-        stmts.push_back(fexpression());
-    } while(is(Symbol::SEMICOLON));
-    
-    switchast->get_binary().right = switchscope();
-    return switchast;
-    
-}
+    // UNTANGLE
 
-ast* parser::switchscope() {
-    require(Symbol::BRACE_LEFT);
-    next();
-    
-    ast* switchscope = new ast{ast_node_block{}};
-    auto& block = switchscope->get_block();
-    block.st = &st();
-    
-    while(!is(Symbol::BRACE_RIGHT)) {
-        block.stmts.push_back(casestmt());
+    switch(type) {
+        case 0: // We are at the first semicolon
+        case 1: // We are at the colon
+        case 2: // We are... done?
+        default:
+            throw parser_error("Illegal for type");
     }
-    
-    return switchscope;
-}
 
-ast* parser::casestmt() {
-    ast* caseast = new ast{ast_node_binary{Symbol::SYMBOL_INVALID, nullptr, nullptr, 0, false}};
-    auto& binary = caseast->get_binary();
-    
-    if(is(Keyword::ELSE)) {
-        binary.op = Symbol::KWELSE;
-    } else if(is(Keyword::CASE)) {
-        binary.op = Symbol::KWCASE;
-        
-    }
-}
-
-ast* parser::returnstmt() {
-    return nullptr;
-}
-
-ast* parser::raisestmt() {
-    return nullptr;
-}
-
-ast* parser::gotostmt() {
-    return nullptr;
-}
-
-ast* parser::labelstmt() {
-    return nullptr;
-}
-
-ast* parser::deferstmt() {
-    return nullptr;
-}
-
-ast* parser::breakstmt() {
-    return nullptr;
-}
-
-ast* parser::continuestmt() {
-    return nullptr;
-}
-
-ast* parser::leavestmt() {
-    return nullptr;
-}
-
-ast* parser::importstmt() {
-    return nullptr;
-}
-
-ast* parser::usingstmt() {
-    return nullptr;
-}
-
-ast* parser::namespacestmt() {
-    return nullptr;
-}
-
-ast* parser::varclassstmt() {
-    return nullptr;
-}
-
-ast* parser::typeestmt() {
-    return nullptr;
-}
-
-ast* parser::functypestmt() {
-    return nullptr;
-}
-
-ast* parser::declstmt() {
-    return nullptr;
-}
-
-ast* parser::declstructstmt() {
-    return nullptr;
-}
-
-ast* parser::vardeclperiod() {
-    return nullptr;
-}
-
-ast* parser::vardecl() {
-    return nullptr;
-}
-
-ast* parser::vardeclstruct() {
-    return nullptr;
-}
-
-ast* parser::funcdecl() {
-    return nullptr;
-}
-
-ast* parser::parameter() {
-    return nullptr;
-}
-
-ast* parser::funcval() {
-    return nullptr;
-}
-
-ast* parser::structdecl() {
-    return nullptr;
-}
-
-ast* parser::structscope() {
-    return nullptr;
-}
-
-ast* parser::uniondecl() {
-    return nullptr;
-}
-
-ast* parser::unionscope() {
-    return nullptr;
-}
-
-ast* parser::enumdecl() {
-    return nullptr;
-}
-
-ast* parser::enumscope() {
-    return nullptr;
-}
-
-ast* parser::assstmt() {
-    return nullptr;
-}
-
-ast* parser::assignment(ast* assignee) {
-    return nullptr;
-}
-
-ast* parser::expressionstmt() {
-    return nullptr;
-}
-
-ast* parser::expression() {
-    return nullptr;
-}
-
-ast* parser::e17() {
-    return nullptr;
-}
-
-ast* parser::e17p() {
-    return nullptr;
-}
-
-ast* parser::e16() {
-    return nullptr;
-}
-
-ast* parser::e16p() {
-    return nullptr;
-}
-
-ast* parser::e15() {
-    return nullptr;
-}
-
-ast* parser::e15p() {
-    return nullptr;
-}
-
-ast* parser::e14() {
-    return nullptr;
-}
-
-ast* parser::e14p() {
-    return nullptr;
-}
-
-ast* parser::e13() {
-    return nullptr;
-}
-
-ast* parser::e13p() {
-    return nullptr;
-}
-
-ast* parser::e12() {
-    return nullptr;
-}
-
-ast* parser::e12p() {
-    return nullptr;
-}
-
-ast* parser::e11() {
-    return nullptr;
-}
-
-ast* parser::e11p() {
-    return nullptr;
-}
-
-ast* parser::e10() {
-    return nullptr;
-}
-
-ast* parser::e10p() {
-    return nullptr;
-}
-
-ast* parser::e9() {
-    return nullptr;
-}
-
-ast* parser::e9p() {
-    return nullptr;
-}
-
-ast* parser::e8() {
-    return nullptr;
-}
-
-ast* parser::e8p() {
-    return nullptr;
-}
-
-ast* parser::e7() {
-    return nullptr;
-}
-
-ast* parser::e7p() {
-    return nullptr;
-}
-
-ast* parser::e6() {
-    return nullptr;
-}
-
-ast* parser::e6p() {
-    return nullptr;
-}
-
-ast* parser::e5() {
-    return nullptr;
-}
-
-ast* parser::e5p() {
-    return nullptr;
-}
-
-ast* parser::e4() {
-    return nullptr;
-}
-
-ast* parser::e4p() {
-    return nullptr;
-}
-
-ast* parser::e3() {
-    return nullptr;
-}
-
-ast* parser::e2() {
-    return nullptr;
-}
-
-ast* parser::e2p() {
-    return nullptr;
-}
-
-ast* parser::e1() {
-    return nullptr;
-}
-
-ast* parser::e1p() {
-    return nullptr;
-}
-
-ast* parser::ee() {
-    return nullptr;
-}
-
-ast* parser::argument() {
-    return nullptr;
-}
-
-ast* parser::fexpression() {
-    return nullptr;
-}
-
-ast* parser::mexpression() {
-    return nullptr;
-}
-
-ast* parser::aexpression() {
-    return nullptr;
+    return forcondast;
 }
 
 bool parser::is_type() {
@@ -952,9 +583,9 @@ bool parser::is_fexpression() {
     return is_expression() || is_varclass() || is_type() || is(Keyword::LET);
 }
 
-bool parser::boolean(uid type) {
-    auto& t = tt().get_type(type);
-    
+bool parser::boolean(ptype type) {
+    auto& t = tt().get_type(type.type);
+
     switch(t.type) {
         case TypeType::PRIMITIVE:
             switch(t.get_primitive().type){
@@ -978,23 +609,7 @@ bool parser::boolean(uid type) {
         case TypeType::STRUCT: [[fallthrough]];
         case TypeType::FUNCTION: [[fallthrough]];
         case TypeType::UNION: [[fallthrough]];
-        case TypeType::ENUM: [[fallthrough]];
-        case TypeType::ARRAY: return false;
+        case TypeType::ENUM: return false;
     }
     return false;
-}
-
-parser::symbol_guard::symbol_guard(globals& g) : g(g) {
-    ost = &g.get_symbol_table();
-    nst = new symbol_table{ost};
-}
-
-parser::symbol_guard::~symbol_guard() {
-    g.set_symbol_table(ost);
-}
-
-parser::context_guard::context_guard(uid &context) : context(context), pcontext(context) { }
-
-parser::context_guard::~context_guard() {
-    context = pcontext;
 }

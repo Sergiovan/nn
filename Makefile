@@ -20,7 +20,7 @@ FFLAGS=$(CFLAGS) $(INCLUDE_FLAGS) $(LIBRARY_FLAGS)
 SRC=$(wildcard $(SRC_DIR)/**/*.cpp)
 OBJ=$(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
-all: $(TARGET)
+all: debug
 
 debug: CFLAGS+=-DDEBUG -g -O0
 debug: $(TARGET)
@@ -34,10 +34,10 @@ $(TARGET): $(OBJ)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@echo Making $@ from $<...
-	@$(shell mkdir $(subst /,\,$(dir $@)))
+	@$(shell mkdir -p $(dir $@))
 	@$(CXX) -c -o $@ $< $(FFLAGS)
 
 .PHONY: clean
 
 clean:
-	@rd /Q /S out\obj\**\*.o
+	@$(shell find . -type f -name '*.o' -delete)

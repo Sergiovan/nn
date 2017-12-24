@@ -6,6 +6,4 @@
 
 struct ast;
 
-struct value {
-    ast* data; 
-};
+using value = ast*;
