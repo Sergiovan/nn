@@ -85,7 +85,7 @@ public:
     ast* ifscope();
 
     ast* forstmt();
-    ast* forcond();
+    ast* forcond(); // TODO Refiddle when vardeclperiod() vardeclass() and assignment() have been touched
 
     ast* whilestmt();
 
@@ -113,11 +113,13 @@ public:
 
     ast* usingstmt();
 
+    ast* namespacescope();
     ast* namespacestmt();
 
-    ast* varclassstmt();
-    ast* typeestmt();
-    ast* functypestmt();
+    ast* varclass();
+    ast* type(); // TODO Maybe they don't have to return ast
+    ast* propertype();
+    ast* functype();
 
     ast* declstmt();
 
@@ -146,6 +148,9 @@ public:
 
     ast* assstmt();
     ast* assignment();
+
+    ast* newexp();
+    ast* deleteexp(); // TODO Fix syntax
 
     ast* expressionstmt();
     ast* expression();
@@ -219,4 +224,8 @@ private:
     globals& g;
     std::stack<context> cx;
     token c;
+    ptype aux{};
+
+    // Maps "mangled" types to uid
+    std::map<std::string, uid> mtt{};
 };

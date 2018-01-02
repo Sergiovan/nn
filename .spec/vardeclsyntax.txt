@@ -1,0 +1,6 @@
+vardecl (type name [= expression][~type name [= expression]])
+fundecl (type[:type] name([type [,type]]))
+
+varclass + type + colon -> fundecl
+varclass + type + identifier + paren -> fundecl
+varclass + type + identifier + no paren -> vardecl

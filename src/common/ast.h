@@ -69,7 +69,7 @@ struct ast_node_struct {
 struct ast_node_unary {
     Grammar::Symbol op;
     ast* node;
-    ptype type;
+    ptype type{0,0};
     bool assignable = false;
     
     ~ast_node_unary();
@@ -80,7 +80,7 @@ struct ast_node_binary {
     Grammar::Symbol op;
     ast* left;
     ast* right;
-    ptype type;
+    ptype type{0,0};
     bool assignable = false;
     
     ~ast_node_binary();

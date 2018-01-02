@@ -29,6 +29,7 @@ struct sfield {
 struct overload {
     ptype type;
     ast_node_function* function{nullptr};
+    // TODO Symbol table
     bool generic{false};
 };
 

@@ -263,11 +263,14 @@ importstmt = kwimport, (iden | string), [kwas, iden], stmtend
 
 usingstmt = kwusing, iden, {opaccess, iden}, [kwas, iden], stmtend
 
+namespacescope = {usingstmt | namespacestmt | declstmt}
+
 namespacestmt = kwnamespace, iden, {opaccess, iden}, scope
 
 varclass = {kwqualifier}, [kwsign]
 type = (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {varclass, spointer}, {obracket, expression, cbracket}{obracket, cbracket}
-functype = tfunction, [othan, type, {optthen, type}, oparen, [type, {comma, type}, [comma]], cparen, cthan]
+ptype = varclass, type
+functype = tfunction, [othan, ptype, {optthen, ptype}, oparen, [ptype, {comma, ptype}, [comma]], cparen, cthan]
 
 declstmt = ( vardecl, {vardeclend, vardecl}, stmtend | funcdecl | structdecl | uniondecl | enumdecl )
 
@@ -298,8 +301,11 @@ enumscope = obrace, [iden, {comma, iden}, [comma]], cbrace
 assstmt = assignment, stmtend
 assignment = expression, {comma, expression}, assop, aexpression, {comma, aexpression}
 
+newexp = kwnew, type, [obracket, expression, cbracket], {comma, type, [obracket, expression, cbracket]}
+deleteexp = kwdelete, iden, {comma, iden}
+
 expressionstmt = expression, stmtend
-expression = e17
+expression = newexp | deleteexp | e17
 
 e17   = e16, [e17']
 e17'  = optcond, e17, optthen, e17

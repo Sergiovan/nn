@@ -21,9 +21,11 @@ enum class TokenType {
 
 enum class Keyword : char {
     /* Types */
-    VOID, BYTE, CHAR, SHORT, INT,
-    LONG, SIG, FLOAT, DOUBLE, BOOL,
-    STRUCT, UNION, ENUM, STRING, FUN, LET,
+    VOID = 0, BYTE = 1, CHAR = 8, SHORT = 2, INT = 3,
+    LONG = 4, SIG = 11, FLOAT = 5, DOUBLE = 6, BOOL = 10,
+    STRING = 9, FUN = 12, LET = 13,
+
+    STRUCT, UNION, ENUM,
 
     /* Type modifiers */
     CONST, VOLATILE, SIGNED, UNSIGNED,
@@ -104,6 +106,8 @@ enum class Symbol : char {
     KWWHILE, KWSWITCH,
     KWRETURN, KWRAISE, KWGOTO, KWLABEL,
     KWCASE,
+    KWDEFER, KWBREAK, KWCONTINUE, KWLEAVE, KWIMPORT,
+    KWUSING, KWNAMESPACE,
     
     SYMBOL_INVALID
 };

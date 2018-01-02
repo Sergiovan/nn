@@ -45,3 +45,12 @@ parameter:
  * name?
  * data?
  * variable length?
+ 
+Type "mangling":
+Type transformed into its type number, separated by spaces
+Pointers into *,!,?,+
+Pointer varclass into a number too, for the flags
+Array dimensions signified with [. No fixed dimensions, just arrayness (Array length included in array)
+Function types are always preceded by their modifiers without separation. 0 for no modifiers
+Functions separate types with :, also start with :
+Function parameters separated with , and also start with , even if there are no parameters
