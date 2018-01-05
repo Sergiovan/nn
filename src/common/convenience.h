@@ -19,3 +19,10 @@ using trie = std::map<std::string, T>;
 
 using uid = u32;
 using vflags = u8;
+
+constexpr bool __debug =
+#ifdef DEBUG
+                            true;
+#else
+                            false;
+#endif

@@ -52,6 +52,7 @@ struct st_entry {
     st_entry(st_entry_union value, SymbolTableEntryType type);
     
     uid get_type();
+    st_entry_variable& get_variable();
 };
 
 class symbol_table {

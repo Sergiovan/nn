@@ -1109,8 +1109,108 @@ ast* parser::declstmt() {
     } else if(is(Keyword::ENUM)) {
         return enumdecl();
     } else {
-
+        // TODO After both funcdecl and vardecl
     }
+}
+
+ast* parser::declstructstmt() {
+    if(is(Keyword::STRUCT)) {
+        return structdecl();
+    } else if(is(Keyword::UNION)) {
+        return uniondecl();
+    } else if(is(Keyword::ENUM)) {
+        return enumdecl();
+    } else {
+        // TODO After both funcdecl and vardeclstruct
+    }
+}
+
+ast* parser::vardeclperiod() {
+    ast* decls = new ast{ast_node_block{{}, &st()}};
+    auto& stmts = decls->get_block().stmts;
+
+    do {
+        if(is(Symbol::COMMA)) {
+            next();
+        }
+
+        vflags flags = 0;
+        if (is_varclass()) {
+            auto f = varclass();
+            flags = f->get_byte().data;
+            delete f;
+        }
+
+        ptype pt = {0, flags};
+
+        if (is(Keyword::LET)) {
+            pt.type = TypeID::LET;
+            next();
+        } else {
+            auto t = type();
+            if (t->type == NodeType::BINARY) {
+                pt.type = t->get_binary().left->get_dword().data;
+            } else {
+                pt.type = t->get_dword().data;
+            }
+        }
+
+        require(TokenType::IDENTIFIER, "Variables require a unique name");
+        std::string& name = c.value;
+
+        st_entry* var{nullptr};
+
+        if(st().has(name)) {
+            throw parser_exception(t, "Redeclaring an identifier");
+        } else {
+            var = st().add_variable(name, pt.type, nullptr, pt.flags, false);
+        }
+
+        ast* decl = new ast{ast_node_unary{Symbol::SYMDECL, new ast{ast_node_symbol{var, name}}}};
+        stmts.push_back(decl);
+
+    } while(is(Symbol::COMMA));
+    return decls;
+}
+
+ast* parser::vardecl() {
+    ast* assign = new ast{ast_node_binary{Symbol::ASSIGN, nullptr, nullptr}};
+    auto decls = vardeclperiod();
+    assign->get_binary().left = decls;
+    if(is(Symbol::ASSIGN)) {
+        auto vals = vardeclass();
+        assign->get_binary().right = vals;
+
+        auto& declstmts = decls->get_block().stmts, valstmts = vals->get_block().stmts;
+        size_t ndecls = declstmts.size(), nvals = valstmts.size();
+
+        i64 begin = ndecls - nvals; // TODO Wrong, in case of functions
+        if(begin < 0) {
+            throw parser_exception(t, "More values than declarations");
+        }
+        for(u64 i = begin; i < ndecls; ++i) {
+            auto& var = declstmts[i]->get_unary().node->get_symbol().symbol->get_variable();
+            auto& val = valstmts[i - begin];
+
+            ptype valtype = val->get_type();
+            // TODO Flags and conversions
+            if(var.id == TypeID::LET) {
+                var.data = val;
+                var.id = val->get_type().type;
+                var.defined = true;
+            } else if (tt()[val->get_type().type].type == TypeType::FUNCTION) {
+                auto& func = tt()[val->get_type().type].get_func();
+                for(auto& ret : func.returns) {
+
+                }
+            } else if (var.id == val->get_type().type) {
+                var.data = val;
+                var.defined = true;
+            }
+        }
+    }
+
+    return assign;
 }
 
 bool parser::is_type() {

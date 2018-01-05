@@ -108,7 +108,9 @@ enum class Symbol : char {
     KWCASE,
     KWDEFER, KWBREAK, KWCONTINUE, KWLEAVE, KWIMPORT,
     KWUSING, KWNAMESPACE,
-    
+
+    SYMDECL,
+
     SYMBOL_INVALID
 };
 

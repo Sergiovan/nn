@@ -21,6 +21,10 @@ uid st_entry::get_type() {
     }
 }
 
+st_entry_variable& st_entry::get_variable() {
+    return std::get<1>(entry);
+}
+
 symbol_table::symbol_table() : parent() {}
 
 symbol_table::symbol_table(std::nullptr_t) : parent() {}
