@@ -22,7 +22,7 @@ unsigned int token::to_char() {
 
 Grammar::Keyword token::to_keyword() {
     auto kw = Grammar::string_to_keyword.find(value.c_str());
-    if(kw == Grammar::string_to_keyword.end()) {
+    if(kw != Grammar::string_to_keyword.end()) {
         return kw->second;
     } else {
         return Grammar::Keyword::KEYWORD_INVALID;
@@ -31,7 +31,7 @@ Grammar::Keyword token::to_keyword() {
 
 Grammar::Symbol token::to_symbol() {
     auto sym = Grammar::string_to_symbol.find(value.c_str());
-    if(sym == Grammar::string_to_symbol.end()) {
+    if(sym != Grammar::string_to_symbol.end()) {
         return sym->second;
     } else {
         return Grammar::Symbol::SYMBOL_INVALID;

@@ -941,7 +941,7 @@ ast* parser::varclass() {
     return new ast{ast_node_byte{flags}};
 }
 
-ast* parser::type() {
+ast* parser::parsertype() {
     constexpr char ptrs[3][2] = {"!", "?", "+"};
     if(!is_type()) {
         throw parser_exception(t, "Expected type");
@@ -1032,7 +1032,7 @@ ast* parser::propertype() {
     ast* ret = new ast{ast_node_binary{Symbol::ACCESS, nullptr, nullptr}}; // TODO Make Symbol for this
 
     ret->get_binary().left = varclass();
-    ret->get_binary().right = type();
+    ret->get_binary().right = parsertype();
 
     return ret;
 }
@@ -1147,7 +1147,7 @@ ast* parser::vardeclperiod() {
             pt.type = TypeID::LET;
             next();
         } else {
-            auto t = type();
+            auto t = parsertype();
             if (t->type == NodeType::BINARY) {
                 pt.type = t->get_binary().left->get_dword().data;
             } else {
@@ -1184,7 +1184,21 @@ ast* parser::vardecl() {
         auto& declstmts = decls->get_block().stmts, valstmts = vals->get_block().stmts;
         size_t ndecls = declstmts.size(), nvals = valstmts.size();
 
-        i64 begin = ndecls - nvals; // TODO Wrong, in case of functions
+        std::vector<ptype> rvals{};
+        for(u64 i = 0; i < nvals; ++i) {
+            auto& val = valstmts[i];
+            if(val->type == NodeType::BINARY && val->get_binary().op == Symbol::FUN_CALL &&
+                tt()[val->get_type().type].type == TypeType::FUNCTION) {
+                auto& func = tt()[val->get_type().type].get_func();
+                for(auto& ret : func.returns) {
+                    rvals.push_back(ret);
+                }
+            } else {
+                rvals.push_back(val->get_type());
+            }
+        }
+        
+        i64 begin = ndecls - rvals.size(); // TODO Wrong, in case of functions
         if(begin < 0) {
             throw parser_exception(t, "More values than declarations");
         }
@@ -1198,19 +1212,104 @@ ast* parser::vardecl() {
                 var.data = val;
                 var.id = val->get_type().type;
                 var.defined = true;
-            } else if (tt()[val->get_type().type].type == TypeType::FUNCTION) {
+            } else if (val->type == NodeType::BINARY && val->get_binary().op == Symbol::FUN_CALL &&
+                       tt()[val->get_type().type].type == TypeType::FUNCTION) {
                 auto& func = tt()[val->get_type().type].get_func();
-                for(auto& ret : func.returns) {
-
+                for(u64 j = 0; j < func.returns.size(); ++j) {
+                    auto& var = declstmts[i]->get_unary().node->get_symbol().symbol->get_variable();
+                    auto& ret = func.returns[j];
+                    var.data = new ast{ast_node_binary{Symbol::FUN_RET, val, new ast{ast_node_qword{j}},
+                                                       {ret.flags, ret.type}}};
+                    var.id = ret.type;
+                    var.defined = true;
+                    ++i;
                 }
             } else if (var.id == val->get_type().type) {
                 var.data = val;
                 var.defined = true;
+            } else {
+                throw parser_exception(t, "Assigning value of wrong type");
             }
         }
     }
 
     return assign;
+}
+
+ast* parser::vardeclass() {
+    require(Symbol::ASSIGN, "Expected =");
+    ast* values = new ast{ast_node_block{{}, &st()}};
+    
+    do {
+        values->get_block().stmts.push_back(aexpression());
+    } while(is(Symbol::COMMA));
+    
+    return values;
+}
+
+ast* parser::vardeclstruct() {
+    return vardecl(); // TODO Bitfields, eventually
+}
+
+ast* parser::funcdecl() {
+    type typ{TypeType::FUNCTION, type_func{}};
+    type_func& tf = typ.get_func();
+    std::stringstream ss;
+    auto& rets = tf.returns;
+    if(is(Keyword::LET) || is(Keyword::VOID)) {
+        rets.push_back(ptype{(uid)c.to_keyword(),0});
+        ss << ":" << 0 << (uid)c.to_keyword();
+        next();
+    } else if(is_type()) {
+        do {
+            auto pt = parsertype()->get_type();
+            rets.push_back(pt);
+            ss << ":" << pt.flags << pt.type;
+        } while(is(Symbol::COLON));
+    } else {
+        throw parser_exception(t, "Expected let, void or type");
+    }
+    
+    require(TokenType::IDENTIFIER, "Functions require a unique name");
+    std::string& name = c.value;
+    
+    if(st().has(name)) {
+        throw parser_exception(t, "Redeclaring an identifier");
+    }
+    
+    tf.name = name;
+    
+    next(); // IDEN
+    require(Symbol::PAREN_LEFT, "Expected ("); // (
+    next();
+    
+    if(is(Symbol::PAREN_RIGHT)) {
+        ss << ",";
+    }
+    
+    while(!is(Symbol::PAREN_RIGHT)) {
+        ss << ",";
+        auto param = parameter();
+        tf.args.push_back(param);
+        ss << param.type.flags << param.type.type;
+        if(!is(Symbol::COMMA)) {
+            require(Symbol::PAREN_RIGHT, "Expected )");
+        } else {
+            next(); // ,
+        }
+    }
+    
+    std::string ts = ss.str();
+    auto _type = mtt.find(ts);
+    
+    ast* decl = new ast{ast_node_binary{Symbol::ASSIGN, nullptr, nullptr}};
+    
+    if(_type == mtt.end()) {
+        mtt[ts] = typeast->get_dword().data = tt().add_type(ts);
+    } else {
+        typeast->get_dword().data = _type->second;
+    }
+    
 }
 
 bool parser::is_type() {

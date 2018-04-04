@@ -12,6 +12,11 @@
 #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x04
 #endif
+
+#undef VOID // Thanks Microsoft
+#undef CONST // Thaaaanks
+#undef BOOL
+
 #endif
 
 #include <chrono>

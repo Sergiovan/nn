@@ -37,3 +37,9 @@ out/
 cmake-build-debug/
 **/CMakeLists.txt
 nbproject/
+
+proto/__pycache__/
+
+proto/venv/
+
+proto/examples/

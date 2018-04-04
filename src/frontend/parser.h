@@ -117,7 +117,7 @@ public:
     ast* namespacestmt();
 
     ast* varclass();
-    ast* type(); // TODO Maybe they don't have to return ast
+    ast* parsertype(); // TODO Maybe they don't have to return ast
     ast* propertype();
     ast* functype();
 
@@ -133,7 +133,7 @@ public:
     ast* vardeclstruct();
 
     ast* funcdecl();
-    ast* parameter();
+    parameter parameter();
 
     ast* funcval();
 

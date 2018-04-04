@@ -173,7 +173,7 @@ token tokenizer::read() {
             t.value += r.next();
         }
         if(r.peek() == '.') { // Decimals!
-            t.value = r.next();
+            t.value += r.next();
             while(is_a(r.peek(), number)) {
                 t.value += r.next();
             }
