@@ -2,7 +2,7 @@ from reader import Reader
 from collections import deque
 from grammar import *
 import re
-from _logger import LOGGER
+from nnlogger import LOGGER
 from typing import Deque
 
 class Token:
@@ -128,16 +128,17 @@ class Tokenizer:
             if tok.type == TokenType.EOF:
                 return
 
-    def search_lookahead(self, param):
+    def search_lookahead(self, *args):
         for k, v in enumerate(self.lookahead):
-            if isinstance(param, Symbol) and v.to_symbol() == param:
-                return k
-            elif isinstance(param, Keyword) and v.to_keyword() == param:
-                return k
-            elif isinstance(param, TokenType) and v.type == param:
-                return k
-            elif v.value == param:
-                return k
+            for param in args:
+                if isinstance(param, Symbol) and v.to_symbol() == param:
+                    return k
+                elif isinstance(param, Keyword) and v.to_keyword() == param:
+                    return k
+                elif isinstance(param, TokenType) and v.type == param:
+                    return k
+                elif v.value == param:
+                    return k
         return None
 
 

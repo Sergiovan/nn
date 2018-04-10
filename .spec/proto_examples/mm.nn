@@ -6,28 +6,30 @@ int fib(int n){
         case 0, 1 {
             return 1;
         }
-        case { // Default
+        else { // Default
             return fib(n - 2) + fib(n - 1);
         }
     }
 }
 
-<int(int)> add_gen(int i){
-    return int(int a){
+fun<int(int)> add_gen(int i){
+    return (int(int a){
         return a + i;
-    };
+    });
 }
 
-<int(int)>:sig add_or_fail(int i){ // More than 1 sig return is an error
+fun<int(int)>:sig add_or_fail(int i){ // More than 1 sig return is an error
     if i < 0 {
         raise 1; // Everything but sig is null or 0
         // return null, 1; // Also valid
     }
-    return int(int a){
+    return (int(int a){
         return a + i; 
-    };// All sig are automatically 0
+    });// All sig are automatically 0
     // return [...], 0; // Also valid
 }
+
+void print(int);
 
 int main(string[]){
     print(fib(11));

@@ -1,9 +1,5 @@
 from enum import Enum
-import _ast
-from typing import List
-from collections import OrderedDict
-
-Ast = _ast.Ast
+from typing import List, Dict
 
 class TypeID:
     VOID = 0
@@ -33,6 +29,8 @@ class TypeType(Enum):
     UNION = 3
     ENUM = 4
     FUNCTION = 5
+    STRUCTPURE = 6
+    FUNCTIONPURE = 7
 
 class PrimitiveType(Enum):
     VOID = 0
@@ -64,19 +62,55 @@ class Type:
     def __cmp__(self, other):
         return isinstance(other, Type) and self.uid == other.uid
 
+    def __str__(self):
+        return "Type({}, {})".format(self.uid, self.flags)
+
+    def __repr__(self):
+        return str(self)
+
+    def mangled(self):
+        return "{}{}".format(chr(self.flags), self.uid)
+
 class StructField:
-    def __init__(self, type: Type, value: Ast = None, bits = 64, is_bitfield = False):
+    def __init__(self, type: Type, value = None, bits = 64, is_bitfield = False):
         self.type = type
         self.value = value
         self.bits = bits
         self.is_bitfield = is_bitfield
 
+    def __str__(self):
+        return "StructField({}, {}, {})".format(self.type, self.value, self.bits if self.is_bitfield else -1)
+
+    def __repr__(self):
+        return str(self)
+
+class Overload:
+    def __init__(self, type: Type, func = None, generic = False):
+        self.func = func
+        self.generic = generic
+
+    @property
+    def type(self):
+        return self.func.type
+
+    def __str__(self):
+        return "Overload({}, {})".format(self.func, self.generic)
+
+    def __repr__(self):
+        return str(self)
+
 class Parameter:
-    def __init__(self, type: Type, name: str = "", value: Ast = None, var_length = False):
+    def __init__(self, type: Type, name: str = "", value = None, var_length = False):
         self.type = type
         self.name = name
         self.value = value
         self.var_length = var_length
+
+    def __str__(self):
+        return "Parameter({}, {}, {}, {})".format(self.name if self.name else '---', self.type, self.value, self.var_length)
+
+    def __repr__(self):
+        return str(self)
 
 class TypeData:
     pass
@@ -86,37 +120,117 @@ class TypePrimitive(TypeData):
         self.typetype = TypeType.PRIMITIVE
         self.type = type
 
+    def __str__(self):
+        return "TypePrimitive({})".format(self.type)
+
+    def __repr__(self):
+        return str(self)
+
 class TypePointer(TypeData):
-    def __init__(self, at: Type, type: PointerType = PointerType.NAKED):
+    def __init__(self, at: Type, flags = 0, ptype: PointerType = PointerType.NAKED):
         self.typetype = TypeType.POINTER
-        self.type = type
+        self.ptype = ptype
+        self.flags = flags
         self.at = at
 
+    def __str__(self):
+        return "TypePointer({}, {}, {})".format(str(self.ptype), self.flags, str(self.at))
+
+    def __repr__(self):
+        return str(self)
+
+class TypeStructPure(TypeData):
+    def __init__(self, fields: List[Type] = None):
+        self.typetype = TypeType.STRUCTPURE
+        self.fields = fields or []
+
+    def __str__(self):
+        return "TypeStructPure({})".format(self.fields)
+
+    def __repr__(self):
+        return str(self)
+
 class TypeStruct(TypeData):
-    def __init__(self, fields: OrderedDict[str, StructField], name: str = ""):
+    def __init__(self, type: Type = None, fields: Dict[str, StructField] = None, name: str = ""):
         self.typetype = TypeType.STRUCT
-        self.fields = list(fields.values())
-        self.field_names = list(fields.keys())
+        self.truetype = type or Type(0)
+        ff = fields or {}
+        self.fields = list(ff.values())
+        self.field_names = list(ff.keys())
+        self.decls = {}
         self.name = name
+
+    @property
+    def names(self):
+        return self.field_names + list(self.decls.keys())
+
+    def __str__(self):
+        return "TypeStruct({}, {}, {}, {})".format(self.truetype, self.name,
+                                               [(self.field_names[x], str(self.fields[x])) for x in range(len(self.field_names))],
+                                                   self.decls)
+
+    def __repr__(self):
+        return str(self)
 
     def field_by_name(self, name):
         return self.fields[self.field_names.index(name)]
 
 class TypeUnion(TypeData):
-    def __init__(self, fields: OrderedDict[str, Type], name: str = ""):
+    def __init__(self, fields: Dict[str, Type] = None, name: str = ""):
         self.typetype = TypeType.UNION
-        self.fields = list(fields.values())
-        self.field_names = list(fields.keys())
+        ff = fields or {}
+        self.fields = list(ff.values())
+        self.field_names = list(ff.keys())
+        self.decls = {}
         self.name = name
+
+    @property
+    def names(self):
+        return self.field_names + list(self.decls.keys())
+
+    def __str__(self):
+        return "TypeUnion({}, {}, {})".format(self.name,
+                                              [(self.field_names[x], str(self.fields[x])) for x in range(len(self.field_names))],
+                                              self.decls)
+
+    def __repr__(self):
+        return str(self)
 
 class TypeEnum(TypeData):
-    def __init__(self, names: List[str], name: str = ""):
+    def __init__(self, names: List[str] = None, name: str = ""):
         self.typetype = TypeType.ENUM
-        self.names = names
+        self.names = names or []
         self.name = name
 
+    def __str__(self):
+        return "TypeEnum({}, {})".format(self.name, self.names)
+
+    def __repr__(self):
+        return str(self)
+
+class TypeFunctionPure(TypeData):
+    def __init__(self, returns: List[Type] = None, params: List[Type] = None):
+        self.typetype = TypeType.FUNCTIONPURE
+        self.returns: List[Type] = returns or []
+        self.params: List[Type] = params or []
+
+    def __str__(self):
+        return "TypeFunctionPure({}, {})".format(self.returns, self.params)
+
+    def __repr__(self):
+        return str(self)
+
 class TypeFunction(TypeData):
-    def __init__(self, returns: List[Type] = None, params: List[Parameter] = None):
+    def __init__(self, type: Type = None, returns: List[Type] = None, params: List[Parameter] = None, name: str = ""):
         self.typetype = TypeType.FUNCTION
+        self.truetype = type or Type(TypeID.FUN)
         self.returns: List[Type] = returns or []
         self.params: List[Parameter] = params or []
+        self.sigs: List[str] = []
+        self.name = name
+
+    def __str__(self):
+        return "TypeFunction({}, {}, {}, {})".format(self.name, str(self.truetype), self.returns, self.params)
+
+    def __repr__(self):
+        return str(self)

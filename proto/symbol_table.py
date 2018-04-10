@@ -1,20 +1,13 @@
 from enum import Enum
-from _logger import LOGGER
+from nnlogger import LOGGER
 from typing import List, Dict
-from type import *
-from _ast import Ast, AstFunction
+from type import Overload, TypeID
 
 class StEntryType(Enum):
     TYPE = 0
     VARIABLE = 1
     FUNCTION = 2 # Special because overloads
     NAMESPACE = 3
-
-class Overload:
-    def __init__(self, type: Type, func: AstFunction = None, generic = False):
-        self.type = type # TODO Redundant?
-        self.func = func
-        self.generic = generic
 
 class StEntry:
     pass
@@ -26,14 +19,26 @@ class StType(StEntry):
         self.defined = defined
         self.type = id
 
+    def __str__(self):
+        return "StType({}, {})".format(self.id, self.defined)
+
+    def __repr__(self):
+        return str(self)
+
 class StVariable(StEntry):
-    def __init__(self, id, value: Ast, flags, defined: bool):
+    def __init__(self, id, value, flags, defined: bool):
         self.entrytype = StEntryType.VARIABLE
         self.id = id
         self.data = value
         self.flags = flags
         self.defined = defined
         self.type = id
+
+    def __str__(self):
+        return "StVariable({}, {}, {}, {})".format(self.id, self.flags, self.defined, self.data)
+
+    def __repr__(self):
+        return str(self)
 
 class StFunction(StEntry):
     def __init__(self, overloads: List[Overload], defined: bool = True):
@@ -42,11 +47,23 @@ class StFunction(StEntry):
         self.type = TypeID.FUN
         self.defined = defined
 
+    def __str__(self):
+        return "StFunction({}, {})".format(self.overloads, self.defined)
+
+    def __repr__(self):
+        return str(self)
+
 class StNamespace(StEntry):
     def __init__(self, st: 'SymbolTable'):
         self.entrytype = StEntryType.NAMESPACE
         self.st = st
         self.type = -1 # Todo error
+
+    def __str__(self):
+        return "StNamespace()"
+
+    def __repr__(self):
+        return str(self)
 
 class SymbolTable:
     def __init__(self, parent: 'SymbolTable' = None):
@@ -70,7 +87,7 @@ class SymbolTable:
                     None if not propagate or not self.parent else self.parent.search(name, True))
 
     def add(self, name: str, entry: StEntry):
-        if name in self.entries:
+        if name in self.entries and (not hasattr(self.entries[name], 'defined') or self.entries[name].defined):
             LOGGER.error("Entry already in entries: ", name)
             # Todo die
         self.entries[name] = entry

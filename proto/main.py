@@ -1,11 +1,14 @@
-from _logger import LOGGER
+from nnlogger import LOGGER
 from reader import Reader
 from tokenizer import Tokenizer
+from nnparser import Parser
 import time
-import _ast
+import nnast
+
 
 if __name__ == '__main__':
-    r = Reader('examples/mastermind2.nn', True)
+    r = Reader('examples/mm.nn', True)
     t = Tokenizer(r)
-    while not r.finished:
-        LOGGER.info(str(t.read()))
+    p = Parser(t)
+    ret = p.program()
+    p.tt.print()

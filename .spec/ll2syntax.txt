@@ -268,7 +268,7 @@ namespacescope = {usingstmt | namespacestmt | declstmt}
 namespacestmt = kwnamespace, iden, {opaccess, iden}, scope
 
 varclass = {kwqualifier}, [kwsign]
-type = (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer], {varclass, spointer}, {obracket, expression, cbracket}{obracket, cbracket}
+type = (tbyte | tchar | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstring | functype | iden), [spointer, [varclass], {spointer, [varclass]}], {obracket, expression, cbracket}{obracket, cbracket}
 ptype = varclass, type
 functype = tfunction, [othan, ptype, {optthen, ptype}, oparen, [ptype, {comma, ptype}, [comma]], cparen, cthan]
 
@@ -283,10 +283,10 @@ vardeclass = assop, aexpression, {comma, aexpression}
 
 vardeclstruct = [varclass], (type | tlet), iden, [optthen, number], {comma, [[varclass], type], iden, [optthen, number]}, [assop, aexpression, {comma, aexpression}]
 
-funcdecl = (type, {optthen, type} | tvoid | tlet), iden, oparen, [parameter, {comma, parameter}, [comma]], cparen, (scope | stmtend)
-parameter = type, [iden, [assop, aexpression]]
+funcdecl = (ptype, {optthen, ptype} | tvoid | tlet), iden, oparen, [parameter, {comma, parameter}, [comma]], cparen, (scope | stmtend)
+parameter = ptype, [iden, [assop, aexpression]]
 
-funcval = (type, {optthen, type} | tvoid | tlet), [iden], oparen, [parameter, {comma, parameter}, [comma]], cparen, scope
+funcval = (ptype, {optthen, ptype} | tvoid | tlet), [iden], oparen, [parameter, {comma, parameter}, [comma]], cparen, scope
 
 structdecl = tstruct, iden, (structscope, [compileropts] | stmtend)
 structscope = obrace, {usingstmt | declstructstmt}, cbrace
@@ -349,13 +349,13 @@ e5'	  = (opmul | opdiv | opmod), e4
 e4    = e3, [e4']
 e4'   = oppow, e4
 
-e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | "<", type, ">" | opat | opaddress) e3 | e2
+e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | "<", ptype, ">" | opat | opaddress) e3 | e2
 
 e2  = e1, {e2'}
 e2' = (opspread)
 
 e1    = ee, {e1'}
-e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden), {opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}, ee
+e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden), {opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}
 
 ee 	  = "(", (expression | funcval), ")" | literal | iden
 

@@ -1,4 +1,4 @@
-from _logger import LOGGER
+from nnlogger import LOGGER
 import os
 
 class Reader:
@@ -7,7 +7,7 @@ class Reader:
         self.index = 0
         self.column = 1
         self.line = 1
-        self.filename = str if not is_file else "<user input>"
+        self.filename = str if is_file else "<user input>"
         if is_file:
             try:
                 with open(str) as f:

@@ -160,7 +160,7 @@ static const trie<Symbol>  string_to_symbol {
     
     {".", Symbol::ACCESS}, {"..", Symbol::CONCATENATE}, {"...", Symbol::SPREAD},
     
-    {"?", Symbol::TERNARY_CHOICE}, {":", Symbol::TERNARY_CONDITION},
+    {":", Symbol::TERNARY_CHOICE}, {"?", Symbol::TERNARY_CONDITION},
     
     {"@|", Symbol::BIT_SET}, {"@&", Symbol::BIT_CLEAR}, {"@?", Symbol::BIT_CHECK}, {"@^", Symbol::BIT_TOGGLE},
     

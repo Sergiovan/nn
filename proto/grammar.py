@@ -80,6 +80,8 @@ class Keyword(Enum):
     AND = 47
     OR = 48
 
+    THIS = 49
+
     #Invalid
     KEYWORD_INVALID = -1
 
@@ -276,7 +278,8 @@ keyword_dict = {
     "try": Keyword.TRY,
     "catch": Keyword.CATCH,
     "and": Keyword.AND,
-    "or": Keyword.OR
+    "or": Keyword.OR,
+    "this": Keyword.THIS
 }
 
 symbol_dict = {
@@ -305,8 +308,8 @@ symbol_dict = {
     ".": Symbol.ACCESS,
     "..": Symbol.CONCATENATE,
     "...": Symbol.SPREAD,
-    "?": Symbol.TERNARY_CHOICE,
-    ":": Symbol.TERNARY_CONDITION,
+    "?": Symbol.TERNARY_CONDITION,
+    ":": Symbol.TERNARY_CHOICE,
     "@|": Symbol.BIT_SET,
     "@&": Symbol.BIT_CLEAR,
     "@?": Symbol.BIT_CHECK,
