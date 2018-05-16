@@ -86,12 +86,9 @@ class StructField:
 
 class Overload:
     def __init__(self, type: Type, func = None, generic = False):
+        self.type = type
         self.func = func
         self.generic = generic
-
-    @property
-    def type(self):
-        return self.func.type
 
     def __str__(self):
         return "Overload({}, {})".format(self.func, self.generic)
@@ -120,6 +117,21 @@ class TypePrimitive(TypeData):
         self.typetype = TypeType.PRIMITIVE
         self.type = type
 
+    @property
+    def size(self):
+        if self.type in (PrimitiveType.INT, PrimitiveType.FLOAT, PrimitiveType.CHAR, PrimitiveType.SIG):
+            return 4 # 32 bits
+        elif self.type in (PrimitiveType.LONG, PrimitiveType.DOUBLE):
+            return 8 # 64 bits
+        elif self.type in (PrimitiveType.LDOUBLE, PrimitiveType.STRING):
+            return 16 # 128 bits
+        elif self.type in (PrimitiveType.BYTE, PrimitiveType.BOOL):
+            return 1 # 8 bits
+        elif self.type is PrimitiveType.SHORT:
+            return 2 # 16 bits
+        else:
+            return 0 # Invalid
+
     def __str__(self):
         return "TypePrimitive({})".format(self.type)
 
@@ -133,6 +145,10 @@ class TypePointer(TypeData):
         self.flags = flags
         self.at = at
 
+    @property
+    def size(self):
+        return 8 # 64 bits
+
     def __str__(self):
         return "TypePointer({}, {}, {})".format(str(self.ptype), self.flags, str(self.at))
 
@@ -143,6 +159,7 @@ class TypeStructPure(TypeData):
     def __init__(self, fields: List[Type] = None):
         self.typetype = TypeType.STRUCTPURE
         self.fields = fields or []
+        self.size = 0
 
     def __str__(self):
         return "TypeStructPure({})".format(self.fields)
@@ -159,6 +176,7 @@ class TypeStruct(TypeData):
         self.field_names = list(ff.keys())
         self.decls = {}
         self.name = name
+        self.size = 0
 
     @property
     def names(self):
@@ -183,6 +201,7 @@ class TypeUnion(TypeData):
         self.field_names = list(ff.keys())
         self.decls = {}
         self.name = name
+        self.size = 0
 
     @property
     def names(self):
@@ -202,6 +221,10 @@ class TypeEnum(TypeData):
         self.names = names or []
         self.name = name
 
+    @property
+    def size(self):
+        return 8 # 64 bits
+
     def __str__(self):
         return "TypeEnum({}, {})".format(self.name, self.names)
 
@@ -213,6 +236,10 @@ class TypeFunctionPure(TypeData):
         self.typetype = TypeType.FUNCTIONPURE
         self.returns: List[Type] = returns or []
         self.params: List[Type] = params or []
+
+    @property
+    def size(self):
+        return 8 # 64 bits
 
     def __str__(self):
         return "TypeFunctionPure({}, {})".format(self.returns, self.params)
@@ -228,6 +255,16 @@ class TypeFunction(TypeData):
         self.params: List[Parameter] = params or []
         self.sigs: List[str] = []
         self.name = name
+
+    @property
+    def size(self):
+        return 8 # 64 bits
+
+    def find_param(self, name):
+        for param in self.params:
+            if param.name == name:
+                return param
+        return None
 
     def __str__(self):
         return "TypeFunction({}, {}, {}, {})".format(self.name, str(self.truetype), self.returns, self.params)

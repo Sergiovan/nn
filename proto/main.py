@@ -11,4 +11,5 @@ if __name__ == '__main__':
     t = Tokenizer(r)
     p = Parser(t)
     ret = p.program()
-    p.tt.print()
+    nnast.print_tree(ret)
+    #p.tt.print()

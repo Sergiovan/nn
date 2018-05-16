@@ -45,7 +45,12 @@ class StFunction(StEntry):
         self.entrytype = StEntryType.FUNCTION
         self.overloads = overloads
         self.type = TypeID.FUN
+        self.types = [x.type for x in overloads]
         self.defined = defined
+
+    def add_overload(self, overload: Overload):
+        self.overloads.append(overload)
+        self.types.append(overload.type)
 
     def __str__(self):
         return "StFunction({}, {})".format(self.overloads, self.defined)

@@ -355,7 +355,7 @@ class Parser:
             while self.cis(Symbol.SEMICOLON):
                 left.stmts.append(self.fexpression())
 
-            if not self.boolean(left.stmts[-1].type):
+            if not self.is_booleanish(left.stmts[-1].type):
                 pass # raise self.exception("Last statement of 'if' not a boolean")
 
             self.etype = etype
@@ -490,7 +490,7 @@ class Parser:
             while self.cis(Symbol.SEMICOLON):
                 ret.left.stmts.append(self.fexpression())
 
-            if not self.boolean(ret.left.stmts[-1].type):
+            if not self.is_booleanish(ret.left.stmts[-1].type):
                 raise self.exception("Last statement in 'while' cannot be converted to boolean")
 
             self.etype = etype
@@ -1052,8 +1052,43 @@ class Parser:
             vals = self.vardeclass()
             ret.right = vals
 
+            valtypes = []
+            for value in vals.stmts:
+                valtypes += self.expand_type(value)
+
+            syms: List[AstUnary] = ret.left.stmts
+
+            num = 0
+            for sym in syms:
+                if num < len(vals.stmts):
+                    val = vals.stmts[num]
+
+                    if sym.stmt.sym.type == TypeID.LET:
+                        sym.stmt.sym.type = valtypes[num].uid
+                        sym.stmt.sym.flag = valtypes[num].flags
+                    elif sym.stmt.sym.type == TypeID.FUN:
+                        if not self.is_function(val.type):
+                            raise self.exception("Assigning non-function to variable declared fun")
+                        sym.stmt.sym.type = valtypes[num].uid
+                        sym.stmt.sym.flag = valtypes[num].flags
+                    else:
+                        if not self.can_be_weak_cast(valtypes[num], sym.stmt.type):
+                            raise self.exception("Cannot cast {} to {}".format(valtypes[num], sym.stmt.type))
+
+                    # sym.stmt.sym.data = val # TODO Function returns
+                    sym.stmt.sym.defined = True
+
+                    num += 1
+                else:
+                    vals.stmts.append(AstDWord(0, Type(0))) # TODO Correct null initialization
+
             # TODO Check everything is fine
             # TODO Assign values in the St if needed
+        else:
+            vals = AstBlock([], self.cst)
+            for _ in ret.left.stmts:
+                vals.stmts.append(AstDWord(0, Type(0)))
+            ret.right = vals
         return ret
 
     def vardeclass(self):
@@ -1611,7 +1646,7 @@ class Parser:
                     if type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
                         pass  # raise self.exception("Cannot apply pre-unary {} to {}".format(sym.name, type.uid))
                 elif sym == Symbol.LNOT:
-                    if not self.boolean(type):
+                    if not self.is_booleanish(type):
                         pass  # raise self.exception("Cannot negate {}".format(type.uid))
                 return AstUnary(sym, oth, type, assignable, False)
         else:
@@ -1629,20 +1664,79 @@ class Parser:
         while sym in (Symbol.INCREMENT, Symbol.DECREMENT, Symbol.PAREN_LEFT, Symbol.BRACKET_LEFT, Symbol.ACCESS):
             self.next() # sym
             if sym in (Symbol.INCREMENT, Symbol.DECREMENT):
-                if ret.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                    pass  # raise self.exception("Cannot increment or decrement {}".format(ret.type.uid))
+                if not self.is_integer(ret.type):
+                    raise self.exception("Cannot increment or decrement {}".format(ret.type.uid))
                 ret = AstUnary(sym, ret, ret.type)
             elif sym is Symbol.PAREN_LEFT:
-                typ = self.tt[ret.type.uid]
-                if typ.typetype != TypeType.FUNCTION and (typ.typetype == TypeType.PRIMITIVE and typ.type != PrimitiveType.FUN):
-                    pass  # raise self.exception("Cannot call non-function {}".format(ret.type.uid))
+                # typ = self.tt[ret.type.uid]
+                if ret.asttype == AstType.SYMBOL and ret.sym.entrytype == StEntryType.FUNCTION:
+                    typs = ret.sym.types
+                else:
+                    typs = [ret.type]
+
+
+                if not self.is_function(ret.type):
+                    raise self.exception("Cannot call non-function {}".format(ret.type.uid))
                 args = []
                 while not self.cis(Symbol.PAREN_RIGHT) and not self.cis(TokenType.EOF):
                     args.append(self.argument())
                     if self.cis(Symbol.COMMA):
                         self.next() # ,
                 self.next() # )
-                ret = AstBinary(sym, ret, AstBlock([], self.cst), ret.type)
+
+                typ = None
+                typid = None
+
+                for i, ttyp in enumerate(typs):
+                    typid = ttyp
+                    typ = self.tt[ttyp.uid]
+                    try:
+                        named = False
+                        num = 0
+                        used = []
+                        for argument in args:
+                            if argument.asttype == AstType.BINARY and argument.op == Symbol.ASSIGN:
+                                if typ.typetype == TypeType.FUNCTIONPURE:
+                                    raise self.exception("Function parameter names unknown")
+                                named = True
+                                param: Parameter = typ.find_param(argument.left.data)
+                                if param is None:
+                                    raise ParserError("Named parameter did not exist")
+                                if param in used:
+                                    raise self.exception("Already set parameter {}".format(argument.left.data))
+                                used.append(param)
+                                if not self.can_be_weak_cast(self.expand_type(argument.right)[0], param.type):
+                                    raise self.exception("Named parameter {}'s type different from argument passed".format(param.name))
+                            else:
+                                if named:
+                                    raise self.exception("Non-named parameter after named parameters")
+                                types = self.expand_type(argument)
+                                for type in types:
+                                    try:
+                                        param: Parameter = typ.params[num]
+                                    except IndexError:
+                                        raise self.exception("Too many parameters")
+                                    used.append(param)
+                                    if not self.can_be_weak_cast(type, param if isinstance(param, Type) else param.type):
+                                        raise self.exception("Parameter {}'s type different from argument passed".format(param.name))
+                                    num += 1
+                        for param in typ.params:
+                            if param not in used:
+                                if param.value is None:
+                                    raise self.exception("Parameter {} had no argument passed".format(param.name))
+                    except ParserException:
+                        if len(typs) is 1:
+                            raise
+                        elif i == len(typs) - 1:
+                            raise self.exception("None of the overloads fit ")
+                        continue
+
+                    for param in typ.params:
+                        if param not in used:
+                            args.append(param.value)
+                    break
+
+                ret = AstBinary(sym, ret, AstBlock(args, self.cst), typid)
             elif sym is Symbol.BRACKET_LEFT:
                 type = self.tt[ret.type.uid]
                 if type.typetype != TypeType.POINTER:
@@ -1683,7 +1777,10 @@ class Parser:
 
     def argument(self):
         if self.cis(TokenType.IDENTIFIER) and self.cpeek(Symbol.ASSIGN):
-            iden = self.next() # TODO Fancy shit with function parameter names, ...
+            iden = self.next() # TODO Fancy shit with ...
+            ftype = self.tt[self.etype.uid]
+            if ftype.find_param(iden.value) is None:
+                raise self.exception("{} does not name a parameter".format(iden.value))
             self.next() # =
             return AstBinary(Symbol.ASSIGN, AstString(iden.value), self.aexpression())
         else:
@@ -1756,7 +1853,70 @@ class Parser:
         if not self.is_assignment_op():
             raise self.exception("Expected assignment operator, instead got {}".format(self.c.value))
 
-    def boolean(self, type: Type):
+    def can_be_weak_cast(self, frm: Type, to=None):
+        to = to or self.etype
+        totype = self.tt[to.uid]
+        frmtype = self.tt[frm.uid]
+
+        if totype.typetype == TypeType.PRIMITIVE:
+            if self.is_integer(to) and self.is_integer(frm):
+                return True
+
+    def can_be_cast(self, frm: Type, to=None):
+        to = to or self.etype
+        totype = self.tt[to.uid]
+        frmtype = self.tt[frm.uid]
+
+        if frmtype.typetype == TypeType.PRIMITIVE and frmtype.type == PrimitiveType.LET:
+            return True # Undefined types can be converted to anything
+
+        elif totype.typetype == TypeType.PRIMITIVE:
+            if self.is_number(to) and self.is_numberish(frm):
+                return True # Numberish things can be converted to numbers
+            elif totype.type == PrimitiveType.BOOL and self.is_booleanish(frm):
+                return True # Booleanish things can be converted to booleans
+
+        elif totype.typetype == TypeType.POINTER:
+            if totype.ptype == PointerType.NAKED and (self.is_integer(frm) or (frmtype.typetype == TypeType.FUNCTION) or
+                    (frmtype.typetype == TypeType.POINTER)):
+                return True # Integers and pointers can be converted to pointers
+
+        elif totype.typetype == TypeType.FUNCTIONPURE or totype.typetype == TypeType.PRIMITIVE and totype.type == PrimitiveType.FUN:
+            if frmtype.typetype == TypeType.FUNCTION and frmtype.truetype in (to, Type(TypeID.FUN)):
+                return True
+            elif frmtype.typetype == TypeType.POINTER:
+                return True
+
+        elif totype.typetype == TypeType.STRUCT:
+            if frmtype.typetype == TypeType.STRUCT and frmtype.truetype == totype.truetype:
+                return True
+
+        return False
+
+    def is_integer(self, type: Type):
+        t = self.tt[type.uid]
+        return t.typetype == TypeType.PRIMITIVE and t.type in (PrimitiveType.BYTE, PrimitiveType.SHORT,
+                                                               PrimitiveType.INT, PrimitiveType.LONG)
+
+    def is_real(self, type: Type):
+        t = self.tt[type.uid]
+        return t.typetype == TypeType.PRIMITIVE and t.type in (PrimitiveType.FLOAT, PrimitiveType.DOUBLE,
+                                                               PrimitiveType.LDOUBLE)
+
+    def is_number(self, type: Type):
+        t = self.tt[type.uid]
+        return t.typetype == TypeType.PRIMITIVE and t.type in (PrimitiveType.BYTE, PrimitiveType.SHORT,
+                                                               PrimitiveType.INT, PrimitiveType.LONG,
+                                                               PrimitiveType.FLOAT, PrimitiveType.DOUBLE,
+                                                               PrimitiveType.LDOUBLE)
+
+    def is_numberish(self, type: Type):
+        t = self.tt[type.uid]
+        return (self.is_number(type) or
+                (t.typetype == TypeType.PRIMITIVE and t.type in (PrimitiveType.CHAR, PrimitiveType.BOOL, PrimitiveType.SIG)) or
+                t.typetype in (TypeType.POINTER, TypeType.FUNCTION))
+
+    def is_booleanish(self, type: Type):
         t = self.tt[type.uid]
 
         if t.typetype == TypeType.PRIMITIVE:
@@ -1767,3 +1927,20 @@ class Parser:
         else:
             return t.typetype == TypeType.POINTER
 
+    def is_function(self, type: Type):
+        t = self.tt[type.uid]
+
+        if t.typetype == TypeType.FUNCTION or t.typetype == TypeType.FUNCTIONPURE:
+            return True
+        elif t.typetype == TypeType.PRIMITIVE and t.type == PrimitiveType.FUN:
+            return True
+        else:
+            return False
+
+    def expand_type(self, ast):
+        t = self.tt[ast.type.uid]
+        if ast.asttype == AstType.BINARY and ast.op == Symbol.PAREN_LEFT:
+            if t.typetype == TypeType.FUNCTION or t.typetype == TypeType.FUNCTIONPURE:
+                return t.returns
+        else:
+            return [ast.type]
