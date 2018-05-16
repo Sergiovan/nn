@@ -51,7 +51,8 @@ class TypeTable:
             return self.add_type(self.unmangle(type))
 
     def get_pure(self, type: Union[TypeStruct, TypeFunction]):
-        if type.truetype and type.truetype.uid and type.truetype.uid != TypeID.FUN:
+        if isinstance(type, (TypeStruct, TypeFunction)) and type.truetype and type.truetype.uid and \
+                type.truetype.uid != TypeID.FUN:
             return self.table[type.truetype.uid]
         else:
             mangled = self.mangle(type)
@@ -60,11 +61,11 @@ class TypeTable:
             return self.mangled[mangled]
 
 
-    def mangle(self, type: TypeData):
+    def mangle(self, type: TypeData, internal = False):
         def mangle_if_pointer(type: Type):
             t = self.table[type.uid]
             if isinstance(t, TypePointer):
-                return self.mangle(t)
+                return self.mangle(t, True)
             else:
                 return type.mangled()
 
@@ -72,13 +73,13 @@ class TypeTable:
         otype = type # TODO Remove when not debugging
         ret = ''
         if isinstance(type, TypePointer):
-            ret = '{}{}'.format(ptrs[type.ptype.value - Symbol.POINTER.value], chr(type.flags)) + ret
+            ret = '{}{}'.format(ptrs[type.ptype.value - PointerType.NAKED.value], chr(type.flags)) + ret
             at = self.table[type.at.uid]
             while isinstance(at, TypePointer):
-                ret += '{}{}'.format(ptrs[type.ptype.value - Symbol.POINTER.value], chr(type.flags)) + ret
+                ret += '{}{}'.format(ptrs[type.ptype.value - PointerType.NAKED.value], chr(type.flags)) + ret
                 type = at
                 at = self.table[type.at.uid]
-            ret = type.at.mangled() + ret
+            ret = type.at.mangled() if internal else str(type.at.uid) + ret
         elif isinstance(type, TypeFunction) or isinstance(type, TypeFunctionPure):
             ret = ':' + ''.join('{}:'.format(mangle_if_pointer(x)) for x in type.returns)[:-1]
             ret += ',' + ''.join('{},'.format(mangle_if_pointer(x.type if isinstance(type, TypeFunction) else x)) for x in type.params)[:-1]

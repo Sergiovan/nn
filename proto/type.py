@@ -85,10 +85,11 @@ class StructField:
         return str(self)
 
 class Overload:
-    def __init__(self, type: Type, func = None, generic = False):
+    def __init__(self, type: Type, func = None, generic = False, defined = False):
         self.type = type
         self.func = func
         self.generic = generic
+        self.defined = defined
 
     def __str__(self):
         return "Overload({}, {})".format(self.func, self.generic)
@@ -191,7 +192,10 @@ class TypeStruct(TypeData):
         return str(self)
 
     def field_by_name(self, name):
-        return self.fields[self.field_names.index(name)]
+        try:
+            return self.fields[self.field_names.index(name)]
+        except:
+            return None
 
 class TypeUnion(TypeData):
     def __init__(self, fields: Dict[str, Type] = None, name: str = ""):
@@ -214,6 +218,12 @@ class TypeUnion(TypeData):
 
     def __repr__(self):
         return str(self)
+
+    def field_by_name(self, name):
+        try:
+            return self.fields[self.field_names.index(name)]
+        except:
+            return None
 
 class TypeEnum(TypeData):
     def __init__(self, names: List[str] = None, name: str = ""):

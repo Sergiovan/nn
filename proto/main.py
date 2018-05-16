@@ -7,7 +7,7 @@ import nnast
 
 
 if __name__ == '__main__':
-    r = Reader('examples/mm.nn', True)
+    r = Reader('examples/mastermind2.nn', True)
     t = Tokenizer(r)
     p = Parser(t)
     ret = p.program()

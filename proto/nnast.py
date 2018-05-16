@@ -92,7 +92,7 @@ class AstString(Ast):
         self.type = Type(TypeID.STRING)
 
     def __str__(self):
-        return "AstString({}, {})".format(self.data, self.type)
+        return "AstString(\"{}\", {})".format(self.data.replace('\n', '\\n').replace('"', '\\"'), self.type)
 
 class AstArray(Ast):
     def __init__(self, value: List[Ast], type):

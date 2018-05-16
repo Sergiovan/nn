@@ -112,7 +112,10 @@ class Parser:
     def iden(self):
         self.crequire(TokenType.IDENTIFIER)
         tmp = self.next()
-        return AstSymbol(self.cst.search(tmp.value, True), tmp.value) # TODO Foolproof
+        sym = self.cst.search(tmp.value, True)
+        if sym is None:
+            raise self.exception("Symbol \"{}\" is does not exist".format(tmp.value))
+        return AstSymbol(sym, tmp.value) # TODO Foolproof
 
     def compileriden(self):
         return AstNone() # Todo
@@ -133,7 +136,7 @@ class Parser:
     def array(self):
         self.crequire(Symbol.BRACKET_LEFT) # [
         etype = Type(TypeID.LET) # self.tt[self.cx.top.expected.uid].at # TODO
-        ret = AstArray([], etype) # Might throw
+        ret = AstArray([], Type(TypeID.LET)) # Might throw
 
         with self.cx.save_and_push(Context(self.cst, etype)):
             while self.cis(Symbol.COMMA) or self.cis(Symbol.BRACKET_LEFT):
@@ -142,14 +145,22 @@ class Parser:
                     break
                 else:
                     exp = self.expression() # Moves us to next comma
-                    if self.etype.uid == TypeID.LET:
-                        self.etype.uid = exp.type
-                    elif self.etype.uid != exp.type.uid: # Todo Type comparisons
+                    if etype.uid == TypeID.LET:
+                        etype.uid = exp.type.uid
+                    elif etype.uid != exp.type.uid: # Todo Type comparisons
                         raise self.exception("Cannot convert {} to {} for array".format(self.etype.uid, exp.type.uid))
                     ret.data.append(exp)
 
         self.crequire(Symbol.BRACKET_RIGHT) # ]
         self.next()
+
+        ttype = TypePointer(etype)
+        mangled = self.tt.mangle(ttype)
+        if mangled in self.tt.mangled:
+            ptype = Type(self.tt.mangled[self.tt.mangle(ttype)])
+        else:
+            ptype = Type(self.tt.add_type(mangled))
+        ret.type = ptype
 
         return ret
 
@@ -355,8 +366,8 @@ class Parser:
             while self.cis(Symbol.SEMICOLON):
                 left.stmts.append(self.fexpression())
 
-            if not self.is_booleanish(left.stmts[-1].type):
-                pass # raise self.exception("Last statement of 'if' not a boolean")
+            if not self.is_booleanish(left.stmts[-1].type) and len([x for x in self.expand_type(left.stmts[-1]) if x.uid == TypeID.SIG]) == 0:
+                raise self.exception("Last statement of 'if' not a boolean")
 
             self.etype = etype
 
@@ -419,6 +430,14 @@ class Parser:
                 else:
                     ftype = 0
                 forstart = AstBinary(Symbol.ASSIGN, decl, vardecl)
+
+                for stmt in forstart.left.stmts:
+                    var = stmt.stmt
+                    if var.name in self.cst:
+                        raise self.exception("{} already in symbol table".format(var.name))
+                    else:
+                        self.cst.add(var.name, var.sym)
+
         elif self.cis(TokenType.IDENTIFIER):
             forstart = self.assignment()
             if self.cis(Symbol.BRACE_LEFT) or self.cis(Keyword.DO):
@@ -458,6 +477,14 @@ class Parser:
             self.next() # :
 
             forcolon.right = self.expression()
+
+            for stmt in forcolon.left.stmts:
+                var = stmt.stmt
+                if var.name in self.cst:
+                    raise self.exception("{} already in symbol table".format(var.name))
+                else:
+                    self.cst.add(var.name, var.sym)
+
             ret.stmt = forcolon
             ret.op = Symbol.KWFOREACH
         elif ftype == 2: # We done boys
@@ -600,7 +627,30 @@ class Parser:
         self.crequire(Symbol.SEMICOLON)
         self.next() # ;
 
-        # TODO check returns
+        if self.etype.uid == TypeID.LET:
+            pass # First return is always fine
+        elif isinstance(ret.stmt, AstNone) and self.etype.uid != TypeID.VOID:
+            raise self.exception("Returning void from non-void function")
+        else:
+            retypes = self.tt[self.etype.uid].returns
+            num = 0
+            vnum = 0
+            while num < len(retypes):
+                if vnum < len(ret.stmt.stmts):
+                    val = ret.stmt.stmts[vnum]
+                    types = self.expand_type(val)
+                    for type in types:
+                        if retypes[num].uid == TypeID.SIG and type.uid != TypeID.SIG:
+                            ret.stmt.stmts.insert(vnum, AstQWord(0, Type(TypeID.SIG)))
+                            vnum += 1
+                        else:
+                            if not self.can_be_weak_cast(val.type, type):
+                                raise self.exception("Cannot cast return type {} to {}".format(val.type.uid, type.uid))
+                        num += 1
+                    vnum += 1
+                else:
+                    ret.stmt.stmts.append(AstQWord(0, retypes[num]))
+                    num += 1
 
         return ret
 
@@ -961,7 +1011,7 @@ class Parser:
                 raise self.exception("Declaration is not struct, union, enum, variable or function")
 
 
-    def declstructstmt(self):
+    def declstructstmt(self, id):
         if self.cis(Keyword.STRUCT):
             return self.structdecl()
         elif self.cis(Keyword.UNION):
@@ -1003,7 +1053,7 @@ class Parser:
                 self.next()  # ;
                 return ret
             elif type == 1:
-                return self.funcdecl()
+                return self.funcdecl(id)
             else:
                 raise self.exception("Declaration is not struct, union, enum, variable or function")
 
@@ -1022,7 +1072,7 @@ class Parser:
                 pt.uid = TypeID.LET
                 self.next() # let
             elif self.is_type():
-                t = self.parsertype() # TODO Arrays?
+                t = self.parsertype()
                 if isinstance(t, AstBinary):
                     pt.uid = t.left.data
                 else:
@@ -1035,10 +1085,6 @@ class Parser:
             self.next() # iden
 
             var = StVariable(pt.uid, AstDWord(0, Type(0)), pt.flags, False) # Todo correct null initialization
-            if name in self.cst:
-                raise self.exception("{} already in symbol table".format(name))
-            else:
-                self.cst.add(name, var)
 
             decl = AstUnary(Symbol.SYMDECL, AstSymbol(var, name))
             decls.stmts.append(decl)
@@ -1052,35 +1098,14 @@ class Parser:
             vals = self.vardeclass()
             ret.right = vals
 
-            valtypes = []
-            for value in vals.stmts:
-                valtypes += self.expand_type(value)
-
-            syms: List[AstUnary] = ret.left.stmts
-
-            num = 0
-            for sym in syms:
-                if num < len(vals.stmts):
-                    val = vals.stmts[num]
-
-                    if sym.stmt.sym.type == TypeID.LET:
-                        sym.stmt.sym.type = valtypes[num].uid
-                        sym.stmt.sym.flag = valtypes[num].flags
-                    elif sym.stmt.sym.type == TypeID.FUN:
-                        if not self.is_function(val.type):
-                            raise self.exception("Assigning non-function to variable declared fun")
-                        sym.stmt.sym.type = valtypes[num].uid
-                        sym.stmt.sym.flag = valtypes[num].flags
-                    else:
-                        if not self.can_be_weak_cast(valtypes[num], sym.stmt.type):
-                            raise self.exception("Cannot cast {} to {}".format(valtypes[num], sym.stmt.type))
-
-                    # sym.stmt.sym.data = val # TODO Function returns
-                    sym.stmt.sym.defined = True
-
-                    num += 1
+            for stmt in ret.left.stmts:
+                var = stmt.stmt
+                if var.name in self.cst:
+                    raise self.exception("{} already in symbol table".format(var.name))
                 else:
-                    vals.stmts.append(AstDWord(0, Type(0))) # TODO Correct null initialization
+                    self.cst.add(var.name, var.sym)
+
+            self.check_assignment(ret, True)
 
             # TODO Check everything is fine
             # TODO Assign values in the St if needed
@@ -1089,6 +1114,13 @@ class Parser:
             for _ in ret.left.stmts:
                 vals.stmts.append(AstDWord(0, Type(0)))
             ret.right = vals
+
+            for stmt in ret.left.stmts:
+                var = stmt.stmt
+                if var.name in self.cst:
+                    raise self.exception("{} already in symbol table".format(var.name))
+                else:
+                    self.cst.add(var.name, var.sym)
         return ret
 
     def vardeclass(self):
@@ -1106,7 +1138,7 @@ class Parser:
     def vardeclstruct(self):
         return self.vardecl() # TODO Structs
 
-    def funcdecl(self):
+    def funcdecl(self, id=None):
         type = TypeFunction()
 
         if self.cis(Keyword.LET) or self.cis(Keyword.VOID):
@@ -1126,13 +1158,20 @@ class Parser:
         name = self.c.value
         type.name = name
 
+        prev = None
+
         if name in self.cst: # TODO Overloading and late declaration
-            raise self.exception("Redeclaring an identifier")
+            prev = self.cst.search(name, False)
+            if prev.entrytype != StEntryType.FUNCTION:
+                raise self.exception("Redeclaring identifier {} as a function".format(name))
 
         self.next() # iden
         self.crequire(Symbol.PAREN_LEFT)
 
         self.next() # (
+
+        if id is not None:
+            type.params.append(Parameter(Type(id)))
 
         while not self.cis(Symbol.PAREN_RIGHT):
             param = self.parameter()
@@ -1148,20 +1187,37 @@ class Parser:
         type.truetype = Type(pureid)
         typeid = self.tt.add_type(type)
 
+        overload = None
+
+        if prev:
+            for ol in prev.overloads:
+                t = self.tt[ol.type.uid]
+                if t.truetype == pureid:
+                    if ol.defined:
+                        raise self.exception("Redeclaring overload {}".format(name))
+                    overload = ol
+                    break
+
         st = SymbolTable(self.cst)
         scope = AstBlock([], st)
         defined = False
 
         for param in type.params:
-            st.add(param.name, StVariable(param.type.uid, param.value, param.type.flags, True))
+            if param.name:
+                st.add(param.name, StVariable(param.type.uid, param.value, param.type.flags, True))
 
 
         astfunc = AstFunction(scope, Type(typeid))
-        stfunc = StFunction([Overload(astfunc.type, astfunc)], defined)  # TODO Overloading
-        self.cst.add(name, stfunc)
+        if not prev and not overload:
+            stfunc = StFunction([Overload(astfunc.type, astfunc, defined)], defined)  # TODO Overloading
+            self.cst.add(name, stfunc)
+        elif prev and not overload:
+            prev.add_overload(Overload(astfunc.type, astfunc, defined))
+        else:
+            overload.func = astfunc
 
         if self.cis(Symbol.BRACE_LEFT):
-            with self.cx.save_and_push(Context(st, typeid)):
+            with self.cx.save_and_push(Context(st, Type(typeid))):
                 scope = self.scope()
                 defined = True
         elif self.cis(Symbol.SEMICOLON):
@@ -1246,7 +1302,7 @@ class Parser:
             st.add(name, stfunc)
 
         self.crequire(Symbol.BRACE_LEFT, "Function values require a scope after them")
-        with self.cx.save_and_push(Context(st, typeid)):
+        with self.cx.save_and_push(Context(st, Type(typeid))):
             scope = self.scope()
 
         astfunc.block = scope
@@ -1281,7 +1337,7 @@ class Parser:
                     if self.cis(Keyword.USING):
                         using = self.usingstmt() # TODO Merge st or whatever
                     else:
-                        elem = self.declstructstmt()
+                        elem = self.declstructstmt(id)
                         if elem.asttype == AstType.POST_UNARY and elem.op == Symbol.SYMDECL:
                             name = self.tt.table[elem.stmt.type.uid].name
                             tttype.decls[name] = self.cst.search(name) # TODO Forward-declare, struct compare before pure type
@@ -1431,6 +1487,8 @@ class Parser:
         while self.cis(Symbol.COMMA):
             ret.right.stmts.append(self.aexpression())
 
+        self.check_assignment(ret)
+
         return ret
 
     def newexpression(self):
@@ -1440,10 +1498,28 @@ class Parser:
         ret = AstUnary(Symbol.KWNEW, AstBlock([], self.cst))
 
         type = self.parsertype() # TODO Remove arrays in this case
-        ret.stmt.stmts.append(AstDWord(1, Type(type.data)))
+
+        ttype = TypePointer(Type(type.data))
+        mangled = self.tt.mangle(ttype)
+        ptype = Type(0)
+        if mangled in self.tt.mangled:
+            ptype = Type(self.tt.mangled[self.tt.mangle(ttype)])
+        else:
+            ptype = Type(self.tt.add_type(mangled))
+
+        ret.stmt.stmts.append(AstDWord(1, ptype))
         while self.cis(Symbol.COMMA):
             type = self.parsertype()
-            ret.stmt.stmts.append(AstDWord(1, Type(type.data)))
+
+            ttype = TypePointer(Type(type.data))
+            mangled = self.tt.mangle(ttype)
+            ptype = Type(0)
+            if mangled in self.tt.mangled:
+                ptype = Type(self.tt.mangled[self.tt.mangle(ttype)])
+            else:
+                ptype = Type(self.tt.add_type(mangled))
+
+            ret.stmt.stmts.append(AstDWord(1, ptype))
 
         return ret
 
@@ -1477,19 +1553,20 @@ class Parser:
 
     def e17(self):
         ret = self.e16()
+        retype = self.expand_type(ret)[0]
         if self.cis(Symbol.TERNARY_CHOICE):
-            ret = AstUnary(Symbol.TERNARY_CHOICE, AstBlock([ret], self.etype)) # TODO Check boooleanness of e16
+            if not self.is_booleanish(retype):
+                raise self.exception("Ternary condition is not a boolean")
+            ret.assignable = True
+            ret = AstUnary(Symbol.TERNARY_CHOICE, AstBlock([ret], self.etype))
             self.next() # ?
             ret.stmt.stmts.append(self.e17())
             self.crequire(Symbol.TERNARY_CONDITION)
             self.next() # :
             ret.stmt.stmts.append(self.e17())
-            if ret.stmt.stmts[1].type != ret.stmt.stmts[2].type:
-                pass  # raise self.exception("Both sides of conditional must be the same type")
+            if self.expand_type(ret.stmt.stmts[1]) != self.expand_type(ret.stmt.stmts[2]):
+                raise self.exception("Both sides of conditional must be the same type(s)")
             ret.type = ret.stmt.stmts[1].type
-            if ret.type != self.etype and self.etype.uid != TypeID.LET:
-                pass  # raise self.exception("Was not expecting {}, but {}".format(ret.type.uid, self.etype.uid))
-            ret.assignable = True
         return ret
 
     def e16(self):
@@ -1524,96 +1601,110 @@ class Parser:
 
     def e11(self):
         ret = self.e10()
+        retype = self.expand_type(ret)[0]
         while self.cis(Symbol.XOR):
             self.next() # ^
             oth = self.e10()
-            if oth.type != ret.type or oth.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                pass  # raise self.exception("Cannot XOR types {} and {} together".format(ret.type.uid, oth.type.uid))
-            ret = AstBinary(Symbol.XOR, ret, oth, oth.type)
+            othype = self.expand_type(oth)[0]
+            if not self.is_integer(retype) or not self.is_integer(othype):
+                raise self.exception("Cannot XOR types {} and {} together".format(retype.uid, othype.uid))
+            ret = AstBinary(Symbol.XOR, ret, oth, othype)
         return ret
 
     def e10(self):
         ret = self.e9()
+        retype = self.expand_type(ret)[0]
         while self.cis(Symbol.OR):
             self.next()  # |
             oth = self.e9()
-            if oth.type != ret.type or oth.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                pass  # raise self.exception("Cannot OR types {} and {} together".format(ret.type.uid, oth.type.uid))
-            ret = AstBinary(Symbol.OR, ret, oth, oth.type)
+            othype = self.expand_type(oth)[0]
+            if not self.is_integer(retype) or not self.is_integer(othype):
+                raise self.exception("Cannot OR types {} and {} together".format(retype.uid, othype.uid))
+            ret = AstBinary(Symbol.OR, ret, oth, othype)
         return ret
 
     def e9(self):
         ret = self.e8()
+        retype = self.expand_type(ret)[0]
         while self.cis(Symbol.AND):
             self.next()  # &
             oth = self.e8()
-            if oth.type != ret.type or oth.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                pass  # raise self.exception("Cannot AND types {} and {} together".format(ret.type.uid, oth.type.uid))
-            ret = AstBinary(Symbol.AND, ret, oth, oth.type)
+            othype = self.expand_type(oth)[0]
+            if not self.is_integer(retype) or not self.is_integer(othype):
+                raise self.exception("Cannot AND types {} and {} together".format(retype.uid, othype.uid))
+            ret = AstBinary(Symbol.AND, ret, oth, othype)
         return ret
 
     def e8(self):
         ret = self.e7()
+        retype = self.expand_type(ret)[0]
         sym = self.c.to_symbol()
         while sym in (Symbol.BIT_SET, Symbol.BIT_TOGGLE, Symbol.BIT_CLEAR, Symbol.BIT_CHECK):
             self.next() # @| @& @? @^
             oth = self.e7()
-            if ret.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE) or oth.type.uid not in (
-                                    TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                pass  # raise self.exception("Cannot do bit operation with {} and {}".format(ret.type.uid, oth.type.uid))
-            ret = AstBinary(sym, ret, oth, ret.type if sym is not Symbol.BIT_CHECK else Type(TypeID.BOOL))
+            othype = self.expand_type(oth)[0]
+            if not self.is_integer(retype) or not self.is_integer(othype):
+                raise self.exception("Cannot do bit operation with {} and {}".format(retype.uid, othype.uid))
+            ret = AstBinary(sym, ret, oth, retype if sym is not Symbol.BIT_CHECK else Type(TypeID.BOOL))
             sym = self.c.to_symbol()
         return ret
 
     def e7(self):
         ret = self.e6()
+        retype = self.expand_type(ret)[0]
         sym = self.c.to_symbol()
         while sym in (Symbol.SHIFT_RIGHT, Symbol.SHIFT_LEFT, Symbol.ROTATE_RIGHT, Symbol.ROTATE_RIGHT):
             self.next()  # >> << >>> <<<
             oth = self.e6()
-            if ret.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE) or oth.type.uid not in (
-                                    TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                pass  # raise self.exception("Cannot do bit shift with {} and {}".format(ret.type.uid, oth.type.uid))
-            ret = AstBinary(sym, ret, oth, ret.type)
+            othype = self.expand_type(oth)[0]
+            if not self.is_integer(retype) or not self.is_integer(othype):
+                raise self.exception("Cannot do bit shift with {} and {}".format(retype.uid, othype.uid))
+            ret = AstBinary(sym, ret, oth, retype)
             sym = self.c.to_symbol()
         return ret
 
     def e6(self):
         ret = self.e5()
+        retype = self.expand_type(ret)[0]
         sym = self.c.to_symbol()
         while sym in (Symbol.ADD, Symbol.SUBTRACT, Symbol.CONCATENATE):
             self.next()  # + - ..
             oth = self.e5()
+            othype = self.expand_type(oth)[0]
             if sym is Symbol.CONCATENATE:
-                if ret.type.uid is not TypeID.STRING or oth.type.uid not in (TypeID.STRING, TypeID.CHAR):
-                    pass  # raise self.exception("Cannot concatenate {} and {}".format(ret.type.uid, oth.type.uid))
+                if ((retype.uid is not TypeID.STRING or othype.uid not in (TypeID.STRING, TypeID.CHAR)) and
+                    not self.point_to_same(retype, othype)):
+                    raise self.exception("Cannot concatenate {} and {}".format(retype.uid, othype.uid))
             else:
-                if ret.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE) or oth.type.uid not in (
-                        TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                    pass # raise self.exception("Cannot add/subtract {} and {}".format(ret.type.uid, oth.type.uid))
-            ret = AstBinary(sym, ret, oth, ret.type)
+                if not self.is_number(retype) or not self.is_number(othype):
+                    raise self.exception("Cannot add/subtract {} and {}".format(retype.uid, othype.uid))
+            ret = AstBinary(sym, ret, oth, retype)
             sym = self.c.to_symbol()
         return ret
 
     def e5(self):
         ret = self.e4()
+        retype = self.expand_type(ret)[0]
         sym = self.c.to_symbol()
         while sym in (Symbol.MULTIPLY, Symbol.DIVIDE, Symbol.MODULO):
             self.next()  # * / %
             oth = self.e4()
-            if ret.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE) or oth.type.uid not in (
-                    TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                pass # raise self.exception("Cannot do * / % with {} and {}".format(ret.type.uid, oth.type.uid))
-            ret = AstBinary(sym, ret, oth, ret.type)
+            othype = self.expand_type(oth)[0]
+            if not self.is_number(retype) or not self.is_number(othype):
+                raise self.exception("Cannot do * / % with {} and {}".format(retype.uid, othype.uid))
+            ret = AstBinary(sym, ret, oth, retype)
             sym = self.c.to_symbol()
         return ret
 
     def e4(self):
         ret = self.e3()
+        retype = self.expand_type(ret)[0]
         if self.cis(Symbol.POWER):
-            ret = AstBinary(self.next().to_symbol(), ret, self.e4(), ret.type)
-            if ret.left.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE) or ret.right.type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                pass  # raise self.exception("Cannot ** with {} and {}".format(ret.left.type.uid, ret.right.type.uid))
+            ret = AstBinary(self.next().to_symbol(), ret, self.e4())
+            othype = self.expand_type(ret.right)[0]
+            ret.type = Type(TypeID.DOUBLE) if self.is_real(retype) or self.is_real(othype) else Type(TypeID.LONG)
+            if not self.is_number(retype) or not self.is_number(othype):
+                raise self.exception("Cannot ** with {} and {}".format(retype.uid, othype.uid))
         return ret
 
     def e3(self):
@@ -1630,24 +1721,25 @@ class Parser:
                 self.next() # symbol
                 oth = self.e3()
                 assignable = False
-                type = oth.type
+                type = self.expand_type(oth)[0]
                 if sym is Symbol.LNOT:
+                    if not self.is_booleanish(type):
+                        raise self.exception("Cannot negate {}".format(type.uid))
                     type = Type(TypeID.BOOL)
                 elif sym is Symbol.DEREFERENCE:
                     ttype = self.tt[type.uid]
                     if not isinstance(ttype, TypePointer):
-                        pass  # raise self.exception("Trying to dereference non-pointer type")
+                        raise self.exception("Trying to dereference non-pointer type")
                     type = ttype.at
                     assignable = True
                 elif sym is Symbol.POINTER:
-                    # TODO Make pointer type
-                    pass
+                    ttype = TypePointer(type)
+                    ptype = Type(self.tt.mangled[self.tt.mangle(ttype)]) # TODO ?????
+                    assignable = True
+                    type = ptype
                 elif sym in (Symbol.INCREMENT, Symbol.DECREMENT, Symbol.ADD, Symbol.SUBTRACT, Symbol.NOT):
-                    if type.uid not in (TypeID.SHORT, TypeID.INT, TypeID.LONG, TypeID.BYTE):
-                        pass  # raise self.exception("Cannot apply pre-unary {} to {}".format(sym.name, type.uid))
-                elif sym == Symbol.LNOT:
-                    if not self.is_booleanish(type):
-                        pass  # raise self.exception("Cannot negate {}".format(type.uid))
+                    if not self.is_integer(type):
+                        raise self.exception("Cannot apply pre-unary {} to {}".format(sym.name, type.uid))
                 return AstUnary(sym, oth, type, assignable, False)
         else:
             return self.e2()
@@ -1661,23 +1753,27 @@ class Parser:
     def e1(self):
         ret = self.ee()
         sym = self.c.to_symbol()
+        fparam = None
         while sym in (Symbol.INCREMENT, Symbol.DECREMENT, Symbol.PAREN_LEFT, Symbol.BRACKET_LEFT, Symbol.ACCESS):
+            retype = self.expand_type(ret)[0]
             self.next() # sym
             if sym in (Symbol.INCREMENT, Symbol.DECREMENT):
-                if not self.is_integer(ret.type):
-                    raise self.exception("Cannot increment or decrement {}".format(ret.type.uid))
-                ret = AstUnary(sym, ret, ret.type)
+                if not self.is_integer(retype):
+                    raise self.exception("Cannot increment or decrement {}".format(retype.uid))
+                ret = AstUnary(sym, ret, retype)
             elif sym is Symbol.PAREN_LEFT:
                 # typ = self.tt[ret.type.uid]
                 if ret.asttype == AstType.SYMBOL and ret.sym.entrytype == StEntryType.FUNCTION:
                     typs = ret.sym.types
                 else:
-                    typs = [ret.type]
+                    typs = [retype]
 
-
-                if not self.is_function(ret.type):
-                    raise self.exception("Cannot call non-function {}".format(ret.type.uid))
+                if not self.is_function(retype):
+                    raise self.exception("Cannot call non-function {}".format(retype.uid))
                 args = []
+                if fparam:
+                    args.append(fparam)
+                    fparam = None
                 while not self.cis(Symbol.PAREN_RIGHT) and not self.cis(TokenType.EOF):
                     args.append(self.argument())
                     if self.cis(Symbol.COMMA):
@@ -1738,24 +1834,76 @@ class Parser:
 
                 ret = AstBinary(sym, ret, AstBlock(args, self.cst), typid)
             elif sym is Symbol.BRACKET_LEFT:
-                type = self.tt[ret.type.uid]
+                type = self.tt[retype.uid]
                 if type.typetype != TypeType.POINTER:
-                    pass  # raise self.exception("Cannot get array element from non-pointer")
-                etype = self.etype
-                self.etype = Type(TypeID.LONG)
+                    raise self.exception("Cannot get array element from non-pointer")
                 exp = self.expression()
-                self.etype = etype
+                exptype = self.expand_type(exp)[0]
+                if not self.is_integer(exptype):
+                    raise self.exception("Cannot index with non-integers")
                 self.crequire(Symbol.BRACKET_RIGHT)
                 self.next()
-                at = hasattr(type, 'at') and type.at or Type(0)
+                at = type.at
                 ret = AstBinary(sym, ret, exp, at, True)
             elif sym is Symbol.ACCESS:
-                if isinstance(ret, AstUnary) and ret.op == Symbol.ACCESS:
-                    name = self.c.value
-                    self.next() # iden
-                    ret.stmt.stmts.append(AstString(name)) # TODO Better?
-                else:
-                    ret = AstUnary(Symbol.ACCESS, AstBlock([ret, AstString(self.next().value)], self.cst), Type(TypeID.LET), True)
+                while True:
+                    retype = self.expand_type(ret)[0]
+                    t = self.tt[retype.uid]
+                    name = self.next().value
+                    if t.typetype == TypeType.POINTER and name != 'length':
+                        t = self.tt[t.at.uid]
+                    if t.typetype == TypeType.STRUCT or t.typetype == TypeType.UNION:
+                        if t.field_by_name(name):
+                            ret = AstUnary(Symbol.ACCESS, AstBlock([ret, AstString(name)], self.cst), t.field_by_name(name).type, True)
+                            fparam = ret
+                        elif name in t.decls:
+                            fparam = ret
+                            ret = AstSymbol(t.decls[name], name)
+                        else:
+                            f = self.cst.search(name, True)
+                            if f and f.entrytype == StEntryType.FUNCTION:
+                                fparam = ret
+                                ret = AstSymbol(f, name)
+                            else:
+                                raise self.exception("Cannot find {}".format(name))
+                    elif t.typetype == TypeType.FUNCTION:
+                        if name in t.sigs:
+                            ret = AstQWord(t.sigs.index(name), Type(TypeID.SIG))
+                            fparam = ret
+                        else:
+                            f = self.cst.search(name, True)
+                            if f and f.entrytype == StEntryType.FUNCTION:
+                                fparam = ret
+                                ret = AstSymbol(f, name)
+                            else:
+                                raise self.exception("Cannot find {}".format(name))
+                    elif isinstance(ret, AstSymbol) and ret.sym.entrytype == StEntryType.TYPE and t.typetype == TypeType.ENUM:
+                        if name in t.names:
+                            ret = AstQWord(t.names.index(name), retype)
+                        else:
+                            raise self.exception("Cannot find {}".format(name))
+                    elif t.typetype == TypeType.POINTER or t.typetype == TypeType.PRIMITIVE and t.type == PrimitiveType.STRING:
+                        if name == 'length':
+                            ret = AstUnary(Symbol.ACCESS, AstBlock([ret, AstString(name)], self.cst), Type(TypeID.LONG), False)
+                            fparam = ret
+                        else:
+                            f = self.cst.search(name, True)
+                            if f and f.entrytype == StEntryType.FUNCTION:
+                                fparam = ret
+                                ret = AstSymbol(f, name)
+                            else:
+                                raise self.exception("Cannot find {}".format(name))
+                    else:
+                        f = self.cst.search(name, True)
+                        if f and f.entrytype == StEntryType.FUNCTION:
+                            fparam = ret
+                            ret = AstSymbol(f, name)
+                        else:
+                            raise self.exception("Cannot find {}".format(name))
+                    if not self.cis(Symbol.ACCESS):
+                        break
+                    self.next() # .
+
             sym = self.c.to_symbol()
         return ret
 
@@ -1861,6 +2009,11 @@ class Parser:
         if totype.typetype == TypeType.PRIMITIVE:
             if self.is_integer(to) and self.is_integer(frm):
                 return True
+            elif self.is_real(to) and self.is_real(frm): # TODO Sizes
+                return True
+        if to.uid == frm.uid:
+            return True
+        return False
 
     def can_be_cast(self, frm: Type, to=None):
         to = to or self.etype
@@ -1923,7 +2076,10 @@ class Parser:
             pt = t.type
             return (pt == PrimitiveType.BYTE or pt == PrimitiveType.SHORT or pt == PrimitiveType.INT or
                     pt == PrimitiveType.LONG or pt == PrimitiveType.FLOAT or pt == PrimitiveType.DOUBLE or
-                    pt == PrimitiveType.LDOUBLE or pt == PrimitiveType.BOOL or pt == PrimitiveType.SIG)
+                    pt == PrimitiveType.LDOUBLE or pt == PrimitiveType.BOOL or pt == PrimitiveType.SIG or
+                    pt == PrimitiveType.FUN)
+        elif t.typetype == TypeType.FUNCTION or t.typetype == TypeType.FUNCTIONPURE:
+            return True
         else:
             return t.typetype == TypeType.POINTER
 
@@ -1937,10 +2093,63 @@ class Parser:
         else:
             return False
 
+    def point_to_same(self, a: Type, b: Type):
+        at = self.tt[a.uid]
+        bt = self.tt[b.uid]
+
+        if at.typetype != TypeType.POINTER or bt.typetype != TypeType.POINTER:
+            return False
+        else:
+            return at.at == bt.at
+
     def expand_type(self, ast):
         t = self.tt[ast.type.uid]
         if ast.asttype == AstType.BINARY and ast.op == Symbol.PAREN_LEFT:
             if t.typetype == TypeType.FUNCTION or t.typetype == TypeType.FUNCTIONPURE:
                 return t.returns
-        else:
-            return [ast.type]
+        elif ast.asttype == AstType.POST_UNARY:
+            if ast.op == Symbol.TERNARY_CHOICE:
+                if t.typetype == TypeType.FUNCTION or t.typetype == TypeType.FUNCTIONPURE:
+                    return t.returns
+                else:
+                    return [ast.type]
+            elif ast.op == Symbol.KWNEW:
+                return [x.type for x in ast.stmt.stmts]
+        return [ast.type]
+
+    def check_assignment(self, ast, decl=False):
+        vals = ast.right
+
+        valtypes = []
+        for x in range(len(vals.stmts)):
+            valtypes += [(*y, x) for y in enumerate(self.expand_type(vals.stmts[x]))]
+
+        syms: List[AstUnary] = ast.left.stmts
+
+        if not decl and len(syms) < len(valtypes):
+            raise self.exception("Not assigning enough values")
+
+        for i, sym in enumerate(syms):
+            sym = sym.stmt if decl else sym
+            if i < len(valtypes):
+                pos, val, elem = valtypes[i]
+
+                if decl and sym.sym.type == TypeID.LET:
+                    sym.sym.type = val.uid
+                    sym.sym.flag = val.flags
+                elif decl and sym.sym.type == TypeID.FUN:
+                    if not self.is_function(val):
+                        raise self.exception("Assigning non-function to variable declared fun")
+                    sym.sym.type = val.uid
+                    sym.sym.flag = val.flags
+                else:
+                    if not self.can_be_weak_cast(val, sym.type if decl else sym.type):
+                        raise self.exception("Cannot cast {} to {}".format(val, sym.type))
+
+                if isinstance(sym, AstSymbol) and not sym.sym.defined:
+                    if decl:
+                        sym.sym.data = vals.stmts[elem] if not pos else AstBinary(Symbol.THAN_LEFT, AstQWord(pos, Type(0)),
+                                                                                   vals.stmts[elem])
+                    sym.sym.defined = True
+            else:
+                vals.stmts.append(AstDWord(0, Type(0)))  # TODO Correct null initialization
