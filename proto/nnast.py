@@ -23,13 +23,13 @@ class Ast:
     pass
 
 class AstNone(Ast):
-    def __init__(self):
+    def __init__(self, type = None):
         from type import Type
         self.asttype = AstType.NONE
-        self.type = Type(0)
+        self.type = type or Type(0)
 
     def __str__(self):
-        return "AstNone()"
+        return "AstNone({})".format("Null" if self.type.uid is 14 else "Nothing" if self.type.uid is 15 else "")
 
 class AstSymbol(Ast):
     def __init__(self, sym, name=""):

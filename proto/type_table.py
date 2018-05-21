@@ -18,7 +18,9 @@ class TypeTable:
             TypePrimitive(PrimitiveType.BOOL),
             TypePrimitive(PrimitiveType.SIG),
             TypePrimitive(PrimitiveType.FUN),
-            TypePrimitive(PrimitiveType.LET)
+            TypePrimitive(PrimitiveType.LET),
+            TypePrimitive(PrimitiveType.NULL),
+            TypePrimitive(PrimitiveType.NOTHING)
         ]
         self.mangled: Dict[str, int] = {str(x): x for x in range(len(self.table))}
 

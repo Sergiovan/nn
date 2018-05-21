@@ -26,7 +26,7 @@
             <Keywords name="Folders in comment, close"></Keywords>
             <Keywords name="Keywords1">int float struct void bool string long short double float fun let sig</Keywords>
             <Keywords name="Keywords2">for if while else do continue break return switch case raise</Keywords>
-            <Keywords name="Keywords3">true false</Keywords>
+            <Keywords name="Keywords3">true false null --- this</Keywords>
             <Keywords name="Keywords4"></Keywords>
             <Keywords name="Keywords5"></Keywords>
             <Keywords name="Keywords6"></Keywords>

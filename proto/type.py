@@ -16,6 +16,8 @@ class TypeID:
     SIG = 11
     FUN = 12
     LET = 13
+    NULL = 14
+    NOTHING = 15
 
 class TypeFlag:
     VOLATILE = 1 << 0
@@ -47,12 +49,15 @@ class PrimitiveType(Enum):
     SIG = 11
     FUN = 12
     LET = 13
+    NULL = 14
+    NOTHING = 15
 
 class PointerType(Enum):
     NAKED = 0
     SHARED = 1
     WEAK = 2
     UNIQUE = 3
+
 
 class Type:
     def __init__(self, uid, flags = 0):

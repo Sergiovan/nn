@@ -3,6 +3,12 @@ from nnlogger import LOGGER
 from typing import List, Dict
 from type import Overload, TypeID
 
+class TableType(Enum):
+    DEFAULT = 0
+    STRUCT = 1
+    FUNCTION = 2
+    MAIN = 3
+
 class StEntryType(Enum):
     TYPE = 0
     VARIABLE = 1
@@ -71,9 +77,11 @@ class StNamespace(StEntry):
         return str(self)
 
 class SymbolTable:
-    def __init__(self, parent: 'SymbolTable' = None):
+    def __init__(self, parent: 'SymbolTable' = None, type = TableType.DEFAULT):
         self.parent = parent
         self.entries: Dict[str, StEntry] = {}
+        self.type = type
+        self.depth = 0 if parent is None else self.parent.depth + 1
 
     def __contains__(self, item):
         return item in self.entries
@@ -88,8 +96,11 @@ class SymbolTable:
         self.add(key, value)
 
     def search(self, name: str, propagate = False):
-        return (self.entries[name] if name in self.entries else
-                    None if not propagate or not self.parent else self.parent.search(name, True))
+        return ([self.entries[name], self] if name in self.entries else
+                    [None, None] if not propagate or not self.parent else self.parent.search(name, True))
+
+    def search_table(self, type):
+        return self.parent if self.parent is None or self.parent.type is type else self.parent.search_table(type)
 
     def add(self, name: str, entry: StEntry):
         if name in self.entries and (not hasattr(self.entries[name], 'defined') or self.entries[name].defined):

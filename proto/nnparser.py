@@ -110,9 +110,10 @@ class Parser:
 
     # Must already be defined
     def iden(self):
-        self.crequire(TokenType.IDENTIFIER)
+        if not self.cis(Keyword.THIS):
+            self.crequire(TokenType.IDENTIFIER)
         tmp = self.next()
-        sym = self.cst.search(tmp.value, True)
+        sym, _ = self.cst.search(tmp.value, True)
         if sym is None:
             raise self.exception("Symbol \"{}\" is does not exist".format(tmp.value))
         return AstSymbol(sym, tmp.value) # TODO Foolproof
@@ -135,7 +136,7 @@ class Parser:
     # Expected value must be array/pointer type
     def array(self):
         self.crequire(Symbol.BRACKET_LEFT) # [
-        etype = Type(TypeID.LET) # self.tt[self.cx.top.expected.uid].at # TODO
+        etype = Type(TypeID.LET)
         ret = AstArray([], Type(TypeID.LET)) # Might throw
 
         with self.cx.save_and_push(Context(self.cst, etype)):
@@ -790,7 +791,7 @@ class Parser:
         st = self.cst
         new = False
         for k, v in enumerate(path):
-            q = st.search(v, k == 0)
+            q, _ = st.search(v, k == 0)
             if q is None:
                 if v != pathlen - 1:
                     raise self.exception('Path element {} in {} does not exist'.format(v, '.'.join(path)))
@@ -1161,7 +1162,7 @@ class Parser:
         prev = None
 
         if name in self.cst: # TODO Overloading and late declaration
-            prev = self.cst.search(name, False)
+            prev, _ = self.cst.search(name, False)
             if prev.entrytype != StEntryType.FUNCTION:
                 raise self.exception("Redeclaring identifier {} as a function".format(name))
 
@@ -1171,7 +1172,7 @@ class Parser:
         self.next() # (
 
         if id is not None:
-            type.params.append(Parameter(Type(id)))
+            type.params.append(Parameter(Type(id), 'this'))
 
         while not self.cis(Symbol.PAREN_RIGHT):
             param = self.parameter()
@@ -1340,7 +1341,7 @@ class Parser:
                         elem = self.declstructstmt(id)
                         if elem.asttype == AstType.POST_UNARY and elem.op == Symbol.SYMDECL:
                             name = self.tt.table[elem.stmt.type.uid].name
-                            tttype.decls[name] = self.cst.search(name) # TODO Forward-declare, struct compare before pure type
+                            tttype.decls[name], _ = self.cst.search(name) # TODO Forward-declare, struct compare before pure type
                         elif elem.asttype == AstType.BINARY and elem.op == Symbol.ASSIGN:
                             for decl in elem.left.stmts:
                                 name = decl.stmt.name
@@ -1392,7 +1393,7 @@ class Parser:
                     elem = self.declstmt()
                     if elem.asttype == AstType.POST_UNARY and elem.op == Symbol.SYMDECL:
                         name = self.tt.table[elem.stmt.type.uid].name
-                        type.decls[name] = self.cst.search(name)  # TODO Forward-declare, struct compare before pure type
+                        type.decls[name], _ = self.cst.search(name)  # TODO Forward-declare, struct compare before pure type
                     elif elem.asttype == AstType.BINARY and elem.op == Symbol.ASSIGN:
                         for decl in elem.left.stmts:
                             name = decl.stmt.name
@@ -1860,7 +1861,7 @@ class Parser:
                             fparam = ret
                             ret = AstSymbol(t.decls[name], name)
                         else:
-                            f = self.cst.search(name, True)
+                            f, _ = self.cst.search(name, True)
                             if f and f.entrytype == StEntryType.FUNCTION:
                                 fparam = ret
                                 ret = AstSymbol(f, name)
@@ -1871,7 +1872,7 @@ class Parser:
                             ret = AstQWord(t.sigs.index(name), Type(TypeID.SIG))
                             fparam = ret
                         else:
-                            f = self.cst.search(name, True)
+                            f, _ = self.cst.search(name, True)
                             if f and f.entrytype == StEntryType.FUNCTION:
                                 fparam = ret
                                 ret = AstSymbol(f, name)
@@ -1887,14 +1888,14 @@ class Parser:
                             ret = AstUnary(Symbol.ACCESS, AstBlock([ret, AstString(name)], self.cst), Type(TypeID.LONG), False)
                             fparam = ret
                         else:
-                            f = self.cst.search(name, True)
+                            f, _ = self.cst.search(name, True)
                             if f and f.entrytype == StEntryType.FUNCTION:
                                 fparam = ret
                                 ret = AstSymbol(f, name)
                             else:
                                 raise self.exception("Cannot find {}".format(name))
                     else:
-                        f = self.cst.search(name, True)
+                        f, _ = self.cst.search(name, True)
                         if f and f.entrytype == StEntryType.FUNCTION:
                             fparam = ret
                             ret = AstSymbol(f, name)
@@ -1952,10 +1953,10 @@ class Parser:
             return self.funcval()
         elif self.cis(Symbol.NOTHING):
             self.next() # ---
-            return AstNone() # TODO into the trash
+            return AstNone(Type(TypeID.NOTHING)) # TODO into the trash
         elif self.cis(Keyword.NULL):
             self.next() # null
-            return AstNone() # TODO Differentiate
+            return AstNone(Type(TypeID.NULL)) # TODO Differentiate
         else:
             return self.expression()
 
@@ -1970,8 +1971,8 @@ class Parser:
         return ( self.cis(Keyword.BYTE) or self.cis(Keyword.CHAR) or self.cis(Keyword.SHORT) or self.cis(Keyword.INT)
                  or self.cis(Keyword.LONG) or self.cis(Keyword.SIG) or self.cis(Keyword.FLOAT) or self.cis(Keyword.DOUBLE)
                  or self.cis(Keyword.BOOL) or self.cis(Keyword.STRING) or self.cis(Keyword.FUN)
-                 or (self.cis(TokenType.IDENTIFIER) and self.cst.search(self.c.value, True) and
-                     self.cst.search(self.c.value, True).entrytype == StEntryType.TYPE)) # TODO Safeguard better
+                 or (self.cis(TokenType.IDENTIFIER) and self.cst.search(self.c.value, True)[0] is not None and
+                     self.cst.search(self.c.value, True)[0].entrytype == StEntryType.TYPE)) # TODO Safeguard better
 
     def is_varclass(self):
         return self.cis(Keyword.CONST) or self.cis(Keyword.VOLATILE)
@@ -1986,7 +1987,7 @@ class Parser:
                 self.cis(Symbol.DECREMENT) or self.cis(Symbol.ADD) or self.cis(Symbol.SUBTRACT) or
                 self.cis(Symbol.NOT) or self.cis(Symbol.LNOT) or self.cis(Symbol.THAN_LEFT) or
                 self.cis(Symbol.DEREFERENCE) or self.cis(Symbol.ADDRESS) or self.cis(Keyword.DELETE) or
-                self.cis(Keyword.NEW) or self.is_literal())
+                self.cis(Keyword.NEW) or self.cis(Keyword.THIS) or self.is_literal())
 
     def is_fexpression(self):
         return self.is_expression() or self.is_varclass() or self.is_type() or self.cis(Keyword.LET)
@@ -2005,6 +2006,12 @@ class Parser:
         to = to or self.etype
         totype = self.tt[to.uid]
         frmtype = self.tt[frm.uid]
+
+        if frmtype.typetype == TypeType.PRIMITIVE:
+            if frmtype.type == PrimitiveType.NULL:
+                return totype.typetype == TypeType.POINTER or self.is_function(to)
+            elif frmtype.type == PrimitiveType.NOTHING:
+                return True
 
         if totype.typetype == TypeType.PRIMITIVE:
             if self.is_integer(to) and self.is_integer(frm):
@@ -2134,16 +2141,25 @@ class Parser:
             if i < len(valtypes):
                 pos, val, elem = valtypes[i]
 
+
                 if decl and sym.sym.type == TypeID.LET:
+                    if val.uid == TypeID.NULL:
+                        raise self.exception("Cannot initialize let variable to null")
+                    elif val.uid == TypeID.NOTHING:
+                        raise self.exception("Cannot initialize let variable to nothing")
                     sym.sym.type = val.uid
                     sym.sym.flag = val.flags
                 elif decl and sym.sym.type == TypeID.FUN:
+                    if val.uid == TypeID.NULL:
+                        raise self.exception("Cannot initialize fun variable to null")
+                    elif val.uid == TypeID.NOTHING:
+                        raise self.exception("Cannot initialize fun variable to nothing")
                     if not self.is_function(val):
                         raise self.exception("Assigning non-function to variable declared fun")
                     sym.sym.type = val.uid
                     sym.sym.flag = val.flags
                 else:
-                    if not self.can_be_weak_cast(val, sym.type if decl else sym.type):
+                    if not self.can_be_weak_cast(val, sym.type):
                         raise self.exception("Cannot cast {} to {}".format(val, sym.type))
 
                 if isinstance(sym, AstSymbol) and not sym.sym.defined:
