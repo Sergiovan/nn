@@ -156,11 +156,7 @@ class Parser:
         self.next()
 
         ttype = TypePointer(etype)
-        mangled = self.tt.mangle(ttype)
-        if mangled in self.tt.mangled:
-            ptype = Type(self.tt.mangled[self.tt.mangle(ttype)])
-        else:
-            ptype = Type(self.tt.add_type(mangled))
+        ptype = Type(self.tt.get_from(ttype))
         ret.type = ptype
 
         return ret
@@ -1172,7 +1168,7 @@ class Parser:
         self.next() # (
 
         if id is not None:
-            type.params.append(Parameter(Type(id), 'this'))
+            type.params.append(Parameter(Type(id), 'this')) # TODO Pointer
 
         while not self.cis(Symbol.PAREN_RIGHT):
             param = self.parameter()
@@ -1325,6 +1321,8 @@ class Parser:
 
         tttype = TypeStruct(Type(0), {}, name) # Typetable type
         id = self.tt.add_type(tttype, False)
+        pid = self.tt.get_from(TypePointer(Type(id)))
+
 
         sttype = StType(id, False) # Symboltable type
         self.cst.add(name, sttype)
@@ -1338,7 +1336,7 @@ class Parser:
                     if self.cis(Keyword.USING):
                         using = self.usingstmt() # TODO Merge st or whatever
                     else:
-                        elem = self.declstructstmt(id)
+                        elem = self.declstructstmt(pid)
                         if elem.asttype == AstType.POST_UNARY and elem.op == Symbol.SYMDECL:
                             name = self.tt.table[elem.stmt.type.uid].name
                             tttype.decls[name], _ = self.cst.search(name) # TODO Forward-declare, struct compare before pure type
@@ -1735,7 +1733,7 @@ class Parser:
                     assignable = True
                 elif sym is Symbol.POINTER:
                     ttype = TypePointer(type)
-                    ptype = Type(self.tt.mangled[self.tt.mangle(ttype)]) # TODO ?????
+                    ptype = Type(self.tt.get_from(ttype))
                     assignable = True
                     type = ptype
                 elif sym in (Symbol.INCREMENT, Symbol.DECREMENT, Symbol.ADD, Symbol.SUBTRACT, Symbol.NOT):
@@ -1858,7 +1856,7 @@ class Parser:
                             ret = AstUnary(Symbol.ACCESS, AstBlock([ret, AstString(name)], self.cst), t.field_by_name(name).type, True)
                             fparam = ret
                         elif name in t.decls:
-                            fparam = ret
+                            fparam = AstUnary(Symbol.POINTER, ret, Type(self.tt.get_from(TypePointer(retype))), True, False)
                             ret = AstSymbol(t.decls[name], name)
                         else:
                             f, _ = self.cst.search(name, True)

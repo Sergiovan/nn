@@ -62,6 +62,12 @@ class TypeTable:
                 self.add_type(mangled)
             return self.mangled[mangled]
 
+    def get_from(self, type):
+        mangled = self.mangle(type)
+        if mangled not in self.mangled:
+            return self.add_type(type)
+        else:
+            return self.mangled[mangled]
 
     def mangle(self, type: TypeData, internal = False):
         def mangle_if_pointer(type: Type):

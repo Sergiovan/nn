@@ -43,3 +43,13 @@ proto/__pycache__/
 proto/venv/
 
 proto/examples/
+
+proto2/proto/venv/
+
+proto2/proto/__pycache__/
+
+proto2/proto/examples/todo\.txt
+
+proto2/proto/examples/tree_1\.txt
+
+proto2/proto/examples/tree_2\.txt
