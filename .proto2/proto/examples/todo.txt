@@ -1,0 +1,54 @@
+nnparser.py:
+x Foolproof iden()
+- Fit number() to correct Ast
+x Get correct array() type
+- array() type comparisons
+- struct_lit() bitfields
+- program() panic, not break
+- statement() expression statement fix
+- scopestatement() expression statement fix
+- compileropts() and compileriden()
+- Check on forstmt() scoping
+- forcond() multiple statements after third one in classic for
+- casestmt() type checking
+- trailing commas everywhere
+x returnstmt() check returns with function
+- raisestmt() add sigs to function and check returns
+- deferstmt() allow non-expressions
+- importstmt() do import
+- usingstmt() merge sts and stuff
+- namespacestmt() final namespaces, through compileropts
+- namespacescope() panic, not break
+- varclass() test signed
+- propertype() and all other varclass appearances, reverse
+- declstmt() make function-variable declaration into separate function
+- declstructstmt() same
+x vardeclperiod() arrays might be fucked, correct null initialization
+x vardecl() type checks, st updates
+x funcdecl() overloading and late declarations
+- parameter() check for spread operator
+- funcval() overloading and late declarations
+- structdecl() late declarations, using statements, forward declare function inside struct, struct comparisons, compileropts
+- uniondecl() late declarations, forward declare functions inside union (?), disable assignments, compileropts
+- enumdecl() late declarations (?)
+- newexpression() remove arrays
+- deleteexpression() statement?
+x All expressions: Type checking
+- e3() signed unsigned type cast, into pointer
+- e2() unconfuse
+x e1() fix access, overload resolution
+- argument() ...
+- aexpression() null and ---
+- is_type() better
+
+tokenizer.py:
+- to_int() integer literal parsing
+- to_char() utf-8
+- read() parsing numbers and utf-8 strings
+
+type_table.py:
+- Bitfields when mangling and unmangling
+
+Eventually:
+- $static
+- expression.struct.function()
