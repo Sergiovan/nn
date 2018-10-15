@@ -1,0 +1,14 @@
+Normal types:
+ = 1 byte normal type + 8 bytes type + 1 byte flags + 6 zero bytes
+ 
+Pointer types:
+ = 1 bytes pointer type + 1 byte pointer flags + 5 zero bytes + 8 bytes type + 1 byte flags + 7 zero bytes
+ 
+ - Sub type array:
+  = 1 bytes array type + 1 byte pointer flags + 8 bytes size + padding to 8 + 8 bytes type + 1 byte flags + 7 zero bytes
+ 
+Function types:
+ = x * (1 bytes function return type + 8 bytes return type) + y * (1 bytes function parameter type + 8 bytes parameter type + 1 byte special parameter flags)
+ 
+Struct types:
+ = x * (1 bytes struct type + 8 bytes member type + 1 byte bitfield length)

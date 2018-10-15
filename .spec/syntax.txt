@@ -1,0 +1,389 @@
+# Hash marks a comment
+# "x" is for literal character(s) x
+# {x} is 0 or more of x
+# {{x}} is 1 or more of x
+# {x; y} is 0 or more of x separated by y. Trailing y allowed
+# {{x; y}} is 1 or more of x separated by y. Trailing y allowed
+# [x] is 0 or 1 of x
+# [[x]] is [x], as regular expression syntax
+# (x) is x
+# ((x)) is x as special syntax
+# x | y is x or y
+# x, y is x followed by y
+
+
+letter = [[a-zA-Z]]
+digit  = [[0-9]]
+whitespace = [[ \n\t]]
+symbols = [[+-*/%#~&@|^!?:;<>,.'"[]{}()=\`]]
+underscore = "_"
+dollar = "$"
+other = (( !symbols & !whitespace & !dollar & !letter & !digit & !underscore ))
+identifier_legal_start = underscore | letter | other
+identifier_legal = identifier_legal_start | digit
+any = ["\\"] , letter | digit | whitespace | symbols | underscore | dollar | other
+
+tvoid        = "void"
+
+tbyte        = "byte"
+tshort       = "short"
+tint         = "int"
+tlong        = "long"
+
+tsig         = "sig"
+
+tfloat       = "float"
+tdouble      = "double"
+
+tbool        = "bool"
+
+tstruct      = "struct"
+tunion       = "union"
+tenum        = "enum"
+
+tchar        = "char"
+tstring      = "string"
+
+tfunction    = "fun"
+tlet         = "let"
+
+kwtype       = tvoid | tbyte | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tstruct | tunion | tenum | tchar | tstring | tfunction | tlet
+
+qconst       = "const"
+qvolatile    = "volatile"
+
+qsigned 	 = "signed"
+qunsigned    = "unsigned"
+
+qpointer     = "*"
+qupointer    = "*!"
+qwpointer    = "*?"
+qspointer    = "*+"
+
+kwqualifier  = qconst | qvolatile
+kwsign		 = qsigned | qunsigned
+spointer     = qpointer | qupointer | qwpointer | qspointer 
+
+cif          = "if"
+celse        = "else"
+cfor         = "for"
+cwhile       = "while"
+cdo          = "do"
+cswitch      = "switch"
+creturn      = "return"
+craise       = "raise"
+cbreak       = "break"
+ccontinue    = "continue"
+cleave       = "leave"
+cgoto        = "goto"
+clabel       = "label"
+cdefer       = "defer"
+ctry 	     = "try"
+ccatch		 = "catch"
+
+kwcontrol    = cif | celse | cfor | cwhile | cdo | cswitch | creturn | craise | cbreak | ccontinue | cleave | cgoto | clabel | cdefer | ktry | kcatch
+
+kwtrue       = "true"
+kwfalse      = "false"
+kwnull       = "null"
+kwimport     = "import"
+kwusing      = "using"
+kwnamespace  = "namespace"
+kwcase       = "case"
+kwas		 = "as"
+kwnew 		 = "new"
+kwdelete	 = "delete"
+kwthis       = "this"
+
+kwbool       = kwtrue | kwfalse
+kwmemory 	 = kwnew | kwdelete
+kwother      = kwnull | kwimport | kwusing | kwnamespace | kwcase | kwas | this
+
+rand         = "and"
+ror          = "or"
+
+kwreserved   = rand | ror
+
+snothing	 = "---"
+tokenspecial = snothing 	 
+
+opinc        = "++"
+opdec        = "--"
+
+opadd        = "+"
+opsub        = "-"
+opmul        = "*"
+oppow        = "**"
+opdiv        = "/"
+opmod        = "%"
+
+opaddress    = "*"
+opat         = "@"
+
+opnot        = "!"
+opand        = "&"
+opor         = "|"
+opxor        = "^"
+
+oplnot       = "!!"
+opland       = "&&"
+oplor        = "||"
+oplxor       = "^^"
+
+opaccess     = "."
+opconcat     = ".."
+opspread     = "..."
+
+opcond     = "?"
+opthen     = ":"
+
+opbitset     = "@|"
+opbitclear   = "@&"
+opbitcheck   = "@?"
+opbittoggle  = "@^"
+
+opbitshiftl  = "<<"
+opbitshiftr  = ">>"
+oprotatel    = "<<<"
+oprotater    = ">>>"
+
+opequals     = "=="
+opnequals    = "!="
+opgt         = ">"
+opgeqt       = ">="
+oplt         = "<"
+opleqt       = "<="
+
+opassign     = "="
+opaddassign  = "+="
+opdecassign  = "-="
+opmulassign  = "*="
+oppowassign  = "**="
+opdivassign  = "/="
+opandassign  = "&="
+oporassign   = "|="
+opxorassign  = "^="
+opshiftlassign    = "<<="
+opshiftrassign    = ">>="
+oprotatelassign   = "<<<="
+oprotatearssign   = ">>>="
+opconcatassign    = "..="
+opbitsetassign    = "@|="
+opbitclearassign  = "@&="
+opbittoggleassign = "@^="
+
+semicolon = ";"
+tilde = "~"
+comma = ","
+qmark = "?"
+colon = ":"
+emark = "!"
+oparen = "("
+cparen = ")"
+obracket = "["
+cbracket = "]"
+obrace = "{"
+cbrace = "}"
+dot = "."
+quote = "'"
+dquote = "\""
+lt = "<"
+gt = ">"
+
+unop     = opinc | opdec | opsub | opaddress | opat | opnot | oplnot | opspread
+preunop  = opinc | opdec | opsub | opaddress | opat | opnot | oplnot
+postunop = opinc | opdec | opspread
+binop    = opadd | opsub | opmul | oppow | opdiv | opmod | opand | opor | opxor | opland | oplor | oplxor | opaccess | opconcat | opbitset | opbitclear | opbitcheck | opbittoggle | opbitshiftl | opbitshiftr | oprotatel | oprotater | opequals | opnequals | opgt | opgeqt | oplt | opleqt
+ternop   = opcond | opthen
+assop    = opassign | opaddassign | opdecassign | opmulassign | oppowassign | opdivassign | oporassign | opxorassign | opshiftlassign | opshiftrassign | oprotatelassign | oprotaterassign | opconcatassign | opbitsetassign | opbitclearassign | opbittoggleassign 
+
+iden = identifier_legal_start, {identifier_legal}
+compileriden = dollar, iden
+compileropts = dollar, obracket, {compileriden; comma}, cbracket
+compilernote = compileriden | compileropts
+
+
+number = {{digit}}, [dot, {{digit}}], ["e", [[+-]], {{digit}}]
+b2number = "0", [[bB]], {{[[01]]}}
+b8number = "0", [[oO]], {{[[0-7]]}}
+b16number = "0", [[xX]], {{[[0-9a-fA-F]]}}
+banumber = {{digit}}, [[lL]], {{letter | digit}}
+
+string = {{dquote, {any}, dquote}}
+char   = quote, any, quote
+array  = obracket, {expression; comma}, cbracket
+struct_lit = obrace, [({{expression; comma}} | {{iden, assop, expression; comma}})], cbrace
+
+literal = number | b2number | b8number | b16number | banumber | string | char | array | struct_lit
+
+# Due to scope being recursive with statement, this one is put here despite the fact none of this is defined yet
+statement = [compilernote],
+  ( ifstmt | 
+	forstmt | 
+	whilestmt | 
+	switchstmt |
+	trystmt |
+	returnstmt | 
+	raisestmt | 
+	gotostmt | 
+	labelstmt |
+	deferstmt |
+	breakstmt |
+	continuestmt | 
+	leavestmt | 
+	usingstmt |
+	namespacestmt |
+	declstmt | 
+	assstmt |
+	expressionstmt |
+	scope )
+	
+(* Can replace a whole scope *)
+scopestatement = [compilernote]
+  ( ifstmt |
+	forstmt |
+	whilestmt | 
+	switchstmt | 
+	returnstmt |
+	raisestmt | 
+	gotostmt | 
+	breakstmt | 
+	continuestmt | 
+	leavestmt |
+	assstmt | 
+	expressionstmt |
+	scope )
+	
+scope = obrace, {statement}, cbrace
+
+ifstmt = cif, {fexpression, semicolon}, expression, (cdo, scopestatement | ifscope)
+ifscope = scope, [celse, scopestatement] # compilernote?
+
+forstmt = cfor, forcond, (cdo, scopestatement | scope)
+forcond = 
+	( [fexpression], semicolon, [expression], semicolon, [mexpression, {semicolon, mexpression}] | 
+	  (type | tlet), iden, colon, expression | 
+	  [type | tlet], iden, assop, expression, comma, expression, [comma, expression])
+	  
+whilestmt = cwhile, {fexpression, semicolon}, expression, (cdo, scopestatement | scope)
+
+switchstmt = cswitch, {fexpression, semicolon}, expression, switchscope
+switchscope = obrace, {casestmt}, cbrace
+casestmt = (kwcase, {{expression; comma}} | celse), (ccontinue | scope | cdo, scopestatement)
+
+trystmt = ctry, colon, {{statement}}, ccatch, (oparen, [tsig], iden, cparen, switchscope | craise, semicolon)
+
+returnstmt = creturn, [{{expression; comma}} | tvoid], semicolon
+
+raisestmt = craise, (expression | iden), semicolon
+
+gotostmt = cgoto, iden, semicolon
+labelstmt = clabel, iden, semicolon
+
+deferstmt = cdefer, statement, semicolon
+
+breakstmt = cbreak, semicolon
+continuestmt = ccontinue, semicolon
+leavestmt = cleave, semicolon
+
+importstmt = kwimport, (iden. {opaccess, iden} | string), [kwas, iden], semicolon
+usingstmt = kwusing, iden, {opaccess, iden}, [kwas, iden], semicolon
+
+namespacestmt = kwnamespace, iden, {opaccess, iden}, namespacescope
+namespacescope = obrace, {usingstmt | namespacestmt | declstmt}, cbrace
+
+typemod = {kwqualifier | kwsign}
+type = (tbyte | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tchar | tstring | functype | iden), typemod, {spointer; typemod}
+functype = tfunction, lt, {type; colon}, oparen, {type; comma}, cparen, gt
+infer = tlet | tfunction
+
+freedeclstmt = freevardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl
+
+structdeclstmt = structvardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl
+
+vardeclass  = assop, aexpression, {comma, aexpression}
+
+freevardecliden = (type | infer), iden, {comma, [type | infer], iden}
+freevardecl = vardecliden, [vardeclass]
+
+structvardecliden = (type | infer), iden, [colon, number], {comma, [type | infer], iden, [colon, number]}
+structvardecl = structvardecliden, [vardeclass]
+
+funcdecl = (type, {colon, type} | tvoid | tlet), iden, oparen, [{parameter; comma}], cparen, (scope | semicolon)
+funcval  = (type, {colon, type} | tvoid | tlet), [iden], oparen, [{parameter; comma}], cparen, [obracket, {{[opaddress], iden; comma}}, cbracket], (scope | semicolon)
+parameter = type, [opspread], [iden], [assop, aexpression]
+
+structdecl = tstruct, iden, (structscope | semicolon)
+structscope = obrace {usingstmt | structdeclstmt}, cbrace
+
+uniondecl = tunion, iden, (unionscope | semicolon)
+unionscope = obrace, {declstmt}, cbrace
+
+enumdecl = tenum, iden, (enumscope | semicolon)
+enumscope = obrace, {iden; comma}, cbrace
+
+assstmt = assignment, semicolon
+assignment = expression, {comma, expression}, assop, aexpression, {comma, aexpression}
+
+expressionstmt = expression, semicolon
+expression = newexp | deleteexp | e17
+
+newexp = kwnew, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace], {comma, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace]}
+deleteexp = kwdelete, iden, {comma, iden}
+
+e17   = e16, [e17']
+e17'  = opcond, e17, opthen, e17
+
+e16   = e15, {e16'}
+e16'  = (opequals | opnequals),  e15
+
+e15   = e14, {e15'}
+e15'  = (oplt | opleqt | opgt | opgeqt), e14
+
+e14   = e13, {e14'}
+e14'  = oplxor, e13
+
+e13   = e12, {e13'}
+e13'  = oplor, e12
+
+e12   = e11, {e12'}
+e12'  = opland, e11
+
+e11   = e10, {e11'}
+e11'  = opxor, e10
+
+e10   = e9, {e10'}
+e10'  = opor, e9
+
+e9    = e8, {e9'}
+e9'   = opand, e8
+
+e8    = e7, {e8'}
+e8'	  = (opbitset | opbitclear | opbitcheck | opbittoggle), e7
+
+e7    = e6, {e7'}
+e7'	  = (opbitshiftl | opbitshiftr | oprotatel | oprotater), e6
+
+e6    = e5, {e6'}
+e6'	  = (opadd | opsub | opconcat), e5
+
+e5    = e4, {e5'}
+e5'	  = (opmul | opdiv | opmod), e4
+
+e4    = e3, [e4']
+e4'   = oppow, e4
+
+e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | "<", ptype, ">" | opat | opaddress) e3 | e2
+
+e2  = e1, {e2'}
+e2' = (opspread)
+
+e1    = ee, {e1'}
+e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden), {opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}
+
+ee 	  = "(", (expression | funcval), ")" | literal | iden
+
+argument = aexpression | iden, "=", aexpression
+fexpression = expression | vardecl | assignment
+mexpression = expression | assignment
+aexpression = (expression | snothing | funcval)
