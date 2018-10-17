@@ -49,3 +49,9 @@ proto/examples/
 \.proto2/proto/__pycache__/
 
 \.proto2/proto/examples/
+
+\.kdev4/
+
+nn
+
+nn\.kdev4
