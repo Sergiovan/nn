@@ -16,7 +16,7 @@ else
 	suppress=> /dev/null
 endif
 
-LDLIBS=-lpthread
+LDLIBS=-lpthread -lstdc++fs
 
 INCLUDEDIR=$(PWD)/src
 INCLUDEFLAGS=$(patsubst %, -I%, $(realpath $(INCLUDEDIR)))

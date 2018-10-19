@@ -1,9 +1,36 @@
+#include <iomanip>
 #include <iostream>
 #include <utility>
+#include <map>
+#include <chrono>
+
+#include "common/grammar.h"
+#include "frontend/reader.h"
+#include "frontend/lexer.h"
+#include "common/utils.h"
+
+
 
 int main(int argc, char** argv) {
-    auto [a, b] = std::make_pair(1, "Hello");
-    std::cout << "Hello, world!" << std::endl;
-    std::cout << (a + 2) << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
+    reader* r = reader::from_file("examples/mastermind2.nn");
+    lexer  l{r};
+    
+    logger::log() << "\n[INDEX ] | [LINE  ] | [COLUMN] | [TOKEN  TYPE] | VALUE\n";
+    
+    while (!r->is_done()) {
+        token t = l.next();
+        logger::log() << '[';
+        logger::log() << std::setw(6) << t.index;
+        logger::log() << "] | [" << std::setw(6) << t.line;
+        logger::log() << "] | [" << std::setw(6) << t.column;
+        logger::log() << "] | [" << logger::color::cyan << std::setw(11) << Grammar::tokentype_names.at(t.type);
+        logger::log() << logger::color::white << "] | " << t.value;
+        logger::log() << "\n";
+    }
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    logger::log() << logger::end;
+    logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
     return 0;
 }
