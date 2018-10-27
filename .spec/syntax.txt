@@ -101,8 +101,10 @@ kwother      = kwnull | kwimport | kwusing | kwnamespace | kwcase | kwas | this
 
 rand         = "and"
 ror          = "or"
+rtypeof      = "typeof"
+rsizeof      = "sizeof"
 
-kwreserved   = rand | ror
+kwreserved   = rand | ror | rtypeof | rsizeof
 
 snothing	 = "---"
 tokenspecial = snothing 	 
@@ -233,7 +235,7 @@ statement = [compilernote],
 	leavestmt | 
 	usingstmt |
 	namespacestmt |
-	declstmt | 
+	freedeclstmt | 
 	assstmt |
 	expressionstmt |
 	scope )
@@ -290,11 +292,11 @@ importstmt = kwimport, (iden. {opaccess, iden} | string), [kwas, iden], semicolo
 usingstmt = kwusing, iden, {opaccess, iden}, [kwas, iden], semicolon
 
 namespacestmt = kwnamespace, iden, {opaccess, iden}, namespacescope
-namespacescope = obrace, {usingstmt | namespacestmt | declstmt}, cbrace
+namespacescope = obrace, {usingstmt | namespacestmt | freedeclstmt}, cbrace
 
 typemod = {kwqualifier | kwsign}
 type = (tbyte | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tchar | tstring | functype | iden), typemod, {spointer; typemod}
-functype = tfunction, lt, {type; colon}, oparen, {type; comma}, cparen, gt
+functype = tfunction, lt, {type; colon}, oparen, {type, [opspread], [opassign]; comma}, cparen, gt
 infer = tlet | tfunction
 
 freedeclstmt = freevardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl
@@ -304,7 +306,7 @@ structdeclstmt = structvardecl, semicolon | funcdecl | structdecl | uniondecl | 
 vardeclass  = assop, aexpression, {comma, aexpression}
 
 freevardecliden = (type | infer), iden, {comma, [type | infer], iden}
-freevardecl = vardecliden, [vardeclass]
+freevardecl = freevardecliden, [vardeclass]
 
 structvardecliden = (type | infer), iden, [colon, number], {comma, [type | infer], iden, [colon, number]}
 structvardecl = structvardecliden, [vardeclass]
@@ -317,7 +319,7 @@ structdecl = tstruct, iden, (structscope | semicolon)
 structscope = obrace {usingstmt | structdeclstmt}, cbrace
 
 uniondecl = tunion, iden, (unionscope | semicolon)
-unionscope = obrace, {declstmt}, cbrace
+unionscope = obrace, {freedeclstmt}, cbrace
 
 enumdecl = tenum, iden, (enumscope | semicolon)
 enumscope = obrace, {iden; comma}, cbrace
@@ -384,6 +386,6 @@ e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression
 ee 	  = "(", (expression | funcval), ")" | literal | iden
 
 argument = aexpression | iden, "=", aexpression
-fexpression = expression | vardecl | assignment
+fexpression = expression | freevardecl | assignment
 mexpression = expression | assignment
 aexpression = (expression | snothing | funcval)

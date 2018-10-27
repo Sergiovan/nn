@@ -43,7 +43,7 @@ enum class Keyword : char {
     NEW, DELETE, THIS,
 
     /* Reserved */
-    AND, OR,
+    AND, OR, TYPEOF, SIZEOF,
     
     /* Invalid */
     KEYWORD_INVALID
@@ -155,7 +155,7 @@ static const dict<Keyword> string_to_keyword {
     {"import", Keyword::IMPORT}, {"using", Keyword::USING}, {"namespace", Keyword::NAMESPACE},
     {"case", Keyword::CASE}, {"as", Keyword::AS}, {"new", Keyword::NEW}, {"delete", Keyword::DELETE},
 
-    {"and", Keyword::AND}, {"or", Keyword::OR}
+    {"and", Keyword::AND}, {"or", Keyword::OR}, {"typeof", Keyword::TYPEOF}, {"sizeof", Keyword::SIZEOF},
 };
 
 static const dict<Symbol>  string_to_symbol {

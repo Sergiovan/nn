@@ -13,7 +13,7 @@
 - Keep track of closest enclosing function and struct/enum
 - Default parameters and spread parameters are part of the type (but the user doesn't have to write them out)
 - Differentiate between expression statements and assignment statements (If token is not iden, it's an expression. If it is an iden, search until semicolon or open paren, skipping groupings. skipping groupings and find an assignment. If found, it's an assignment. Else it's an expression)
-
+- Union types can only have one default
 
 REMEMBER:
 - Make lookup starter as part of the state for dot expressions
