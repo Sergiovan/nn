@@ -50,3 +50,12 @@ std::mutex Logger::mutex{};
 thread_local Logger internal::log;
 
 }
+
+namespace utils {
+    
+u64 utflen(const std::string& str) {
+    return str.length(); // TODO
+}
+
+    
+}

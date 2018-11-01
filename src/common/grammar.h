@@ -121,6 +121,15 @@ enum class Symbol : char {
     SYMBOL_INVALID
 };
 
+template <typename K, typename V> 
+const std::map<V, K> swap_key(std::map<K, V> map) {
+    std::map<V, K> ret{};
+    for (auto elem : map) {
+        ret.insert({elem.second, elem.first});
+    }
+    return ret;
+}
+
 static const std::map<TokenType, std::string> tokentype_names {
     {TokenType::KEYWORD,               "Keyword"},
     {TokenType::SYMBOL,                "Symbol"},
@@ -157,6 +166,8 @@ static const dict<Keyword> string_to_keyword {
 
     {"and", Keyword::AND}, {"or", Keyword::OR}, {"typeof", Keyword::TYPEOF}, {"sizeof", Keyword::SIZEOF},
 };
+
+static const std::map<Keyword, std::string> keyword_names{swap_key(string_to_keyword)};
 
 static const dict<Symbol>  string_to_symbol {
     {"$", Symbol::COMPILER},
@@ -203,5 +214,7 @@ static const dict<Symbol>  string_to_symbol {
     
     {"#", Symbol::COMMENT}, {"#>", Symbol::COMMENT_START}, {"<#", Symbol::COMMENT_END},
 };
+
+static const std::map<Symbol, std::string> symbol_names{swap_key(string_to_symbol)};
 
 }

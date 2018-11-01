@@ -7,8 +7,8 @@
 
 struct ast;
 struct type;
+struct st_entry;
 class symbol_table;
-class st_entry;
 
 
 enum class east_type {
@@ -64,6 +64,7 @@ struct ast_struct {
     type* t; // Struct type
     
     explicit ast_struct(type* t);
+    ast_struct(ast** elems, type* t);
     ~ast_struct();
 };
 
@@ -126,19 +127,19 @@ struct ast {
     ast_variant n;
     
     static ast* none();
-    static ast* symbol();
-    static ast* byte();
-    static ast* word();
-    static ast* dword();
-    static ast* qword();
-    static ast* string();
-    static ast* array();
-    static ast* _struct(type* t = nullptr);
-    static ast* closure();
-    static ast* unary(bool post = true);
-    static ast* binary();
-    static ast* block();
-    static ast* function();
+    static ast* symbol(st_entry* sym = nullptr, const std::string& str = {});
+    static ast* byte(u8 value = 0, type* t = nullptr);
+    static ast* word(u16 value = 0, type* t = nullptr);
+    static ast* dword(u32 value = 0, type* t = nullptr);
+    static ast* qword(u64 value = 0, type* t = nullptr);
+    static ast* string(u8* chars = nullptr, u64 length = 0);
+    static ast* array(ast** elems = nullptr, u64 length = 0, type* t = nullptr);
+    static ast* _struct(type* t = nullptr, ast** elems = nullptr);
+    static ast* closure(ast* function = nullptr, ast** elems = nullptr, u64 size = 0);
+    static ast* unary(Grammar::Symbol op = Grammar::Symbol::SYMBOL_INVALID, ast* node = nullptr, type* t = nullptr, bool post = true, bool owned = true);
+    static ast* binary(Grammar::Symbol op = Grammar::Symbol::SYMBOL_INVALID, ast* left = nullptr, ast* right = nullptr, type* t = nullptr, bool lowned = true, bool rowned = true);
+    static ast* block(symbol_table* st = nullptr);
+    static ast* function(ast* block = nullptr, type* t = nullptr);
     
     ast_none&     as_none();
     ast_symbol&   as_symbol();

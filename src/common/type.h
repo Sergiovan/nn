@@ -193,6 +193,8 @@ struct type {
     type_pfunction& as_pfunction();
     
     bool is_primitive(int type = -1);
+    bool is_let();
+    bool is_fun();
     bool is_pointer();
     bool is_pointer(eptr_type type);
     bool is_struct();

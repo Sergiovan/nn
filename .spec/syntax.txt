@@ -219,7 +219,7 @@ struct_lit = obrace, [({{expression; comma}} | {{iden, assop, expression; comma}
 literal = number | b2number | b8number | b16number | banumber | string | char | array | struct_lit
 
 # Due to scope being recursive with statement, this one is put here despite the fact none of this is defined yet
-statement = [compilernote],
+statement = {compilernote},
   ( ifstmt | 
 	forstmt | 
 	whilestmt | 
@@ -241,7 +241,7 @@ statement = [compilernote],
 	scope )
 	
 (* Can replace a whole scope *)
-scopestatement = [compilernote]
+scopestatement = {compilernote}
   ( ifstmt |
 	forstmt |
 	whilestmt | 

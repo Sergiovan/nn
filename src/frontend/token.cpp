@@ -1,6 +1,15 @@
 #include "frontend/token.h"
 #include "frontend/reader.h"
 
+#include <sstream>
+
+token::token() {
+    r = nullptr;
+    index = 0;
+    line = 0;
+    column = 0;
+    source = std::string{};
+}
 
 token::token(reader* r) : r(r) {
     index = r->get_index();
@@ -29,6 +38,11 @@ utfchar token::as_char() {
     return a;
 }
 
+std::string token::as_string() {
+    // TODO
+    return value;
+}
+
 Grammar::Keyword token::as_keyword() {
     auto kw = Grammar::string_to_keyword.find(value);
     if(kw != Grammar::string_to_keyword.end()) {
@@ -45,4 +59,10 @@ Grammar::Symbol token::as_symbol() {
     } else {
         return Grammar::Symbol::SYMBOL_INVALID;
     }
+}
+
+std::string token::get_info() {
+    std::stringstream ss{};
+    ss << source << ":" << line << ":" << column;
+    return ss.str();
 }

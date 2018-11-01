@@ -141,6 +141,12 @@ bool type::can_weak_cast(type* o) {
     
     if (o->tt == ettype::PRIMITIVE) {
         type_primitive& op = o->as_primitive();
+        if (op.t == etype_ids::LET) {
+            return true; // Can always cast to let
+        }
+        if (op.t == etype_ids::FUN && is_function()) {
+            return true; // Can cast functions to fun
+        }
         if (op.t == etype_ids::NNULL && is_ptr_type(tt)) { // Casting null to a pointer type
             return true;
         }
@@ -291,6 +297,14 @@ type_pfunction& type::as_pfunction() {
 
 bool type::is_primitive(int type) {
     return tt == ettype::PRIMITIVE && (type < 0 || as_primitive().t == type);
+}
+
+bool type::is_let() {
+    return is_primitive(etype_ids::LET);
+}
+
+bool type::is_fun() {
+    return is_primitive(etype_ids::FUN);
 }
 
 bool type::is_pointer() {

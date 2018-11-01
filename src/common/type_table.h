@@ -41,6 +41,24 @@ public:
     type* get(const std::string& mangled);
     
     type_id next_id();
+    
+    void merge(type_table&& o);
+    
+    type* t_void{nullptr};
+    type* t_byte{nullptr};
+    type* t_short{nullptr};
+    type* t_int{nullptr};
+    type* t_long{nullptr};
+    type* t_sig{nullptr};
+    type* t_float{nullptr};
+    type* t_double{nullptr};
+    type* t_bool{nullptr};
+    type* t_char{nullptr};
+    type* t_string{nullptr};
+    type* t_fun{nullptr};
+    type* t_let{nullptr};
+    type* t_null{nullptr};
+    type* t_nothing{nullptr};
 private:
     std::vector<type*> types{};
     dict<type_id> mangle_table{};

@@ -1,6 +1,9 @@
 #include "common/ast.h"
 
 #include "common/type.h"
+#include "common/symbol_table.h"
+
+using namespace Grammar;
 
 ast_string::~ast_string() {
     if (chars) {
@@ -22,6 +25,10 @@ ast_struct::ast_struct(type* t) : t(t) {
         u64 elems = t->as_struct().fields.size();
         ast_struct::elems = new ast*[elems];
     }
+}
+
+ast_struct::ast_struct(ast** elems, type* t) : elems(elems), t(t) {
+    
 }
 
 ast_struct::~ast_struct() {
@@ -89,98 +96,97 @@ ast* ast::none() {
     return r;
 }
 
-ast* ast::symbol() {
+ast* ast::symbol(st_entry* sym, const std::string& str) {
     ast* r = new ast;
     r->t = east_type::SYMBOL;
-    r->n = ast_symbol{};
+    r->n = ast_symbol{sym, str};
     return r;
 }
 
-ast* ast::byte() {
+ast* ast::byte(u8 value, type* t) {
     ast* r = new ast;
     r->t = east_type::BYTE;
-    r->n = ast_byte{};
+    r->n = ast_byte{value, t};
     return r;
 }
 
-ast* ast::word() {
+ast* ast::word(u16 value, type* t) {
     ast* r = new ast;
     r->t = east_type::WORD;
-    r->n = ast_word{};
+    r->n = ast_word{value, t};
     return r;
 }
 
-ast* ast::dword() {
+ast* ast::dword(u32 value, type* t) {
     ast* r = new ast;
     r->t = east_type::DWORD;
-    r->n = ast_dword{};
+    r->n = ast_dword{value, t};
     return r;
 }
 
-ast* ast::qword() {
+ast* ast::qword(u64 value, type* t) {
     ast* r = new ast;
     r->t = east_type::QWORD;
-    r->n = ast_qword{};
+    r->n = ast_qword{value, t};
     return r;
 }
 
-ast* ast::string() {
+ast* ast::string(u8* chars, u64 length) {
     ast* r = new ast;
     r->t = east_type::STRING;
-    r->n = ast_string{};
+    r->n = ast_string{chars, length};
     return r;
 }
 
-ast* ast::array() {
+ast* ast::array(ast** elems, u64 length, type* t) {
     ast* r = new ast;
     r->t = east_type::ARRAY;
-    r->n = ast_array{};
+    r->n = ast_array{elems, length, t};
     return r;
 }
 
-ast* ast::_struct(type* t) {
+ast* ast::_struct(type* t, ast** elems) {
     ast* r = new ast;
     r->t = east_type::STRUCT;
-    r->n = ast_struct{t};
+    r->n = ast_struct{elems, t};
     return r;
 }
 
-ast* ast::closure() {
+ast* ast::closure(ast* function, ast** elems, u64 size) {
     ast* r = new ast;
     r->t = east_type::CLOSURE;
-    r->n = ast_closure{};
+    r->n = ast_closure{function, elems, size};
     return r;
 }
 
-ast* ast::unary(bool post) {
+ast* ast::unary(Symbol op, ast* node, type* t, bool post, bool owned) {
     ast* r = new ast;
     r->t = post ? east_type::POST_UNARY : east_type::PRE_UNARY;
-    r->n = ast_unary{};
-    r->as_unary().post = post;
+    r->n = ast_unary{op, node, t, post, owned};
     return r;
 }
 
-ast* ast::binary() {
+ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool lowned, bool rowned) {
     ast* r = new ast;
     r->t = east_type::BINARY;
-    r->n = ast_binary{};
+    r->n = ast_binary{op, left, right, t, lowned, rowned};
     return r;
 }
 
-ast* ast::block() {
+ast* ast::block(symbol_table* st) {
     ast* r = new ast;
     r->t = east_type::BLOCK;
     r->n = ast_block{};
+    r->as_block().st = st;
     return r;
 }
 
-ast* ast::function() {
+ast* ast::function(ast* block, type* t) {
     ast* r = new ast;
     r->t = east_type::FUNCTION;
-    r->n = ast_function{};
+    r->n = ast_function{block, t};
     return r;
 }
-
 
 ast_none& ast::as_none() {
     return std::get<ast_none>(n);

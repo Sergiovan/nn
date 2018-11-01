@@ -14,6 +14,22 @@ type_table::type_table() {
         }
         add_type(t);
     } // Add all primitives
+    
+    t_void = types[etype_ids::VOID];
+    t_byte = types[etype_ids::BYTE];
+    t_short = types[etype_ids::SHORT];
+    t_int = types[etype_ids::INT];
+    t_long = types[etype_ids::LONG];
+    t_sig = types[etype_ids::SIG];
+    t_float = types[etype_ids::FLOAT];
+    t_double = types[etype_ids::DOUBLE];
+    t_bool = types[etype_ids::BOOL];
+    t_char = types[etype_ids::CHAR];
+    t_string = types[etype_ids::STRING];
+    t_fun = types[etype_ids::FUN];
+    t_let = types[etype_ids::LET];
+    t_null = types[etype_ids::NNULL];
+    t_nothing = types[etype_ids::NOTHING];
 }
 
 type_table::~type_table() {
@@ -252,6 +268,9 @@ type* type_table::add_type(type* t) {
     std::string mangled{};
     if (t->tt == ettype::PFUNCTION) {
         mangled = mangle(t);
+        if (mangle_table.find(mangled) != mangle_table.end()) {
+            return nullptr; // Already in
+        }
     } else if (t->tt == ettype::FUNCTION) {
         mangled = mangle(t);
         std::string pure_mangled = mangle_pure(t);
@@ -296,3 +315,12 @@ type_id type_table::next_id() {
     return types.size();
 }
 
+void type_table::merge(type_table&& o) {
+    for (auto& t : o.types) {
+        if (add_type(t)) {
+            t = nullptr;
+        }
+    }
+    o.types.clear();
+    o.mangle_table.clear();
+}

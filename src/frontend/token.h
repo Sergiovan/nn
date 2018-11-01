@@ -6,6 +6,7 @@
 class reader;
 
 struct token {
+    token();
     token(reader* r);
     
     Grammar::TokenType type{Grammar::TokenType::NONE};
@@ -23,4 +24,6 @@ struct token {
     std::string as_string();
     Grammar::Keyword as_keyword();
     Grammar::Symbol as_symbol();
+    
+    std::string get_info();
 };

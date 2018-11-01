@@ -94,6 +94,16 @@ token lexer::peek(u64 pos) {
     }
 }
 
+void lexer::skip(u64 amount) {
+    if (amount == 0) {
+        return;
+    }
+    if (amount >= lookahead.size()) {
+        peek(amount);
+    }
+    lookahead.erase(lookahead.begin(), lookahead.begin() + std::min(amount, lookahead.size()));
+}
+
 token lexer::read() {
     token t{r};
     char c = r->next();

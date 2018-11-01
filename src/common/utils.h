@@ -144,4 +144,6 @@ namespace utils {
             return 0;
         }
     }
+    
+    u64 utflen(const std::string& str);
 }
