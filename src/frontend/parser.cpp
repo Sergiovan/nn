@@ -1,5 +1,6 @@
 #include "frontend/parser.h"
 
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 
@@ -28,6 +29,7 @@ void ctx_guard::deactivate() {
 }
 
 ast* parser::parse(lexer* l) {
+    contexts.push({root_st, nullptr, nullptr, nullptr, nullptr});
     parser::l = l;
     c = l->next();
     return program();
@@ -88,23 +90,25 @@ ast* parser::error(const std::string& msg, token* t, bool panic, epanic_mode mod
 void parser::panic(epanic_mode mode) {
     switch(mode) {
         case epanic_mode::SEMICOLON: {
-            u64 i = 0;
-            while (l->peek(i).as_symbol() != Symbol::SEMICOLON && l->peek(i).type != TokenType::END_OF_FILE) {
-                ++i;
-            }
-            l->skip(i);
-            next(); // Into the semicolon
+            skip_until(Symbol::SEMICOLON);
         }
         break;
         case epanic_mode::COMMA: {
-            u64 i = 0;
-            while (l->peek(i).as_symbol() != Symbol::COMMA && l->peek(i).type != TokenType::END_OF_FILE) {
-                ++i;
-            }
-            l->skip(i);
-            next(); // Into the comma
+            skip_until(Symbol::COMMA);
         }
         break;
+        case epanic_mode::ESCAPE_BRACE: 
+            skip_until(Symbol::BRACE_RIGHT);
+            break;
+        case epanic_mode::ESCAPE_BRACKET:
+            skip_until(Symbol::BRACKET_RIGHT);
+            break;
+        case epanic_mode::ESCAPE_PAREN:
+            skip_until(Symbol::PAREN_RIGHT);
+            break;
+        case epanic_mode::IN_ARRAY:
+            skip_until({Symbol::BRACKET_RIGHT, Symbol::COMMA});
+            break;
         default:
             throw parser_exception{};
     } 
@@ -185,6 +189,122 @@ bool parser::require(Grammar::Keyword kw, const std::string& err) {
     return true;
 }
 
+token parser::skip(u64 amount) {
+    l->skip(amount);
+    return next();
+}
+
+bool parser::can_peek_skip_groups (u64 from) {
+    return peek(Symbol::PAREN_LEFT, from) && !peek(Symbol::BRACE_LEFT, from) && !peek(Symbol::BRACKET_LEFT, from);
+}
+
+u64 parser::peek_skip_groups(u64 from) {
+    if (!can_peek_skip_groups(from)) {
+        return 0;
+    }
+    std::stack<Symbol> syms{};
+    u64 ahead = from;
+    token t = l->peek(ahead++);
+    syms.push(t.as_symbol());
+    while (!syms.empty()) {
+        t = l->peek(ahead++);
+        if (t.type == TokenType::END_OF_FILE) {
+            break;
+        } else if (t.type == TokenType::SYMBOL) {
+            if (t.as_symbol() == Symbol::PAREN_RIGHT && syms.top() == Symbol::PAREN_LEFT) {
+                syms.pop();
+            } else if (t.as_symbol() == Symbol::BRACE_RIGHT && syms.top() == Symbol::BRACE_LEFT) {
+                syms.pop();
+            } else if (t.as_symbol() == Symbol::BRACKET_RIGHT && syms.top() == Symbol::BRACKET_LEFT) {
+                syms.pop();
+            } else if (t.as_symbol() == Symbol::PAREN_LEFT) {
+                syms.push(t.as_symbol());
+            } else if (t.as_symbol() == Symbol::BRACE_LEFT) {
+                syms.push(t.as_symbol());
+            } else if (t.as_symbol() == Symbol::BRACKET_LEFT) {
+                syms.push(t.as_symbol());
+            }
+        }
+    }
+    return ahead - from;
+}
+
+token parser::skip_until(TokenType tt, bool skip_groups) {
+    u64 amount = 0;
+    
+    token t = l->peek(amount);
+    while (t.type != tt && t.type != TokenType::END_OF_FILE) {
+        if (skip_groups) {
+            u64 skip_amount = peek_skip_groups(amount);
+            if (skip_amount) {
+                amount += skip_amount;
+                t = l->peek(amount);
+                continue;
+            }
+        }
+        t = l->peek(++amount);
+    }
+    return skip(amount);
+}
+
+token parser::skip_until(Symbol sym, bool skip_groups) {
+    u64 amount = 0;
+    
+    token t = l->peek(amount);
+    while (t.type != TokenType::END_OF_FILE && t.as_symbol() != sym) {
+        if (skip_groups) {
+            u64 skip_amount = peek_skip_groups(amount);
+            if (skip_amount) {
+                amount += skip_amount;
+                t = l->peek(amount);
+                continue;
+            }
+        }
+        t = l->peek(++amount);
+    }
+    return skip(amount);
+}
+
+token parser::skip_until(const std::vector<Grammar::Symbol>& syms, bool skip_groups) {
+    if (syms.empty()) {
+        throw parser_exception{};
+    }
+    u64 amount = 0;
+    
+    token t = l->peek(amount);
+    while (t.type != TokenType::END_OF_FILE && 
+          (t.as_symbol() == Symbol::SYMBOL_INVALID || std::find(syms.begin(), syms.end(),  t.as_symbol()) != syms.end())) {
+        if (skip_groups) {
+            u64 skip_amount = peek_skip_groups(amount);
+            if (skip_amount) {
+                amount += skip_amount;
+                t = l->peek(amount);
+                continue;
+            }
+        }
+        t = l->peek(++amount);
+    }
+    return skip(amount);
+}
+
+token parser::skip_until(Keyword kw, bool skip_groups) {
+    u64 amount = 0;
+    
+    token t = l->peek(amount);
+    while (t.type != TokenType::END_OF_FILE && t.as_keyword() != kw) {
+        if (skip_groups) {
+            u64 skip_amount = peek_skip_groups(amount);
+            if (skip_amount) {
+                amount += skip_amount;
+                t = l->peek(amount);
+                continue;
+            }
+        }
+        t = l->peek(++amount);
+    }
+    return skip(amount);
+}
+
 ast* parser::iden() {
     if (is(Keyword::THIS)) {
         require(TokenType::IDENTIFIER);
@@ -242,7 +362,7 @@ ast* parser::character() {
 ast* parser::array() {
     require(Symbol::BRACKET_LEFT);
     std::vector<ast*> elems{};
-    type* t = types.t_let;
+    type* t = ctx().expected; // Needs to be set as the type of the element, not the type of the array
     
     do {
         next(); // [ ,
@@ -250,18 +370,39 @@ ast* parser::array() {
             break;
         } else {
             ast* exp = expression();
-            if (!exp->get_type()->can_weak_cast(t)) {
-                return error("Cannot cast to array type", nullptr, true, epanic_mode::COMMA);
+            if (!exp->get_type()->can_weak_cast(t)) { // Eventually ANY arrays will be a thing, not for now
+                exp = error("Cannot cast to array type", nullptr, true, epanic_mode::IN_ARRAY);
+                continue;
+            } else if (t == types.t_let) {
+                t = exp->get_type();
             }
+            elems.push_back(exp);
         }
     } while (is(Symbol::COMMA));
+    require(Symbol::BRACKET_RIGHT);
+    
+    next(); // ]
+    
+    type arr_type{{eptr_type::ARRAY, 0, t}};
+    type* asttype = types.get_or_add(arr_type);
+    
+    ast* ret = ast::array(nullptr, elems.size(), asttype);
+    std::memcpy(ret->as_array().elems, elems.data(), elems.size() * sizeof(ast*));
+    return ret;
 }
 
 ast* parser::struct_lit() {
+    require(Symbol::BRACE_LEFT);
+    type* t = ctx().expected; // Needs to be set as the type of the struct
+    
     return nullptr;
 }
 
-ast* parser::literal() {
+ast* parser::safe_literal() {
+    return nullptr;
+}
+
+ast* parser::compound_literal() {
     return nullptr;
 }
 
@@ -449,19 +590,19 @@ ast* parser::assignment() {
     return nullptr;
 }
 
+ast* parser::newinit() {
+    return nullptr;
+}
+
+ast* parser::deletestmt() {
+    return nullptr;
+}
+
 ast* parser::expressionstmt() {
     return nullptr;
 }
 
 ast* parser::expression() {
-    return nullptr;
-}
-
-ast* parser::newexpr() {
-    return nullptr;
-}
-
-ast* parser::deleteexpr() {
     return nullptr;
 }
 

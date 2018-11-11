@@ -13,7 +13,7 @@ struct st_entry;
 
 enum class ettype {
     PRIMITIVE, POINTER, STRUCT, UNION,
-    ENUM, FUNCTION, PSTRUCT, PFUNCTION
+    ENUM, COMBINATION, FUNCTION, PSTRUCT, PFUNCTION
 };
 
 enum class eptr_type {
@@ -92,6 +92,12 @@ namespace eparam_flags {
 
 struct type;
 
+struct pfield {
+    type* t;
+    u8 bits{64};
+    bool bitfield{false};
+};
+
 struct field {
     type* t;
     ast* value{nullptr}; // Owned
@@ -129,10 +135,15 @@ struct type_pointer {
     type* t{nullptr};
 };
 
+struct type_pstruct {
+    std::vector<pfield> fields;
+    u64 size{0};
+};
+
 struct type_struct {
+    type_pstruct* pure{nullptr};
     std::vector<field> fields;
     st_entry* ste;
-    u64 size{0};
 };
 
 struct type_union {
@@ -150,21 +161,40 @@ struct type_enum {
     u64 size{0};
 };
 
+struct type_combination {
+    std::vector<type*> types{};
+};
+
+
 struct type_pfunction {
-    std::vector<type*> returns{};
+    type* rets{nullptr};
     std::vector<pparameter> params{};
 };
 
 struct type_function {
     type_pfunction* pure{nullptr};
     std::vector<parameter> params{};
-    dict<u64> sigs{};
+    st_entry* ste;
 };
 
-using type_variant = std::variant<type_primitive, type_pointer, type_struct, type_union, 
-                                  type_enum, type_function, type_pfunction>;
+using type_variant = std::variant<type_primitive, type_pointer, 
+                                  type_pstruct, type_struct, type_union, 
+                                  type_enum, type_combination, type_function, type_pfunction>;
 
 struct type {
+    type() = default;
+    type(ettype ttype, type_id id = 0, type_flags flags = 0);
+    type(ettype ttype, type_id id, type_flags flags, type_variant t);
+    type(type_primitive t);
+    type(type_pointer t);
+    type(type_pstruct t);
+    type(type_struct t);
+    type(type_union t);
+    type(type_enum t);
+    type(type_combination t);
+    type(type_function t);
+    type(type_pfunction t);
+    
     ettype     tt;
     type_id    id{0};
     type_flags flags{0};
@@ -178,27 +208,32 @@ struct type {
     
     static type* primitive();
     static type* pointer();
+    static type* pstruct();
     static type* _struct();
     static type* _union();
     static type* _enum();
+    static type* combination();
     static type* function();
     static type* pfunction();
     
-    type_primitive& as_primitive();
-    type_pointer&   as_pointer();
-    type_struct&    as_struct();
-    type_union&     as_union();
-    type_enum&      as_enum();
-    type_function&  as_function();
-    type_pfunction& as_pfunction();
+    type_primitive&   as_primitive();
+    type_pointer&     as_pointer();
+    type_pstruct&     as_pstruct();
+    type_struct&      as_struct();
+    type_union&       as_union();
+    type_enum&        as_enum();
+    type_combination& as_combination();
+    type_function&    as_function();
+    type_pfunction&   as_pfunction();
     
     bool is_primitive(int type = -1);
     bool is_let();
     bool is_fun();
     bool is_pointer();
     bool is_pointer(eptr_type type);
-    bool is_struct();
+    bool is_struct(bool pure = false);
     bool is_union();
     bool is_enum();
+    bool is_combination();
     bool is_function(bool pure = false);
 };

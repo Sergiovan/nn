@@ -84,13 +84,18 @@ std::string type_table::mangle(type* t) {
             add_bytes(ss, p.t->id);
             return ss.str();
         }
+        case ettype::COMBINATION: {
+            auto& c = t->as_combination();
+            ss << mangle_bytes::combination_start;
+            add_bytes(ss, (u64) c.types.size());
+            for (auto& typ : c.types) {
+                add_bytes(ss, typ->id);
+            }
+        }
         case ettype::PFUNCTION: {
             auto& pf = t->as_pfunction();
-            ss << mangle_bytes::function_start << (char) t-> flags;
-            for (auto t : pf.returns) {
-                ss << mangle_bytes::function_return;
-                add_bytes(ss, t->id);
-            }
+            ss << mangle_bytes::function_start << (char) t->flags;
+            add_bytes(ss, pf.rets->id);
             for (auto& p : pf.params) {
                 ss << mangle_bytes::function_param;
                 add_bytes(ss, p.t->id);
@@ -99,7 +104,14 @@ std::string type_table::mangle(type* t) {
             return ss.str();
         }
         case ettype::PSTRUCT: {
-            return {};
+            auto& ps = t->as_pstruct();
+            ss << mangle_bytes::struct_start << (char) t->flags;
+            for (auto& f : ps.fields) {
+                ss << mangle_bytes::struct_separator;
+                add_bytes(ss, f.t->id);
+                ss << (char) f.bits;
+            }
+            return ss.str();
         }
         default:
             ss << mangle_bytes::normal_start;
@@ -117,10 +129,8 @@ std::string type_table::mangle_pure(type* t) {
         case ettype::FUNCTION: {
             auto& f = t->as_function();
             auto pf = f.pure;
-            for (auto t : pf->returns) {
-                ss << mangle_bytes::function_return;
-                add_bytes(ss, t->id);
-            }
+            ss << mangle_bytes::function_start << (char) t->flags;
+            add_bytes(ss, pf->rets->id);
             for (auto& p : pf->params) {
                 ss << mangle_bytes::function_param;
                 add_bytes(ss, p.t->id);
@@ -131,7 +141,7 @@ std::string type_table::mangle_pure(type* t) {
         case ettype::STRUCT: {
             auto& s = t->as_struct();
             ss << mangle_bytes::struct_start << (char) t->flags;
-            for (auto& f : s.fields) {
+            for (auto& f : s.pure->fields) {
                 ss << mangle_bytes::struct_separator;
                 add_bytes(ss, f.t->id);
                 ss << (char) f.bits;
@@ -201,15 +211,15 @@ type type_table::unmangle(const std::string& mangled) {
         }
         case mangle_bytes::struct_start: {
             type_flags flags = (u8) mangled[1];
-            type t{ettype::STRUCT, etype_ids::LET, flags, type_struct{{}, nullptr}};
-            auto& fields = t.as_struct().fields;
+            type t{ettype::PSTRUCT, etype_ids::LET, flags, type_pstruct{{}}};
+            auto& fields = t.as_pstruct().fields;
             u64 pt{0};
             while (pt < mangled.length()) {
                 if (mangled[pt] != mangle_bytes::struct_separator) {
                     break;
                 }
                 std::memcpy(&cti.str, &mangled[pt + 1], sizeof(type_id));
-                fields.push_back({types[cti.id], nullptr, (type_flags) mangled[pt + 1 + sizeof(type_id)]});
+                fields.push_back({types[cti.id], (type_flags) mangled[pt + 1 + sizeof(type_id)]});
                 pt += 10;
             }
             return t;
@@ -229,20 +239,25 @@ type type_table::unmangle(const std::string& mangled) {
             }
             return t;
         }
+        case mangle_bytes::combination_start: {
+            type t{ettype::COMBINATION, etype_ids::LET, 0, type_combination{}};
+            auto& typs = t.as_combination().types;
+            std::memcpy(&cti.str, &mangled[1], sizeof(u64));
+            u64 size = cti.id;
+            for (u64 i = 0; i < size; ++i) {
+                std::memcpy(&cti.str, &mangled[1 + sizeof(u64) * (i + 1)], sizeof(u64));
+                typs.push_back(types[cti.id]);
+            }
+            return t;
+        }
         case mangle_bytes::function_start: {
             type_flags flags = (u8) mangled[1];
             type t{ettype::PFUNCTION, etype_ids::FUN, flags, type_pfunction{}};
-            auto& rets = t.as_pfunction().returns;
+            auto& rets = t.as_pfunction().rets;
             auto& params = t.as_pfunction().params;
-            u64 pt{2};
-            while (pt < mangled.length()) {
-                if (mangled[pt] != mangle_bytes::function_return) {
-                    break;
-                }
-                std::memcpy(&cti.str, &mangled[pt + 1], sizeof(type_id));
-                rets.push_back({types[cti.id]});
-                pt += 9;
-            }
+            std::memcpy(&cti.str, &mangled[2], sizeof(type_id));
+            rets = types[cti.id];
+            u64 pt{9};
             while (pt < mangled.length()) {
                 if (mangled[pt] != mangle_bytes::function_param) {
                     break;
@@ -266,19 +281,23 @@ type* type_table::add_type(type* t) {
     t->id = next_id();
     types.push_back(t);
     std::string mangled{};
-    if (t->tt == ettype::PFUNCTION) {
+    if (t->tt == ettype::PFUNCTION || t->tt == ettype::PSTRUCT) {
         mangled = mangle(t);
         if (mangle_table.find(mangled) != mangle_table.end()) {
             return nullptr; // Already in
         }
-    } else if (t->tt == ettype::FUNCTION) {
+    } else if (t->tt == ettype::FUNCTION || t->tt == ettype::STRUCT) {
         mangled = mangle(t);
         std::string pure_mangled = mangle_pure(t);
         type* ptp = get(pure_mangled);
         if (!ptp) {
             ptp = add_type(pure_mangled);
         }
-        t->as_function().pure = &ptp->as_pfunction();
+        if (t->tt == ettype::STRUCT) {
+            t->as_struct().pure = &ptp->as_pstruct();
+        } else {
+            t->as_function().pure = &ptp->as_pfunction();
+        }
     } else {
         mangled = mangle(t);
     }
@@ -302,13 +321,21 @@ type* type_table::get(type& t) {
     return get(mangle(&t));
 }
 
-type* type_table::get(const std::string& mangled){
+type* type_table::get(const std::string& mangled) {
     auto t = mangle_table.find(mangled);
     if (t == mangle_table.end()) {
         return nullptr;
     } else {
         return types[t->second];
     }
+}
+
+type* type_table::get_or_add(type& t) {
+    type* ret = get(t);
+    if (!ret) {
+        ret = add_type(&t);
+    }
+    return ret;
 }
 
 type_id type_table::next_id() {

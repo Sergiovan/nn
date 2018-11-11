@@ -15,7 +15,8 @@ class symbol_table;
 class parser;
 
 enum class epanic_mode {
-    SEMICOLON, COMMA, ESCAPE_BRACE, ESCAPE_BRACKET, ESCAPE_PAREN
+    SEMICOLON, COMMA, ESCAPE_BRACE, ESCAPE_BRACKET, ESCAPE_PAREN,
+    IN_ARRAY
 };
 
 struct context {
@@ -74,6 +75,15 @@ private:
     bool require(Grammar::Symbol sym, const std::string& err = {});
     bool require(Grammar::Keyword kw, const std::string& err = {});
     
+    token skip(u64 amount = 1);
+    bool can_peek_skip_groups(u64 from);
+    u64 peek_skip_groups(u64 from = 0);
+    
+    token skip_until(Grammar::TokenType tt, bool skip_groups = true);
+    token skip_until(Grammar::Symbol sym, bool skip_groups = true);
+    token skip_until(const std::vector<Grammar::Symbol>& syms, bool skip_groups = true);
+    token skip_until(Grammar::Keyword kw, bool skip_groups = true);
+    
     ast* iden();
     ast* compileriden();
     ast* compileropts();
@@ -84,7 +94,9 @@ private:
     ast* character();
     ast* array();
     ast* struct_lit();
-    ast* literal();
+    
+    ast* safe_literal();
+    ast* compound_literal();
     
     ast* program();
     ast* statement();
@@ -155,11 +167,11 @@ private:
     ast* assstmt();
     ast* assignment();
     
+    ast* newinit();
+    ast* deletestmt();
+    
     ast* expressionstmt();
     ast* expression();
-    
-    ast* newexpr();
-    ast* deleteexpr();
     
     ast* e17();
     ast* e16();
@@ -200,3 +212,4 @@ private:
     
     friend struct ctx_guard;
 };
+

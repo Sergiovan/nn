@@ -103,8 +103,10 @@ rand         = "and"
 ror          = "or"
 rtypeof      = "typeof"
 rsizeof      = "sizeof"
+ryield		 = "yield"
+rany		 = "any"
 
-kwreserved   = rand | ror | rtypeof | rsizeof
+kwreserved   = rand | ror | rtypeof | rsizeof | ryield | rany
 
 snothing	 = "---"
 tokenspecial = snothing 	 
@@ -174,6 +176,9 @@ opbitsetassign    = "@|="
 opbitclearassign  = "@&="
 opbittoggleassign = "@^="
 
+opto = "->"
+opfrom = "<-"
+
 semicolon = ";"
 tilde = "~"
 comma = ","
@@ -191,6 +196,8 @@ quote = "'"
 dquote = "\""
 lt = "<"
 gt = ">"
+rarrow = "->"
+larrow = "<-"
 
 unop     = opinc | opdec | opsub | opaddress | opat | opnot | oplnot | opspread
 preunop  = opinc | opdec | opsub | opaddress | opat | opnot | oplnot
@@ -216,7 +223,8 @@ char   = quote, any, quote
 array  = obracket, {expression; comma}, cbracket
 struct_lit = obrace, [({{expression; comma}} | {{iden, assop, expression; comma}})], cbrace
 
-literal = number | b2number | b8number | b16number | banumber | string | char | array | struct_lit
+safe_literal = number | b2number | b8number | b16number | banumber | string | char
+compound_literal = array | struct_lit
 
 # Due to scope being recursive with statement, this one is put here despite the fact none of this is defined yet
 statement = {compilernote},
@@ -238,6 +246,7 @@ statement = {compilernote},
 	freedeclstmt | 
 	assstmt |
 	expressionstmt |
+	deletestmt |
 	scope )
 	
 (* Can replace a whole scope *)
@@ -254,6 +263,7 @@ scopestatement = {compilernote}
 	leavestmt |
 	assstmt | 
 	expressionstmt |
+	deletestmt |
 	scope )
 	
 scope = obrace, {statement}, cbrace
@@ -295,7 +305,8 @@ namespacestmt = kwnamespace, iden, {opaccess, iden}, namespacescope
 namespacescope = obrace, {usingstmt | namespacestmt | freedeclstmt}, cbrace
 
 typemod = {kwqualifier | kwsign}
-type = (tbyte | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tchar | tstring | functype | iden), typemod, {spointer; typemod}
+arraysize = obracket, [expression], cbracket
+type = (tbyte | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tchar | tstring | functype | iden), typemod, {spointer | arraysize; typemod}
 functype = tfunction, lt, {type; colon}, oparen, {type, [opspread], [opassign]; comma}, cparen, gt
 infer = tlet | tfunction
 
@@ -327,11 +338,11 @@ enumscope = obrace, {iden; comma}, cbrace
 assstmt = assignment, semicolon
 assignment = expression, {comma, expression}, assop, aexpression, {comma, aexpression}
 
-expressionstmt = expression, semicolon
-expression = newexp | deleteexp | e17
+newinit = kwnew, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace], {comma, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace]}
+deletestmt = kwdelete, iden, {comma, iden}, semicolon
 
-newexp = kwnew, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace], {comma, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace]}
-deleteexp = kwdelete, iden, {comma, iden}
+expressionstmt = expression, semicolon
+expression = e17
 
 e17   = e16, [e17']
 e17'  = opcond, e17, opthen, e17
@@ -375,7 +386,7 @@ e5'	  = (opmul | opdiv | opmod), e4
 e4    = e3, [e4']
 e4'   = oppow, e4
 
-e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | "<", ptype, ">" | opat | opaddress) e3 | e2
+e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | opat | opaddress) e3 | (lt, type, gt, (compound_literal, e2 | e3)) | e2
 
 e2  = e1, {e2'}
 e2' = (opspread)
@@ -383,9 +394,9 @@ e2' = (opspread)
 e1    = ee, {e1'}
 e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden), {opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}
 
-ee 	  = "(", (expression | funcval), ")" | literal | iden
+ee 	  = "(", (expression | funcval), ")" | safe_literal | iden
 
 argument = aexpression | iden, "=", aexpression
 fexpression = expression | freevardecl | assignment
 mexpression = expression | assignment
-aexpression = (expression | snothing | funcval)
+aexpression = (compound_literal | newinit | expression | snothing | funcval)

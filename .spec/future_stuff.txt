@@ -1,0 +1,24 @@
+Yielding and coroutines:
+Coroutine objects are not normal function pointers, they hold their own stack. Functions with "yield" are coroutines. Coroutines must have an ending "return" or "raise" that's always reached.
+
+Typeof:
+"typeof <iden>" or "typeof <type>", returns a number. Runtime types also available if used.
+
+Sizeof: 
+"sizeof <iden>" or "sizeof <type>", returns the number of bytes the type takes, sans extras (like type info, etc)
+
+any array:
+"any[] <iden>", gives an array of arbitrary types. Values need to be converted before use.
+
+Generic functions:
+"<returns> <iden> <any as K, int, double, string as V> <params>" (Syntax not final)
+
+Generic struct:
+"struct <iden> <any as K, int, double, string as V> <struct>" (Syntax not final)
+
+Combination type casting:
+"<{typename or number; colon}>" allows reordering or ditching of combination types' types
+"<let>" allows for automatic reordering based on context clues (only for assignments)
+
+Multicasting:
+"<a -> b>" casts to a, then to b. Chainable

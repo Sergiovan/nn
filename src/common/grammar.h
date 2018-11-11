@@ -44,6 +44,7 @@ enum class Keyword : char {
 
     /* Reserved */
     AND, OR, TYPEOF, SIZEOF,
+    YIELD, ANY,
     
     /* Invalid */
     KEYWORD_INVALID
@@ -103,6 +104,8 @@ enum class Symbol : char {
     BRACE_LEFT, BRACE_RIGHT,
     BRACKET_LEFT, BRACKET_RIGHT,
     /*DOT, THAN_LEFT, THAN_RIGHT,*/
+    
+    TO, FROM,
     
     /* NOT SYMBOLS, JUST FOR AST PURPOSES */
     KWIF, KWELSE, KWFOR, KWFORCLASSIC, KWFOREACH, KWFORLUA,
@@ -164,7 +167,7 @@ static const dict<Keyword> string_to_keyword {
     {"import", Keyword::IMPORT}, {"using", Keyword::USING}, {"namespace", Keyword::NAMESPACE},
     {"case", Keyword::CASE}, {"as", Keyword::AS}, {"new", Keyword::NEW}, {"delete", Keyword::DELETE},
 
-    {"and", Keyword::AND}, {"or", Keyword::OR}, {"typeof", Keyword::TYPEOF}, {"sizeof", Keyword::SIZEOF},
+    {"and", Keyword::AND}, {"or", Keyword::OR}, {"typeof", Keyword::TYPEOF}, {"sizeof", Keyword::SIZEOF}, {"yield", Keyword::YIELD}, {"any", Keyword::ANY}
 };
 
 static const std::map<Keyword, std::string> keyword_names{swap_key(string_to_keyword)};
@@ -211,6 +214,8 @@ static const dict<Symbol>  string_to_symbol {
     /*{":", Symbol::COLON},*/{"(", Symbol::PAREN_LEFT}, {")", Symbol::PAREN_RIGHT},
     {"{", Symbol::BRACE_LEFT}, {"}", Symbol::BRACE_RIGHT}, {"[", Symbol::BRACKET_LEFT},
     {"]", Symbol::BRACKET_RIGHT},/*{"<", Symbol::THAN_LEFT},*//*{">", Symbol::THAN_RIGHT},*/
+    
+    {"->", Symbol::TO}, {"<-", Symbol::FROM},
     
     {"#", Symbol::COMMENT}, {"#>", Symbol::COMMENT_START}, {"<#", Symbol::COMMENT_END},
 };

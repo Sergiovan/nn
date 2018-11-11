@@ -16,6 +16,20 @@ type_union::~type_union() {
     }
 };
 
+type::type(ettype ttype, type_id id, type_flags flags) : tt(ttype), id(id), flags(flags) {}
+type::type(ettype ttype, type_id id, type_flags flags, type_variant t) : tt(ttype), id(id), flags(flags), t(t) {}
+
+
+type::type(type_primitive t) : tt(ettype::PRIMITIVE), t(t) {}
+type::type(type_pointer t) : tt(ettype::POINTER), t(t) {}
+type::type(type_pstruct t) : tt(ettype::PSTRUCT), t(t) {}
+type::type(type_struct t) : tt(ettype::STRUCT), t(t) {}
+type::type(type_union t) : tt(ettype::UNION), t(t) {}
+type::type(type_enum t) : tt(ettype::ENUM), t(t) {}
+type::type(type_combination t) : tt(ettype::COMBINATION), t(t) {}
+type::type(type_function t) : tt(ettype::FUNCTION), t(t) {}
+type::type(type_pfunction t) : tt(ettype::PFUNCTION), t(t) {}
+
 u64 type::get_size() {
     switch (tt) {
         case ettype::PRIMITIVE:
@@ -46,30 +60,39 @@ u64 type::get_size() {
                 return 8;
             }
         }
-        case ettype::STRUCT: { // TODO Not packed like this
-            type_struct& s = as_struct();
-            if (s.size) {
-                return s.size;
+        case ettype::PSTRUCT: { // TODO Not packed like this
+            type_pstruct& ps = as_pstruct();
+            if (ps.size) {
+                return ps.size;
             } else {
                 bool prev_was_bitfield = false;
                 u64 bfsum = 0;
-                for (field f : s.fields) {
+                for (pfield f : ps.fields) {
                     if (f.bitfield) {
                         bfsum += f.bits;
                         if (bfsum > 8) {
                             int bytes = std::floor(bfsum / 8);
                             bfsum -= bytes * 8;
-                            s.size += bytes;
+                            ps.size += bytes;
                         }
                     } else {
                         if (prev_was_bitfield) {
-                            s.size++;
+                            ps.size++;
                             bfsum = 0;
                         }
-                        s.size += f.t->get_size();
+                        ps.size += f.t->get_size();
                     }
                 }
-                return s.size;
+                return ps.size;
+            }
+        }
+        case ettype::STRUCT: { 
+            type_struct& s = as_struct();
+            type_pstruct* ps = s.pure;
+            if (ps->size) {
+                return ps->size;
+            } else {
+                return type{type_pstruct{*ps}}.get_size();
             }
         }
         case ettype::UNION: {
@@ -108,7 +131,7 @@ u64 type::get_size() {
         }
         case ettype::FUNCTION:
             return 8;
-        case ettype::PSTRUCT: [[fallthrough]];
+        case ettype::COMBINATION:
         case ettype::PFUNCTION: [[fallthrough]];
         default:
             return 0;
@@ -123,6 +146,7 @@ bool type::can_boolean() {
         case ettype::STRUCT: [[fallthrough]];
         case ettype::UNION: [[fallthrough]];
         case ettype::ENUM: [[fallthrough]];
+        case ettype::COMBINATION: [[fallthrough]];
         case ettype::PSTRUCT: [[fallthrough]];
         case ettype::PFUNCTION: [[fallthrough]];
         default:
@@ -153,6 +177,10 @@ bool type::can_weak_cast(type* o) {
         if (op.t ==  etype_ids::NOTHING) { // Casting Nothing to anything
             return true;
         }
+    }
+    
+    if (tt == ettype::PSTRUCT && o->tt == ettype::STRUCT && o->as_struct().pure == &as_pstruct()) {
+        return true;
     }
     
     if (tt == ettype::STRUCT || tt == ettype::UNION || tt == ettype::ENUM) { // Never allow POD casting
@@ -247,8 +275,12 @@ type* type::pointer() {
     return new type{ettype::POINTER, etype_ids::LET, 0, type_pointer{}};
 }
 
+type* type::pstruct() {
+    return new type{ettype::PSTRUCT, etype_ids::LET, 0, type_pstruct{}};
+}
+
 type* type::_struct() {
-    return new type{ettype::STRUCT, etype_ids::LET, 0, type_struct{{}, nullptr}};
+    return new type{ettype::STRUCT, etype_ids::LET, 0, type_struct{nullptr, {}}};
 }
 
 type* type::_union() {
@@ -257,6 +289,10 @@ type* type::_union() {
 
 type* type::_enum() {
     return new type{ettype::ENUM, etype_ids::LET, 0, type_enum{}};
+}
+
+type* type::combination() {
+    return new type{ettype::COMBINATION, etype_ids::LET, 0, type_combination{}};
 }
 
 type* type::function() {
@@ -275,6 +311,10 @@ type_pointer&   type::as_pointer() {
     return std::get<type_pointer>(t);
 }
 
+type_pstruct&   type::as_pstruct() {
+    return std::get<type_pstruct>(t);
+}
+
 type_struct&    type::as_struct() {
     return std::get<type_struct>(t);
 }
@@ -285,6 +325,10 @@ type_union&     type::as_union() {
 
 type_enum&      type::as_enum() {
     return std::get<type_enum>(t);
+}
+
+type_combination& type::as_combination() {
+    return std::get<type_combination>(t);
 }
 
 type_function&  type::as_function() {
@@ -315,8 +359,8 @@ bool type::is_pointer(eptr_type type) {
     return is_pointer() && as_pointer().ptr_t == type;
 }
 
-bool type::is_struct() {
-    return tt == ettype::STRUCT;
+bool type::is_struct(bool pure) {
+    return tt == (pure ? ettype::PSTRUCT : ettype::STRUCT);
 }
 
 bool type::is_union() {
@@ -325,6 +369,10 @@ bool type::is_union() {
 
 bool type::is_enum() {
     return tt == ettype::ENUM;
+}
+
+bool type::is_combination() {
+    return tt == ettype::COMBINATION;
 }
 
 bool type::is_function(bool pure) {

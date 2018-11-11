@@ -21,6 +21,8 @@ namespace mangle_bytes {
     constexpr char function_start = ':';
     constexpr char function_return = ':';
     constexpr char function_param = ',';
+    
+    constexpr char combination_start = 'C';
 };
 
 class type_table {
@@ -39,6 +41,8 @@ public:
     type* get(type_id id);
     type* get(type& t);
     type* get(const std::string& mangled);
+    
+    type* get_or_add(type& t);
     
     type_id next_id();
     
