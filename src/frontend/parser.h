@@ -15,8 +15,14 @@ class symbol_table;
 class parser;
 
 enum class epanic_mode {
-    SEMICOLON, COMMA, ESCAPE_BRACE, ESCAPE_BRACKET, ESCAPE_PAREN,
-    IN_ARRAY
+    NO_PANIC, SEMICOLON, COMMA, 
+    ESCAPE_BRACE, ESCAPE_BRACKET, ESCAPE_PAREN,
+    IN_ARRAY, IN_STRUCT_LIT,
+    ULTRA_PANIC
+};
+
+enum class eexpression_type {
+    EXPRESSION, ASSIGNMENT, DECLARATION, INVALID
 };
 
 struct context {
@@ -58,7 +64,7 @@ private:
     context pop_context();
     ctx_guard guard();
     
-    ast* error(const std::string& msg, token* t = nullptr, bool panic = true, epanic_mode mode = epanic_mode::SEMICOLON);
+    ast* error(const std::string& msg, epanic_mode mode = epanic_mode::NO_PANIC, token* t = nullptr);
     void panic(epanic_mode mode);
     
     token next();
@@ -71,9 +77,13 @@ private:
     bool peek(Grammar::Symbol sym, u64 lookeahead = 0);
     bool peek(Grammar::Keyword kw, u64 lookahead = 0);
     
-    bool require(Grammar::TokenType tt, const std::string& err = {});
-    bool require(Grammar::Symbol sym, const std::string& err = {});
-    bool require(Grammar::Keyword kw, const std::string& err = {});
+    bool require(Grammar::TokenType tt, epanic_mode mode = epanic_mode::SEMICOLON, const std::string& err = {});
+    bool require(Grammar::Symbol sym, epanic_mode mode = epanic_mode::SEMICOLON, const std::string& err = {});
+    bool require(Grammar::Keyword kw, epanic_mode mode = epanic_mode::SEMICOLON, const std::string& err = {});
+    
+    void compiler_assert(Grammar::TokenType tt);
+    void compiler_assert(Grammar::Symbol tt);
+    void compiler_assert(Grammar::Keyword kw);
     
     token skip(u64 amount = 1);
     bool can_peek_skip_groups(u64 from);
@@ -84,7 +94,7 @@ private:
     token skip_until(const std::vector<Grammar::Symbol>& syms, bool skip_groups = true);
     token skip_until(Grammar::Keyword kw, bool skip_groups = true);
     
-    ast* iden();
+    ast* iden(bool withthis = false);
     ast* compileriden();
     ast* compileropts();
     ast* compilernote();
@@ -136,24 +146,30 @@ private:
     ast* namespacestmt();
     ast* namespacescope();
     
-    ast* typemod();
+    type_flags typemod();
+    ast* arraysize();
     ast* nntype();
+    ast* functype();
     ast* infer();
     
     ast* freedeclstmt();
     ast* structdeclstmt();
+    ast* uniondeclstmt();
     
-    ast* vardeclass();
+    ast* vardeclass(); // Requires expected values
     
-    ast* freevardecliden();
-    ast* freevardecl();
+    ast* freevardecliden(ast* t1 = nullptr);
+    ast* freevardecl(ast* t1 = nullptr);
     
-    ast* structvardecliden();
-    ast* structvardecl();
+    ast* structvardecliden(ast* t1 = nullptr);
+    ast* structvardecl(ast* t1 = nullptr);
     
-    ast* funcdecl();
+    ast* simplevardecl(ast* t1 = nullptr);
+    
+    type* funcreturns(ast* t1 = nullptr);
+    ast* funcdecl(ast* t1 = nullptr, type* thistype = nullptr);
     ast* funcval();
-    ast* nnparameter();
+    parameter nnparameter();
     
     ast* structdecl();
     ast* structscope();
@@ -193,9 +209,17 @@ private:
     ast* ee();
     
     ast* argument();
-    ast* fexpression();
-    ast* mexpression();
-    ast* aexpression();
+    ast* fexpression(eexpression_type* expression_type = nullptr);
+    ast* mexpression(eexpression_type* expression_type = nullptr);
+    ast* aexpression(); // Requires expected values
+    
+    bool is_type();
+    bool is_infer();
+    bool is_decl_start();
+    bool is_compiler_token();
+    bool is_assignment_operator();
+    bool is_pointer_type();
+    
     
     token c;
     lexer* l{nullptr};

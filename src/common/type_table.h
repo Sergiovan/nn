@@ -38,6 +38,8 @@ public:
     type* add_type(type* t);
     type* add_type(const std::string& mangled);
     
+    type* update_type(type_id id, type& nvalue);
+    
     type* get(type_id id);
     type* get(type& t);
     type* get(const std::string& mangled);
@@ -48,21 +50,21 @@ public:
     
     void merge(type_table&& o);
     
-    type* t_void{nullptr};
-    type* t_byte{nullptr};
-    type* t_short{nullptr};
-    type* t_int{nullptr};
-    type* t_long{nullptr};
-    type* t_sig{nullptr};
-    type* t_float{nullptr};
-    type* t_double{nullptr};
-    type* t_bool{nullptr};
-    type* t_char{nullptr};
-    type* t_string{nullptr};
-    type* t_fun{nullptr};
-    type* t_let{nullptr};
-    type* t_null{nullptr};
-    type* t_nothing{nullptr};
+    static type* t_void;
+    static type* t_byte;
+    static type* t_short;
+    static type* t_int;
+    static type* t_long;
+    static type* t_sig;
+    static type* t_float;
+    static type* t_double;
+    static type* t_bool;
+    static type* t_char;
+    static type* t_string;
+    static type* t_fun;
+    static type* t_let;
+    static type* t_null;
+    static type* t_nothing;
 private:
     std::vector<type*> types{};
     dict<type_id> mangle_table{};

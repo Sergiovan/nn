@@ -220,13 +220,19 @@ banumber = {{digit}}, [[lL]], {{letter | digit}}
 
 string = {{dquote, {any}, dquote}}
 char   = quote, any, quote
-array  = obracket, {expression; comma}, cbracket
-struct_lit = obrace, [({{expression; comma}} | {{iden, assop, expression; comma}})], cbrace
+array  = obracket, {aexpression; comma}, cbracket
+struct_lit = obrace, [({{aexpression; comma}} | {{iden, opassign, aexpression; comma}})], cbrace
 
-safe_literal = number | b2number | b8number | b16number | banumber | string | char
+safe_literal = number | b2number | b8number | b16number | banumber | string | char | kwnull | kwtrue | kwfalse
 compound_literal = array | struct_lit
 
 # Due to scope being recursive with statement, this one is put here despite the fact none of this is defined yet
+program = 
+  { importstmt | 
+    usingstmt | 
+	namespacestmt |
+	freedeclstmt }
+
 statement = {compilernote},
   ( ifstmt | 
 	forstmt | 
@@ -273,9 +279,9 @@ ifscope = scope, [celse, scopestatement] # compilernote?
 
 forstmt = cfor, forcond, (cdo, scopestatement | scope)
 forcond = 
-	( [fexpression], semicolon, [expression], semicolon, [mexpression, {semicolon, mexpression}] | 
-	  (type | tlet), iden, colon, expression | 
-	  [type | tlet], iden, assop, expression, comma, expression, [comma, expression])
+	( [fexpression], semicolon, [expression], semicolon, {mexpression; semicolon} | 
+	  (type | infer), iden, colon, expression | 
+	  [type | infer], iden, opassign, expression, [comma, expression], [comma, expression])
 	  
 whilestmt = cwhile, {fexpression, semicolon}, expression, (cdo, scopestatement | scope)
 
@@ -285,7 +291,7 @@ casestmt = (kwcase, {{expression; comma}} | celse), (ccontinue | scope | cdo, sc
 
 trystmt = ctry, colon, {{statement}}, ccatch, (oparen, [tsig], iden, cparen, switchscope | craise, semicolon)
 
-returnstmt = creturn, [{{expression; comma}} | tvoid], semicolon
+returnstmt = creturn, [{{aexpression; comma}} | tvoid], semicolon
 
 raisestmt = craise, (expression | iden), semicolon
 
@@ -298,7 +304,7 @@ breakstmt = cbreak, semicolon
 continuestmt = ccontinue, semicolon
 leavestmt = cleave, semicolon
 
-importstmt = kwimport, (iden. {opaccess, iden} | string), [kwas, iden], semicolon
+importstmt = kwimport, (iden, {opaccess, iden} | string), [kwas, iden], semicolon
 usingstmt = kwusing, iden, {opaccess, iden}, [kwas, iden], semicolon
 
 namespacestmt = kwnamespace, iden, {opaccess, iden}, namespacescope
@@ -308,13 +314,15 @@ typemod = {kwqualifier | kwsign}
 arraysize = obracket, [expression], cbracket
 type = (tbyte | tshort | tint | tlong | tsig | tfloat | tdouble | tbool | tchar | tstring | functype | iden), typemod, {spointer | arraysize; typemod}
 functype = tfunction, lt, {type; colon}, oparen, {type, [opspread], [opassign]; comma}, cparen, gt
-infer = tlet | tfunction
+infer = tlet
 
 freedeclstmt = freevardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl
 
 structdeclstmt = structvardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl
 
-vardeclass  = assop, aexpression, {comma, aexpression}
+uniondeclstmt = simplevardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl;
+
+vardeclass  = opassign, aexpression, {comma, aexpression}
 
 freevardecliden = (type | infer), iden, {comma, [type | infer], iden}
 freevardecl = freevardecliden, [vardeclass]
@@ -322,15 +330,17 @@ freevardecl = freevardecliden, [vardeclass]
 structvardecliden = (type | infer), iden, [colon, number], {comma, [type | infer], iden, [colon, number]}
 structvardecl = structvardecliden, [vardeclass]
 
+simplevardecl = (type | infer), iden, [assop, aexpression]
+
 funcdecl = (type, {colon, type} | tvoid | tlet), iden, oparen, [{parameter; comma}], cparen, (scope | semicolon)
-funcval  = (type, {colon, type} | tvoid | tlet), [iden], oparen, [{parameter; comma}], cparen, [obracket, {{[opaddress], iden; comma}}, cbracket], (scope | semicolon)
-parameter = type, [opspread], [iden], [assop, aexpression]
+funcval  = (type, {colon, type} | tvoid | tlet), [iden], oparen, [{parameter; comma}], cparen, [obracket, {{[opaddress], iden; comma}}, cbracket], scope
+parameter = type, [opspread], [iden], [opassign, aexpression]
 
 structdecl = tstruct, iden, (structscope | semicolon)
 structscope = obrace {usingstmt | structdeclstmt}, cbrace
 
 uniondecl = tunion, iden, (unionscope | semicolon)
-unionscope = obrace, {freedeclstmt}, cbrace
+unionscope = obrace, {simplevardecl}, cbrace
 
 enumdecl = tenum, iden, (enumscope | semicolon)
 enumscope = obrace, {iden; comma}, cbrace
@@ -338,7 +348,7 @@ enumscope = obrace, {iden; comma}, cbrace
 assstmt = assignment, semicolon
 assignment = expression, {comma, expression}, assop, aexpression, {comma, aexpression}
 
-newinit = kwnew, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace], {comma, type, [obracket, expression, cbracket], [obrace, {{expression; comma}}, cbrace]}
+newinit = kwnew, type, [obracket, expression, cbracket], [obrace, {{aexpression; comma}}, cbrace], {comma, type, [obracket, expression, cbracket], [obrace, {{aexpression; comma}}, cbrace]}
 deletestmt = kwdelete, iden, {comma, iden}, semicolon
 
 expressionstmt = expression, semicolon
@@ -392,11 +402,11 @@ e2  = e1, {e2'}
 e2' = (opspread)
 
 e1    = ee, {e1'}
-e1'	  = (opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden), {opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}
+e1'	  = {{opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}}
 
 ee 	  = "(", (expression | funcval), ")" | safe_literal | iden
 
 argument = aexpression | iden, "=", aexpression
-fexpression = expression | freevardecl | assignment
+fexpression = freevardecl | mexpression
 mexpression = expression | assignment
 aexpression = (compound_literal | newinit | expression | snothing | funcval)

@@ -6,36 +6,28 @@
 #include "common/ast.h"
 
 type_table::type_table() {
-    for (type_id i = etype_ids::VOID; i <= etype_ids::NOTHING; ++i) {
-        type* t = type::primitive();
-        t->as_primitive().t = i;
-        if (i == etype_ids::SHORT || i == etype_ids::INT || i == etype_ids::LONG) {
-            t->flags |= etype_flags::SIGNED;
-        }
-        add_type(t);
-    } // Add all primitives
-    
-    t_void = types[etype_ids::VOID];
-    t_byte = types[etype_ids::BYTE];
-    t_short = types[etype_ids::SHORT];
-    t_int = types[etype_ids::INT];
-    t_long = types[etype_ids::LONG];
-    t_sig = types[etype_ids::SIG];
-    t_float = types[etype_ids::FLOAT];
-    t_double = types[etype_ids::DOUBLE];
-    t_bool = types[etype_ids::BOOL];
-    t_char = types[etype_ids::CHAR];
-    t_string = types[etype_ids::STRING];
-    t_fun = types[etype_ids::FUN];
-    t_let = types[etype_ids::LET];
-    t_null = types[etype_ids::NNULL];
-    t_nothing = types[etype_ids::NOTHING];
+    add_type(t_void);
+    add_type(t_byte);
+    add_type(t_short);
+    add_type(t_int);
+    add_type(t_long);
+    add_type(t_sig);
+    add_type(t_float);
+    add_type(t_double);
+    add_type(t_bool);
+    add_type(t_char);
+    add_type(t_string);
+    add_type(t_fun);
+    add_type(t_let);
+    add_type(t_null);
+    add_type(t_nothing);
 }
 
 type_table::~type_table() {
-    for (auto& t : types) {
-        if (t) {
-            delete t;
+    // Do not delete the basic types, they go when the program goes
+    for (u64 i = etype_ids::LAST + 1; i < types.size(); ++i) {
+        if (types[i]) {
+            delete types[i];
         }
     }
 }
@@ -128,10 +120,9 @@ std::string type_table::mangle_pure(type* t) {
     switch (t->tt) {
         case ettype::FUNCTION: {
             auto& f = t->as_function();
-            auto pf = f.pure;
             ss << mangle_bytes::function_start << (char) t->flags;
-            add_bytes(ss, pf->rets->id);
-            for (auto& p : pf->params) {
+            add_bytes(ss, f.rets->id);
+            for (auto& p : f.params) {
                 ss << mangle_bytes::function_param;
                 add_bytes(ss, p.t->id);
                 ss << (char) p.flags;
@@ -141,7 +132,7 @@ std::string type_table::mangle_pure(type* t) {
         case ettype::STRUCT: {
             auto& s = t->as_struct();
             ss << mangle_bytes::struct_start << (char) t->flags;
-            for (auto& f : s.pure->fields) {
+            for (auto& f : s.fields) {
                 ss << mangle_bytes::struct_separator;
                 add_bytes(ss, f.t->id);
                 ss << (char) f.bits;
@@ -313,6 +304,34 @@ type* type_table::add_type(const std::string& mangled) {
     return t;
 }
 
+type* type_table::update_type(type_id id, type& nvalue) {
+    type* toup = types[id];
+    std::string mangl = mangle(toup);
+    mangle_table.erase(mangl);
+    toup->tt = nvalue.tt;
+    toup->flags = nvalue.flags;
+    toup->t = nvalue.t;
+    
+    if (toup->tt == ettype::FUNCTION || toup->tt == ettype::STRUCT) {
+        mangl = mangle(toup);
+        std::string manglp = mangle_pure(toup);
+        type* ptp = get(manglp);
+        if (!ptp) {
+            ptp = add_type(manglp);
+        }
+        if (toup->tt == ettype::STRUCT) {
+            toup->as_struct().pure = &ptp->as_pstruct();
+        } else {
+            toup->as_function().pure = &ptp->as_pfunction();
+        }
+    } else {
+        mangl = mangle(toup);
+    }
+    
+    mangle_table.insert({mangl, toup->id});
+    return toup;
+}
+
 type* type_table::get(type_id id) {
     return types[id];
 }
@@ -351,3 +370,19 @@ void type_table::merge(type_table&& o) {
     o.types.clear();
     o.mangle_table.clear();
 }
+
+type* type_table::t_void = new type{ettype::PRIMITIVE, etype_ids::VOID, 0};
+type* type_table::t_byte = new type{ettype::PRIMITIVE, etype_ids::BYTE, 0};
+type* type_table::t_short = new type{ettype::PRIMITIVE, etype_ids::SHORT, etype_flags::SIGNED};
+type* type_table::t_int = new type{ettype::PRIMITIVE, etype_ids::INT, etype_flags::SIGNED};
+type* type_table::t_long = new type{ettype::PRIMITIVE, etype_ids::LONG, etype_flags::SIGNED};
+type* type_table::t_sig = new type{ettype::PRIMITIVE, etype_ids::SIG, 0};
+type* type_table::t_float = new type{ettype::PRIMITIVE, etype_ids::FLOAT, 0};
+type* type_table::t_double = new type{ettype::PRIMITIVE, etype_ids::DOUBLE, 0};
+type* type_table::t_bool = new type{ettype::PRIMITIVE, etype_ids::BOOL, 0};
+type* type_table::t_char = new type{ettype::PRIMITIVE, etype_ids::CHAR, 0};
+type* type_table::t_string = new type{ettype::PRIMITIVE, etype_ids::STRING, 0};
+type* type_table::t_fun = new type{ettype::PRIMITIVE, etype_ids::FUN, 0};
+type* type_table::t_let = new type{ettype::PRIMITIVE, etype_ids::LET, 0};
+type* type_table::t_null = new type{ettype::PRIMITIVE, etype_ids::NNULL, 0};
+type* type_table::t_nothing = new type{ettype::PRIMITIVE, etype_ids::NOTHING, 0};

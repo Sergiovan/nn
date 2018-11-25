@@ -25,6 +25,12 @@ st_variable::~st_variable() {
     }
 }
 
+st_function::~st_function() {
+    if (st) {
+        delete st;
+    }
+}
+
 st_namespace::~st_namespace() {
     if (st) {
         delete st;
@@ -108,6 +114,15 @@ st_entry* symbol_table::get(const std::string& name, est_entry_type t, bool prop
     return entry->t == t ? entry : nullptr;
 }
 
+overload* symbol_table::get_overload(const std::string& name, type* ftype, bool propagate, etable_owner until) {
+    std::vector<type*> params{};
+    auto& fparams = ftype->as_function().params;
+    for (auto& param : fparams) {
+        params.push_back(param.t);
+    }
+    return get_overload(name, params, propagate, until);
+}
+
 overload* symbol_table::get_overload(const std::string& name, std::vector<type*>& params, bool propagate, etable_owner until) {
     auto entry = get(name);
     if (entry && entry->t == est_entry_type::FUNCTION) {
@@ -189,15 +204,28 @@ st_entry* symbol_table::add_variable(const std::string& name, type* t, ast* valu
     return ne;
 }
 
-std::pair<st_entry*, overload*> symbol_table::add_function(const std::string& name, type* function, ast* value) {
+st_entry* symbol_table::add_or_get_empty_function(const std::string& name) {
+    st_entry* f = get(name, false);
+    if (f && !f->is_function()) {
+        return nullptr;
+    } else if (!f) {
+        f = new st_entry{st_function{}, est_entry_type::FUNCTION};
+        entries.insert({name, f});
+    }
+    
+    return f;
+}
+
+std::pair<st_entry*, overload*> symbol_table::add_function(const std::string& name, type* function, ast* value, symbol_table* st) {
     st_entry* f = get(name, false);
     if (f && !f->is_function()) {
         return {nullptr, nullptr};
     } else if (!f) {
         f = new st_entry{st_function{}, est_entry_type::FUNCTION};
+        entries.insert({name, f});
     }
     
-    overload o{function, value, value != nullptr, new symbol_table{etable_owner::FUNCTION, this}};
+    overload o{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}};
     f->as_function().overloads.emplace_back(std::move(o));
     return {f, &f->as_function().overloads.back()};
 }
@@ -235,6 +263,11 @@ st_entry* symbol_table::add_field(const std::string& name, u64 field) {
     return ne;
 }
 
+st_entry* symbol_table::borrow(const std::string& name, st_entry* entry) {
+    borrowed_entries.insert({name, entry});
+    return entry;
+}
+
 bool symbol_table::merge_st(symbol_table* st) {
     for (auto& [name, entry] : st->entries) {
         if (has(name, false)) {
@@ -246,5 +279,11 @@ bool symbol_table::merge_st(symbol_table* st) {
     return true;
 }
 
+u64 symbol_table::get_size(bool borrowed) {
+    return entries.size() + (borrowed ? borrowed_entries.size() : 0);
+}
 
+symbol_table* symbol_table::make_child(etable_owner new_owner) {
+    return new symbol_table(new_owner == etable_owner::COPY ? owner : new_owner, this);
+}
 

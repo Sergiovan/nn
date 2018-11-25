@@ -10,13 +10,158 @@ field::~field() {
     }
 }
 
+field::field(const field& o) {
+    if (value) {
+        delete value;
+    }
+    
+    t = o.t;
+    if (o.value) {
+        value = new ast;
+        *value = *o.value;
+    } else {
+        value = nullptr;
+    }
+    bits = o.bits;
+    name = o.name;
+    bitfield = o.bitfield;
+}
+
+field::field(field&& o) {
+    t = o.t;
+    std::swap(value, o.value);
+    bits = o.bits;
+    name = o.name;
+    bitfield = o.bitfield;
+}
+
+field& field::operator=(const field& o) {
+    if (this != &o) {
+        if (value) {
+            delete value;
+        }
+        
+        t = o.t;
+        if (o.value) {
+            value = new ast;
+            *value = *o.value;
+        } else {
+            value = nullptr;
+        }
+        bits = o.bits;
+        name = o.name;
+        bitfield = o.bitfield;
+    }
+    return *this;
+}
+
+field& field::operator=(field&& o) {
+    if (this != &o) {
+        t = o.t;
+        std::swap(value, o.value);
+        bits = o.bits;
+        name = o.name;
+        bitfield = o.bitfield;
+    }
+    return *this;
+}
+
+type_union::type_union(const std::vector<ufield> fields, st_entry* ste, u64 def_type, ast* def_value, u64 size) 
+    : fields(fields), ste(ste), def_type(def_type), def_value(def_value), size(size) {
+    
+}
+
+
 type_union::~type_union() {
     if (def_value) {
         delete def_value;
     }
 };
 
-type::type(ettype ttype, type_id id, type_flags flags) : tt(ttype), id(id), flags(flags) {}
+type_union::type_union(const type_union& o) {
+    if (def_value) {
+        delete def_value;
+    }
+    fields = o.fields;
+    ste = o.ste;
+    def_type = o.def_type;
+    if (o.def_value) {
+        def_value = new ast;
+        *def_value = *o.def_value;
+    } else {
+        def_value = nullptr;
+    }
+    size = o.size;
+}
+
+type_union::type_union(type_union && o) {
+    fields = o.fields;
+    ste = o.ste;
+    def_type = o.def_type;
+    std::swap(def_value, o.def_value);
+    size = o.size;
+}
+
+type_union & type_union::operator=(const type_union& o) {
+    if (this != &o) {
+        if (def_value) {
+            delete def_value;
+        }
+        fields = o.fields;
+        ste = o.ste;
+        def_type = o.def_type;
+        if (o.def_value) {
+            def_value = new ast;
+            *def_value = *o.def_value;
+        } else {
+            def_value = nullptr;
+        }
+        size = o.size;
+    } 
+    return *this;
+}
+
+type_union & type_union::operator=(type_union && o) {
+    if (this != &o) {
+        fields = o.fields;
+        ste = o.ste;
+        def_type = o.def_type;
+        std::swap(def_value, o.def_value);
+        size = o.size;
+    } 
+    return *this;
+}
+
+type::type(ettype ttype, type_id id, type_flags flags) : tt(ttype), id(id), flags(flags) {
+    switch(ttype) {
+        case ettype::PRIMITIVE: 
+            t = type_primitive{};
+            break;
+        case ettype::FUNCTION: 
+            t = type_function{};
+            break;
+        case ettype::STRUCT: 
+            t = type_struct{};
+            break;
+        case ettype::UNION: 
+            t = type_union{};
+            break;
+        case ettype::ENUM: 
+            t = type_enum{};
+            break;
+        case ettype::COMBINATION: 
+            t = type_combination{};
+            break;
+        case ettype::PSTRUCT: 
+            t = type_pstruct{};
+            break;
+        case ettype::PFUNCTION: 
+            t = type_pfunction{};
+            break;
+        default:
+            break;
+    }
+}
 type::type(ettype ttype, type_id id, type_flags flags, type_variant t) : tt(ttype), id(id), flags(flags), t(t) {}
 
 
@@ -195,6 +340,20 @@ bool type::can_weak_cast(type* o) {
             return true;
         }
         if (is_real_type(tp.t) && op.t == DOUBLE) { // Allow casting from reals to doubles
+            return true;
+        }
+    }
+    
+    if (tt == ettype::COMBINATION && o->tt == ettype::COMBINATION) {
+        if (as_combination().types.size() != o->as_combination().types.size()) {
+            return false;
+        } else {
+            auto& self_types = as_combination().types, o_types = o->as_combination().types;
+            for (u64 i = 0; i < self_types.size(); ++i) {
+                if (!self_types[i]->can_weak_cast(o_types[i])) {
+                    return false;
+                }
+            }
             return true;
         }
     }

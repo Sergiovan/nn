@@ -52,8 +52,8 @@ enum class Keyword : char {
 
 enum class Symbol : char {
     POINTER = 0, MULTIPLY = 0, ADDRESS = 0,
-    GREATER = 1, LT = 1,
-    LESS = 2, GT = 2,
+    GREATER = 1, GT = 1,
+    LESS = 2, LT = 2,
     TERNARY_CHOICE = 3, COLON = 3,
     NOT = 4, EMARK = 4,
     ACCESS = 5, DOT = 5, 

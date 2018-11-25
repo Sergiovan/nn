@@ -10,7 +10,9 @@ struct ast;
 struct type;
 
 enum class etable_owner {
-    FREE, BLOCK, NAMESPACE, FUNCTION, STRUCT, MODULE
+    FREE, BLOCK, NAMESPACE, 
+    FUNCTION, STRUCT, MODULE,
+    COPY
 };
 
 enum class est_entry_type {
@@ -45,6 +47,9 @@ struct st_variable {
 
 struct st_function {
     std::vector<overload> overloads{};
+    symbol_table* st{nullptr}; // Owned, for sigs
+    
+    ~st_function();
 };
 
 struct st_namespace {
@@ -87,16 +92,23 @@ public:
     st_entry* get(const std::string& name, bool propagate = true, etable_owner until = etable_owner::FREE);
     st_entry* get(const std::string& name, est_entry_type t, bool propagate = true, etable_owner until = etable_owner::FREE);
     overload* get_overload(const std::string& name, std::vector<type*>& params, bool propagate = true, etable_owner until = etable_owner::FREE);
+    overload* get_overload(const std::string& name, type* ftype, bool propagate = true, etable_owner until = etable_owner::FREE);
     
     st_entry* add(const std::string& name, st_entry* entry);
     st_entry* add_type(const std::string& name, type* t, bool defined = true);
     st_entry* add_variable(const std::string& name, type* t, ast* value = nullptr);
-    std::pair<st_entry*, overload*> add_function(const std::string& name, type* function, ast* value = nullptr);
+    st_entry* add_or_get_empty_function(const std::string& name);
+    std::pair<st_entry*, overload*> add_function(const std::string& name, type* function, ast* value = nullptr, symbol_table* st = nullptr);
     st_entry* add_namespace(const std::string& name, symbol_table* st = nullptr);
     st_entry* add_module(const std::string& name, symbol_table* st);
     st_entry* add_field(const std::string& name, u64 field);
     
+    st_entry* borrow(const std::string& name, st_entry* entry);
     bool merge_st(symbol_table* st);
+    
+    u64 get_size(bool borrowed = true);
+    
+    symbol_table* make_child(etable_owner new_owner = etable_owner::COPY);
     
 private:
     symbol_table* parent;

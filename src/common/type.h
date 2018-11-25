@@ -43,6 +43,8 @@ namespace etype_ids {
     
     constexpr type_id NNULL   = 13;
     constexpr type_id NOTHING = 14;
+    
+    constexpr type_id LAST = 14;
 } 
 
 constexpr bool is_integer_type(type_id id) {
@@ -105,7 +107,13 @@ struct field {
     std::string name{""};
     bool bitfield{false};
     
+    field() = default;
     ~field();
+    
+    field(const field& o);
+    field(field&& o);
+    field& operator=(const field& o);
+    field& operator=(field&& o);
 };
 
 struct ufield {
@@ -122,6 +130,7 @@ struct parameter {
     type* t;
     param_flags flags;
     std::string name{""};
+    ast* value{nullptr};
     // std::string type_same_as{""}
 };
 
@@ -136,24 +145,31 @@ struct type_pointer {
 };
 
 struct type_pstruct {
-    std::vector<pfield> fields;
+    std::vector<pfield> fields{};
     u64 size{0};
 };
 
 struct type_struct {
     type_pstruct* pure{nullptr};
-    std::vector<field> fields;
-    st_entry* ste;
+    std::vector<field> fields{};
+    st_entry* ste{nullptr};
 };
 
 struct type_union {
-    std::vector<ufield> fields;
-    st_entry* ste;
+    std::vector<ufield> fields{};
+    st_entry* ste{nullptr};
     u64 def_type{0};
     ast* def_value{nullptr}; // Owned
     u64 size{0};
     
+    type_union(const std::vector<ufield> fields = {}, st_entry* ste = nullptr, u64 def_type = 0,
+               ast* def_value = nullptr, u64 size = 0);
     ~type_union();
+    
+    type_union(const type_union& o);
+    type_union(type_union&& o);
+    type_union& operator=(const type_union& o);
+    type_union& operator=(type_union&& o);
 };
 
 struct type_enum {
@@ -165,7 +181,6 @@ struct type_combination {
     std::vector<type*> types{};
 };
 
-
 struct type_pfunction {
     type* rets{nullptr};
     std::vector<pparameter> params{};
@@ -173,8 +188,9 @@ struct type_pfunction {
 
 struct type_function {
     type_pfunction* pure{nullptr};
+    type* rets{nullptr};
     std::vector<parameter> params{};
-    st_entry* ste;
+    st_entry* ste{nullptr};
 };
 
 using type_variant = std::variant<type_primitive, type_pointer, 
