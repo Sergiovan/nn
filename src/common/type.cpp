@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "common/ast.h"
+#include "common/symbol_table.h"
 
 field::~field() {
     if (value) {
@@ -135,7 +136,10 @@ type_union & type_union::operator=(type_union && o) {
 type::type(ettype ttype, type_id id, type_flags flags) : tt(ttype), id(id), flags(flags) {
     switch(ttype) {
         case ettype::PRIMITIVE: 
-            t = type_primitive{};
+            t = type_primitive{id};
+            break;
+        case ettype::POINTER:
+            t = type_pointer{};
             break;
         case ettype::FUNCTION: 
             t = type_function{};
@@ -261,7 +265,7 @@ u64 type::get_size() {
             if (e.size) {
                 return e.size;
             } else {
-                u64 size = e.names.size();
+                u64 size = e.ste->as_type().st->get_size();
                 if (size >> 32) {
                     e.size = 8;
                 } else if (size >> 16) {
@@ -426,6 +430,56 @@ bool type::can_cast(type* o) {
     }
 }
 
+bool type::is_weak_equalish(type* o) {
+    return can_weak_cast(o) && o->can_weak_cast(this);
+}
+
+bool type::is_equalish(type* o) {
+    return can_cast(o) && o->can_cast(this);
+}
+
+type* type::weak_cast_target(type* a, type* b) {
+    if (a->can_weak_cast(b)) {
+        return a;
+    } else if (b->can_weak_cast(a)) {
+        return b;
+    } else {
+        return nullptr;
+    }
+}
+
+type* type::weak_cast_result(type* a, type* b) {
+    type* target = weak_cast_target(a, b);
+    if (target == a) {
+        return b;
+    } else if (target == b) {
+        return a;
+    } else {
+        return nullptr;
+    }
+}
+
+type* type::cast_target(type* a, type* b) {
+    if (a->can_cast(b)) {
+        return a;
+    } else if (b->can_cast(a)) {
+        return b;
+    } else {
+        return nullptr;
+    }
+}
+
+type* type::cast_result(type* a, type* b) {
+    type* target = cast_target(a, b);
+    if (target == a) {
+        return b;
+    } else if (target == b) {
+        return a;
+    } else {
+        return nullptr;
+    }
+}
+
 type* type::primitive() {
     return new type{ettype::PRIMITIVE, etype_ids::LET, 0, type_primitive{}};
 }
@@ -500,6 +554,18 @@ type_pfunction& type::as_pfunction() {
 
 bool type::is_primitive(int type) {
     return tt == ettype::PRIMITIVE && (type < 0 || as_primitive().t == type);
+}
+
+bool type::is_numeric() {
+    return tt == ettype::PRIMITIVE && is_number_type(as_primitive().t);
+}
+
+bool type::is_integer() {
+    return tt == ettype::PRIMITIVE && is_integer_type(as_primitive().t);
+}
+
+bool type::is_real() {
+    return tt == ettype::PRIMITIVE && is_real_type(as_primitive().t);
 }
 
 bool type::is_let() {

@@ -1,8 +1,9 @@
 #include "common/symbol_table.h"
+#include "type_table.h"
 
 #include "common/ast.h"
 #include "common/type.h"
-
+#include "common/utils.h"
 
 overload::~overload() {
     if (st) {
@@ -22,6 +23,47 @@ st_type::~st_type() {
 st_variable::~st_variable() {
     if (value) {
         delete value;
+    }
+}
+
+overload* st_function::get_overload(const std::vector<type*>& args) {
+    std::vector<overload*> ret{};
+    for (auto& ov : overloads) {
+        auto& oparams = ov.t->as_function().params;
+        bool spread = (oparams.back().flags & eparam_flags::SPREAD) == 0;
+        if (args.size() > oparams.size() && !spread) {
+            goto next_overload;
+        }
+        for (u64 i = 0; i < args.size(); ++i) {
+            if (i < oparams.size()) {
+                if (!args[i]->can_weak_cast(oparams[i].t)) {
+                    goto next_overload;
+                }
+            } else if (oparams.back().flags & eparam_flags::SPREAD){
+                if (!args[i]->can_weak_cast(oparams.back().t)) {
+                    goto next_overload;
+                }
+            } else {
+                goto next_overload;
+            }
+        }
+        if (args.size() < oparams.size()) {
+            for (u64 i = args.size(); i < oparams.size(); ++i) {
+                if ((oparams[i].flags & eparam_flags::DEFAULTABLE) == 0) {
+                    goto next_overload;
+                }
+            }
+        }
+        ret.push_back(&ov);
+        next_overload:;
+    }
+    if (ret.size() == 1) {
+        return ret.front();
+    } else if (ret.empty()) {
+        return nullptr;
+    } else {
+        // TODO Sort out the rest of the overloads
+        return nullptr;
     }
 }
 
@@ -81,6 +123,37 @@ bool st_entry::is_module() {
     return t == est_entry_type::MODULE;
 }
 
+type* st_entry::get_type() {
+    switch (t) {
+        case est_entry_type::FIELD: 
+        {
+            type* ftype = as_field().ptype;
+            switch (ftype->tt) {
+                case ettype::FUNCTION:
+                    return as_function().overloads.size() != 1 ? type_table::t_sig : as_function().overloads[0].t;
+                case ettype::ENUM:
+                    return ftype;
+                case ettype::STRUCT:
+                    return ftype->as_struct().fields[as_field().field].t;
+                case ettype::UNION:
+                    return ftype->as_union().fields[as_field().field].t;
+                default:
+                    return nullptr; // Error, bad
+            }
+        }
+        case est_entry_type::FUNCTION:
+            return type_table::t_fun;
+        case est_entry_type::TYPE:
+            return as_type().t;
+        case est_entry_type::VARIABLE:
+            return as_variable().t;
+        case est_entry_type::MODULE: [[fallthrough]];
+        case est_entry_type::NAMESPACE:
+            return type_table::t_void;
+    }
+    return nullptr; // What
+}
+
 symbol_table::symbol_table(etable_owner owner, symbol_table* parent) : parent(parent), owner(owner) {
     
 }
@@ -100,7 +173,7 @@ st_entry* symbol_table::get(const std::string& name, bool propagate, etable_owne
     if (entry == entries.end()) {
         entry = borrowed_entries.find(name);
     }
-    if (entry != entries.end()) {
+    if (entry != entries.end() && entry != borrowed_entries.end()) {
         return entry->second;
     } else if (!propagate || owner == until || !parent) {
         return nullptr;
@@ -123,50 +196,14 @@ overload* symbol_table::get_overload(const std::string& name, type* ftype, bool 
     return get_overload(name, params, propagate, until);
 }
 
-overload* symbol_table::get_overload(const std::string& name, std::vector<type*>& params, bool propagate, etable_owner until) {
+overload* symbol_table::get_overload(const std::string& name, std::vector<type*>& args, bool propagate, etable_owner until) {
     auto entry = get(name);
     if (entry && entry->t == est_entry_type::FUNCTION) {
-        std::vector<overload>& overloads = entry->as_function().overloads;
-        std::vector<overload*> ret{};
-        for (auto& ov : overloads) {
-            auto& oparams = ov.t->as_function().params;
-            bool spread = (oparams.back().flags & eparam_flags::SPREAD) == 0;
-            if (params.size() > oparams.size() && !spread) {
-                goto next_overload;
-            }
-            for (u64 i = 0; i < params.size(); ++i) {
-                if (i < oparams.size()) {
-                    if (!params[i]->can_weak_cast(oparams[i].t)) {
-                        goto next_overload;
-                    }
-                } else {
-                    if (!params[i]->can_weak_cast(oparams.back().t)) {
-                        goto next_overload;
-                    }
-                }
-            }
-            if (params.size() < oparams.size()) {
-                for (u64 i = params.size(); i < oparams.size(); ++i) {
-                    if ((oparams[i].flags & eparam_flags::DEFAULTABLE) == 0) {
-                        goto next_overload;
-                    }
-                }
-            }
-            ret.push_back(&ov);
-            next_overload:;
-        }
-        if (ret.size() == 1) {
-            return ret.front();
-        } else if (ret.empty()) {
-            return nullptr;
-        } else {
-            // TODO Sort out the rest of the overloads
-            return nullptr;
-        }
+        return entry->as_function().get_overload(args);
     } else if (!propagate || owner == until || !parent) {
         return nullptr;
     } else {
-        return parent->get_overload(name, params, propagate, until);
+        return parent->get_overload(name, args, propagate, until);
     }
 }
 
@@ -252,12 +289,12 @@ st_entry* symbol_table::add_module(const std::string& name, symbol_table* st) {
     return ne;
 }
 
-st_entry* symbol_table::add_field(const std::string& name, u64 field) {
+st_entry* symbol_table::add_field(const std::string& name, u64 field, type* ptype) {
     if (has(name, false)) {
         return nullptr;
     }
     
-    st_field nf{field};
+    st_field nf{field, ptype};
     st_entry* ne = new st_entry{nf, est_entry_type::FIELD};
     entries.insert({name, ne});
     return ne;

@@ -31,6 +31,7 @@ struct context {
     type* _struct;
     type* aux;
     type* expected;
+    ast* first_param;
 };
 
 struct ctx_guard {
@@ -49,6 +50,7 @@ class parser_exception : public std::exception {
 
 class parser{
 public:
+    parser();
     ast* parse(lexer* l);
     ast* parse(const std::string& str, bool is_file = false);
     
@@ -89,12 +91,17 @@ private:
     bool can_peek_skip_groups(u64 from);
     u64 peek_skip_groups(u64 from = 0);
     
+    u64 peek_until(Grammar::TokenType tt, bool skip_groups = true);
+    u64 peek_until(Grammar::Symbol sym, bool skip_groups = true);
+    u64 peek_until(const std::vector<Grammar::Symbol>& syms, bool skip_groups = true);
+    u64 peek_until(Grammar::Keyword kw, bool skip_groups = true);
+    
     token skip_until(Grammar::TokenType tt, bool skip_groups = true);
     token skip_until(Grammar::Symbol sym, bool skip_groups = true);
     token skip_until(const std::vector<Grammar::Symbol>& syms, bool skip_groups = true);
     token skip_until(Grammar::Keyword kw, bool skip_groups = true);
     
-    ast* iden(bool withthis = false);
+    ast* iden(bool withthis = false, type** thistype = nullptr);
     ast* compileriden();
     ast* compileropts();
     ast* compilernote();
@@ -146,9 +153,9 @@ private:
     ast* namespacestmt();
     ast* namespacescope();
     
-    type_flags typemod();
+    type_flags typemod(bool* any = nullptr);
     ast* arraysize();
-    ast* nntype();
+    ast* nntype(bool* endswitharray = nullptr);
     ast* functype();
     ast* infer();
     
@@ -208,7 +215,7 @@ private:
     ast* e1();
     ast* ee();
     
-    ast* argument();
+    std::pair<ast*, std::string> argument(bool allow_names, type* ftype = nullptr);
     ast* fexpression(eexpression_type* expression_type = nullptr);
     ast* mexpression(eexpression_type* expression_type = nullptr);
     ast* aexpression(); // Requires expected values
@@ -225,7 +232,7 @@ private:
     lexer* l{nullptr};
     
     std::stack<context> contexts{};
-    symbol_table* root_st{};
+    symbol_table* root_st{nullptr};
     type_table types{};
     
     dict<symbol_table*> modules{};

@@ -173,7 +173,7 @@ struct type_union {
 };
 
 struct type_enum {
-    dict<u64> names{};
+    st_entry* ste{nullptr};
     u64 size{0};
 };
 
@@ -221,6 +221,14 @@ struct type {
     bool can_boolean();
     bool can_weak_cast(type* o); // Weak cast this to o
     bool can_cast(type* o); // Cast this to o
+    bool is_weak_equalish(type* o); // Can either weak cast to o or be weak cast from o
+    bool is_equalish(type* o); // Can either cast to o or be cast from o
+    
+    
+    static type* weak_cast_target(type* a, type* b); // Returns type that can be weak cast to the other
+    static type* weak_cast_result(type* a, type* b);
+    static type* cast_target(type* a, type* b); // Returns type that can be cast to the other
+    static type* cast_result(type* a, type* b);
     
     static type* primitive();
     static type* pointer();
@@ -243,6 +251,9 @@ struct type {
     type_pfunction&   as_pfunction();
     
     bool is_primitive(int type = -1);
+    bool is_numeric();
+    bool is_integer();
+    bool is_real();
     bool is_let();
     bool is_fun();
     bool is_pointer();

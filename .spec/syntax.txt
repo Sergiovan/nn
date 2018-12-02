@@ -340,7 +340,7 @@ structdecl = tstruct, iden, (structscope | semicolon)
 structscope = obrace {usingstmt | structdeclstmt}, cbrace
 
 uniondecl = tunion, iden, (unionscope | semicolon)
-unionscope = obrace, {simplevardecl}, cbrace
+unionscope = obrace, {uniondeclstmt}, cbrace
 
 enumdecl = tenum, iden, (enumscope | semicolon)
 enumscope = obrace, {iden; comma}, cbrace
@@ -348,8 +348,8 @@ enumscope = obrace, {iden; comma}, cbrace
 assstmt = assignment, semicolon
 assignment = expression, {comma, expression}, assop, aexpression, {comma, aexpression}
 
-newinit = kwnew, type, [obracket, expression, cbracket], [obrace, {{aexpression; comma}}, cbrace], {comma, type, [obracket, expression, cbracket], [obrace, {{aexpression; comma}}, cbrace]}
-deletestmt = kwdelete, iden, {comma, iden}, semicolon
+newinit = kwnew, type, [obrace, aexpression, cbrace], {comma, type, [obrace, aexpression, cbrace]}
+deletestmt = kwdelete, expression, {comma, expression}, semicolon
 
 expressionstmt = expression, semicolon
 expression = e17
@@ -396,17 +396,18 @@ e5'	  = (opmul | opdiv | opmod), e4
 e4    = e3, [e4']
 e4'   = oppow, e4
 
-e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | opat | opaddress) e3 | (lt, type, gt, (compound_literal, e2 | e3)) | e2
+e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | opat | opaddress) e3 | (lt, type, gt, e3) | e2
 
 e2  = e1, {e2'}
 e2' = (opspread)
 
 e1    = ee, {e1'}
-e1'	  = {{opinc | opdec | "(", [argument, {",", argument}], ")" | "[", expression, "]" | opaccess, iden}}
+e1'	  = opinc | opdec | oparen, {argument; comma}, cparen | obracket, expression, cbracket | opaccess, iden
 
-ee 	  = "(", (expression | funcval), ")" | safe_literal | iden
+# compound_literal only allowed if e3 is <type> and expected type is set
+ee 	  = oparen, (expression | funcval), cparen | safe_literal | compound_literal | iden
 
-argument = aexpression | iden, "=", aexpression
+argument = aexpression | iden, opassign, aexpression
 fexpression = freevardecl | mexpression
 mexpression = expression | assignment
-aexpression = (compound_literal | newinit | expression | snothing | funcval)
+aexpression = compound_literal | newinit | expression | snothing | funcval

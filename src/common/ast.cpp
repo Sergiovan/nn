@@ -283,10 +283,6 @@ ast_closure & ast_closure::operator=(ast_closure && o) {
     return *this;
 }
 
-bool ast_unary::is_assignable() {
-    return false; // TODO as we go
-}
-
 ast_unary::~ast_unary() {
     if (owned && node) {
         delete node;
@@ -312,6 +308,7 @@ ast_unary::ast_unary(const ast_unary& o) {
     }
     
     t = o.t;
+    assignable = o.assignable;
     post = o.post;
     
     owned = o.owned;
@@ -321,6 +318,7 @@ ast_unary::ast_unary(ast_unary && o) {
     op = o.op;
     std::swap(node, o.node);
     t = o.t;
+    assignable = o.assignable;
     post = o.post;
     std::swap(owned, o.owned);
 }
@@ -345,6 +343,7 @@ ast_unary & ast_unary::operator=(const ast_unary& o) {
         }
         
         t = o.t;
+        assignable = o.assignable;
         post = o.post;
         
         owned = o.owned;
@@ -357,14 +356,11 @@ ast_unary & ast_unary::operator=(ast_unary && o) {
         op = o.op;
         std::swap(node, o.node);
         t = o.t;
+        assignable = o.assignable;
         post = o.post;
         std::swap(owned, o.owned);
     }
     return *this;
-}
-
-bool ast_binary::is_assignable() {
-    return false; // TODO as we go
 }
 
 ast_binary::~ast_binary() {
@@ -409,6 +405,7 @@ ast_binary::ast_binary(const ast_binary& o) {
     }
     
     t = o.t;
+    assignable = o.assignable;
     lowned = o.lowned;
     rowned = o.rowned;
     
@@ -419,6 +416,7 @@ ast_binary::ast_binary(ast_binary && o) {
     std::swap(left, o.left);
     std::swap(right, o.right);
     t = o.t;
+    assignable = o.assignable;
     std::swap(lowned, o.lowned);
     std::swap(rowned, o.rowned);
 }
@@ -457,6 +455,7 @@ ast_binary & ast_binary::operator=(const ast_binary& o) {
         }
         
         t = o.t;
+        assignable = o.assignable;
         lowned = o.lowned;
         rowned = o.rowned;
     }
@@ -469,6 +468,7 @@ ast_binary & ast_binary::operator=(ast_binary && o) {
         std::swap(left, o.left);
         std::swap(right, o.right);
         t = o.t;
+        assignable = o.assignable;
         std::swap(lowned, o.lowned);
         std::swap(rowned, o.rowned);
     }
@@ -745,20 +745,21 @@ ast* ast::closure(ast* function, ast** elems, u64 size) {
     return r;
 }
 
-ast* ast::unary(Symbol op, ast* node, type* t, bool post, bool owned) {
+ast* ast::unary(Symbol op, ast* node, type* t, bool assignable, bool post, bool owned) {
     ast* r = new ast;
     r->t = post ? east_type::POST_UNARY : east_type::PRE_UNARY;
     ast_unary us{};
     us.op = op;
     us.node = node;
     us.t = t;
+    us.assignable = assignable;
     us.post = post;
     us.owned = owned;
     r->n = us;
     return r;
 }
 
-ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool lowned, bool rowned) {
+ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool assignable, bool lowned, bool rowned) {
     ast* r = new ast;
     r->t = east_type::BINARY;
     ast_binary bs{};
@@ -766,6 +767,7 @@ ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool lowned, bool ro
     bs.left = left;
     bs.right = right;
     bs.t = t;
+    bs.assignable = assignable;
     bs.lowned = lowned;
     bs.rowned = rowned;
     r->n = bs;
@@ -922,12 +924,12 @@ bool ast::is_nntype() {
 
 type* ast::get_type() {
     switch (t) {
-        case east_type::SYMBOL: return as_symbol().symbol->as_variable().t; 
+        case east_type::SYMBOL: return as_symbol().symbol->get_type(); 
         case east_type::BYTE: return as_byte().t;
         case east_type::WORD: return as_word().t;
         case east_type::DWORD: return as_dword().t;
         case east_type::QWORD: return as_qword().t;
-        case east_type::STRING: return type_table::t_string; // TODO
+        case east_type::STRING: return type_table::t_string;
         case east_type::ARRAY: return as_array().t;
         case east_type::STRUCT: return as_struct().t;
         case east_type::PRE_UNARY: [[fallthrough]];
@@ -946,9 +948,9 @@ type* ast::get_type() {
 bool ast::is_assignable() {
     switch (t) {
         case east_type::PRE_UNARY: [[fallthrough]];
-        case east_type::POST_UNARY: return as_unary().is_assignable();
-        case east_type::BINARY: return as_binary().is_assignable();
-        case east_type::SYMBOL: return true; // TODO?
+        case east_type::POST_UNARY: return as_unary().assignable;
+        case east_type::BINARY: return as_binary().assignable;
+        case east_type::SYMBOL: return as_symbol().symbol->is_field() || as_symbol().symbol->is_variable(); // Is this work?
         case east_type::FUNCTION: [[fallthrough]];
         case east_type::CLOSURE: [[fallthrough]];   
         case east_type::BLOCK: [[fallthrough]];   

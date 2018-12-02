@@ -9,10 +9,18 @@
 #include "frontend/lexer.h"
 #include "common/utils.h"
 
+#include "common/ast.h"
+#include "frontend/parser.h"
+
 
 
 int main(int argc, char** argv) {
     auto start = std::chrono::high_resolution_clock::now();
+    
+    parser p{};
+    ast* res = p.parse("examples/mastermind2.nn", true);
+    
+    /*
     reader* r = reader::from_file("examples/mastermind2.nn");
     lexer  l{r};
     
@@ -27,7 +35,7 @@ int main(int argc, char** argv) {
         logger::log() << "] | [" << logger::color::cyan << std::setw(11) << Grammar::tokentype_names.at(t.type);
         logger::log() << logger::color::white << "] | " << t.value;
         logger::log() << "\n";
-    }
+    } */
     
     auto end = std::chrono::high_resolution_clock::now();
     logger::log() << logger::end;

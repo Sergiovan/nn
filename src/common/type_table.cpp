@@ -83,6 +83,7 @@ std::string type_table::mangle(type* t) {
             for (auto& typ : c.types) {
                 add_bytes(ss, typ->id);
             }
+            return ss.str();
         }
         case ettype::PFUNCTION: {
             auto& pf = t->as_pfunction();
@@ -162,7 +163,7 @@ type type_table::unmangle(const std::string& mangled) {
     
     switch (mangled[0]) {
         case mangle_bytes::normal_start: {
-            std::memcpy(&cti.str, &mangled[1], sizeof(type_id));
+            std::memcpy(&cti.str[0], mangled.data() + 1, sizeof(type_id));
             type_id id = cti.id;
             type t = *types[id];
             t.flags = (u8) mangled[1 + sizeof(type_id)];
@@ -179,9 +180,9 @@ type type_table::unmangle(const std::string& mangled) {
             type_id pointed{0};
             if (mangled[0] == mangle_bytes::array_ptr_start) {
                 ptr_type = eptr_type::ARRAY;
-                std::memcpy(&cti.str, &mangled[2], sizeof(type_id));
+                std::memcpy(&cti.str[0], mangled.data() + 2, sizeof(type_id));
                 size = cti.id;
-                std::memcpy(&cti.str, &mangled[2 + sizeof(type_id) + 6], sizeof(type_id));
+                std::memcpy(&cti.str[0], mangled.data() + (2 + sizeof(type_id) + 6), sizeof(type_id));
                 pointed = cti.id;
             } else {
                 if (mangle_bytes::naked_ptr_start == mangled[0]) {
@@ -193,7 +194,7 @@ type type_table::unmangle(const std::string& mangled) {
                 } else if (mangle_bytes::weak_ptr_start == mangled[0]) {
                     ptr_type = eptr_type::WEAK;
                 }
-                std::memcpy(&cti.str, &mangled[7], sizeof(type_id));
+                std::memcpy(&cti.str[0], mangled.data() + 7, sizeof(type_id));
                 pointed = cti.id;
             }
             type* tpointed = types[pointed];
@@ -204,12 +205,12 @@ type type_table::unmangle(const std::string& mangled) {
             type_flags flags = (u8) mangled[1];
             type t{ettype::PSTRUCT, etype_ids::LET, flags, type_pstruct{{}}};
             auto& fields = t.as_pstruct().fields;
-            u64 pt{0};
+            u64 pt{2};
             while (pt < mangled.length()) {
                 if (mangled[pt] != mangle_bytes::struct_separator) {
                     break;
                 }
-                std::memcpy(&cti.str, &mangled[pt + 1], sizeof(type_id));
+                std::memcpy(&cti.str[0], mangled.data() + (pt + 1), sizeof(type_id));
                 fields.push_back({types[cti.id], (type_flags) mangled[pt + 1 + sizeof(type_id)]});
                 pt += 10;
             }
@@ -224,7 +225,7 @@ type type_table::unmangle(const std::string& mangled) {
                 if (mangled[pt] != mangle_bytes::struct_separator) {
                     break;
                 }
-                std::memcpy(&cti.str, &mangled[pt + 1], sizeof(type_id));
+                std::memcpy(&cti.str[0], mangled.data() + (pt + 1), sizeof(type_id));
                 fields.push_back({types[cti.id]});
                 pt += 10;
             }
@@ -233,10 +234,10 @@ type type_table::unmangle(const std::string& mangled) {
         case mangle_bytes::combination_start: {
             type t{ettype::COMBINATION, etype_ids::LET, 0, type_combination{}};
             auto& typs = t.as_combination().types;
-            std::memcpy(&cti.str, &mangled[1], sizeof(u64));
+            std::memcpy(&cti.str[0], mangled.data() + 1, sizeof(u64));
             u64 size = cti.id;
             for (u64 i = 0; i < size; ++i) {
-                std::memcpy(&cti.str, &mangled[1 + sizeof(u64) * (i + 1)], sizeof(u64));
+                std::memcpy(&cti.str[0], mangled.data() + (1 + sizeof(u64) * (i + 1)), sizeof(u64));
                 typs.push_back(types[cti.id]);
             }
             return t;
@@ -246,14 +247,14 @@ type type_table::unmangle(const std::string& mangled) {
             type t{ettype::PFUNCTION, etype_ids::FUN, flags, type_pfunction{}};
             auto& rets = t.as_pfunction().rets;
             auto& params = t.as_pfunction().params;
-            std::memcpy(&cti.str, &mangled[2], sizeof(type_id));
+            std::memcpy(&cti.str[0], mangled.data() + 2, sizeof(type_id));
             rets = types[cti.id];
             u64 pt{9};
             while (pt < mangled.length()) {
                 if (mangled[pt] != mangle_bytes::function_param) {
                     break;
                 }
-                std::memcpy(&cti.str, &mangled[pt + 1], sizeof(type_id));
+                std::memcpy(&cti.str[0], mangled.data() + (pt + 1), sizeof(type_id));
                 params.push_back({types[cti.id], (type_flags) mangled[pt + 1 + sizeof(type_id)]});
                 pt += 10;
             }
@@ -342,7 +343,7 @@ type* type_table::get(type& t) {
 
 type* type_table::get(const std::string& mangled) {
     auto t = mangle_table.find(mangled);
-    if (t == mangle_table.end()) {
+    if (t == mangle_table.end() || t->second == 0) { // Cannot pull VOID from table
         return nullptr;
     } else {
         return types[t->second];
@@ -352,7 +353,7 @@ type* type_table::get(const std::string& mangled) {
 type* type_table::get_or_add(type& t) {
     type* ret = get(t);
     if (!ret) {
-        ret = add_type(&t);
+        ret = add_type(t);
     }
     return ret;
 }
