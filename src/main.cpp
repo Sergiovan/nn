@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
     parser p{};
     
     auto start = std::chrono::high_resolution_clock::now();
-    ast* res = p.parse(argc > 1 ? argv[1] : "examples/mastermind2.nn", true);
+    ast* res = p.parse(argc > 1 ? argv[1] : "examples/students.nn", true);
     
     auto end = std::chrono::high_resolution_clock::now();
     

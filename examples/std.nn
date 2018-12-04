@@ -1,0 +1,23 @@
+namespace io {
+
+void print(char);
+void print(string);
+void print(byte);
+void print(short);
+void print(int);
+void print(long);
+void print(float);
+void print(double);
+
+}
+
+namespace math {
+
+long max(long, long);
+long min(long, long);
+
+long floor(double);
+long ceil(double);
+long round(double);
+
+}

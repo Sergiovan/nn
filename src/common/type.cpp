@@ -342,7 +342,7 @@ bool type::can_weak_cast(type* o) {
         using namespace etype_ids;
         type_primitive& tp = as_primitive(), op = o->as_primitive();
         // Allow casting from integers to larger integers
-        if (is_integer_type(tp.t) && is_integer_type(op.t) && get_size() < o->get_size()) { 
+        if (is_integer_type(tp.t) && is_integer_type(op.t) && get_size() <= o->get_size()) { 
             return true;
         }
         if (is_real_type(tp.t) && op.t == DOUBLE) { // Allow casting from reals to doubles
@@ -711,6 +711,7 @@ std::string type::print(bool simple) {
         case ettype::ENUM: {
             type_enum& enm = as_enum();
             ss << "enum " << enm.ste->name;
+            break;
         }
         case ettype::FUNCTION: {
             type_function& fun = as_function();

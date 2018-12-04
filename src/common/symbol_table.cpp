@@ -1,8 +1,10 @@
 #include "common/symbol_table.h"
-#include "type_table.h"
+
+#include <utility>
 
 #include "common/ast.h"
 #include "common/type.h"
+#include "common/type_table.h"
 #include "common/utils.h"
 
 overload::overload(type* t, ast* value, bool defined, symbol_table* st) 
@@ -204,7 +206,7 @@ overload* st_function::get_overload(const std::vector<type*>& args) {
     std::vector<overload*> ret{};
     for (auto& ov : overloads) {
         auto& oparams = ov.t->as_function().params;
-        bool spread = (oparams.back().flags & eparam_flags::SPREAD) == 0;
+        bool spread = (oparams.back().flags & eparam_flags::SPREAD) != 0;
         if (args.size() > oparams.size() && !spread) {
             goto next_overload;
         }
@@ -236,8 +238,23 @@ overload* st_function::get_overload(const std::vector<type*>& args) {
     } else if (ret.empty()) {
         return nullptr;
     } else {
-        // TODO Sort out the rest of the overloads
-        return nullptr;
+        std::vector<overload*> rret{};
+        for (auto& ov : ret) {
+            auto& oparams = ov->t->as_function().params;
+            bool spread = (oparams.back().flags & eparam_flags::SPREAD) != 0;
+            for (int i = 0; i < oparams.size() - (spread ? 1 : 0); ++i) {
+                if (oparams[i].t != args[i]) {
+                    goto final_next_overload;
+                }
+            }
+            rret.push_back(ov);
+            final_next_overload:;
+        }
+        if (rret.size() == 1) {
+            return ret.front();
+        } else {
+            return nullptr;
+        }
     }
 }
 
@@ -300,10 +317,6 @@ st_namespace::~st_namespace() {
 }
 
 st_namespace::st_namespace(const st_namespace& o) {
-    if (st) {
-        delete st;
-    }
-
     if (o.st) {
         st = new symbol_table{*o.st};
     } else {
@@ -348,15 +361,11 @@ symbol_table::~symbol_table() {
 }
 
 symbol_table::symbol_table(const symbol_table& o) {
-    for (auto& entry : entries) {
-        delete entry.second;
-    }
-
     parent = o.parent;
     owner = o.owner;
     
     for (auto& oentry : o.entries) {
-        entries.insert({oentry.first, new st_entry{*oentry.second}});
+        entries.insert({oentry.first, oentry.second ? new st_entry{*oentry.second} : nullptr});
     }
     borrowed_entries = o.borrowed_entries;
 }
@@ -378,7 +387,7 @@ symbol_table& symbol_table::operator=(const symbol_table& o) {
         owner = o.owner;
         
         for (auto& oentry : o.entries) {
-            entries.insert({oentry.first, new st_entry{*oentry.second}});
+            entries.insert({oentry.first, oentry.second ? new st_entry{*oentry.second} : nullptr});
         }
         borrowed_entries = o.borrowed_entries;
     }
@@ -395,12 +404,12 @@ symbol_table& symbol_table::operator=(symbol_table&& o) {
     return *this;
 }
 
-st_entry* st_entry::variable(type* t, ast* value, bool defined) {
-    return new st_entry{st_variable{t, value, defined}, est_entry_type::VARIABLE};
+st_entry* st_entry::variable(const std::string& name, type* t, ast* value, bool defined) {
+    return new st_entry{st_variable{t, value, defined}, est_entry_type::VARIABLE, name};
 }
 
-st_entry * st_entry::field(u64 field, type* ptype) {
-    return new st_entry{st_field{field, ptype}, est_entry_type::FIELD};
+st_entry * st_entry::field(const std::string& name, u64 field, type* ptype) {
+    return new st_entry{st_field{field, ptype}, est_entry_type::FIELD, name};
 }
 
 
@@ -422,6 +431,10 @@ st_namespace& st_entry::as_namespace() {
 
 st_field& st_entry::as_field() {
     return std::get<st_field>(entry);
+}
+
+st_namespace& st_entry::as_module() {
+    return std::get<st_namespace>(entry);
 }
 
 bool st_entry::is_type() {
@@ -446,6 +459,10 @@ bool st_entry::is_field() {
 
 bool st_entry::is_module() {
     return t == est_entry_type::MODULE;
+}
+
+bool st_entry::is_label() {
+    return t == est_entry_type::LABEL;
 }
 
 type* st_entry::get_type() {
@@ -473,7 +490,8 @@ type* st_entry::get_type() {
         case est_entry_type::VARIABLE:
             return as_variable().t;
         case est_entry_type::MODULE: [[fallthrough]];
-        case est_entry_type::NAMESPACE:
+        case est_entry_type::NAMESPACE: [[fallthrough]];
+        case est_entry_type::LABEL: 
             return type_table::t_void;
     }
     return nullptr; // What
@@ -541,7 +559,7 @@ st_entry* symbol_table::add_type(const std::string& name, type* t, bool defined)
     if (t->is_struct() || t->is_union()) {
         nt.st = new symbol_table(etable_owner::STRUCT, this);
     }
-    st_entry* ne = new st_entry{nt, est_entry_type::TYPE, name};
+    st_entry* ne = new st_entry{std::move(nt), est_entry_type::TYPE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -552,7 +570,7 @@ st_entry* symbol_table::add_variable(const std::string& name, type* t, ast* valu
     }
     
     st_variable nv{t, value, value != nullptr};
-    st_entry* ne = new st_entry{nv, est_entry_type::VARIABLE, name};
+    st_entry* ne = new st_entry{std::move(nv), est_entry_type::VARIABLE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -589,7 +607,7 @@ st_entry* symbol_table::add_namespace(const std::string& name, symbol_table* st)
     }
     
     st_namespace nn{st};
-    st_entry* ne = new st_entry{nn, est_entry_type::NAMESPACE, name};
+    st_entry* ne = new st_entry{std::move(nn), est_entry_type::NAMESPACE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -600,7 +618,7 @@ st_entry* symbol_table::add_module(const std::string& name, symbol_table* st) {
     }
     
     st_namespace nm{st};
-    st_entry* ne = new st_entry{nm, est_entry_type::MODULE, name};
+    st_entry* ne = new st_entry{std::move(nm), est_entry_type::MODULE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -611,7 +629,18 @@ st_entry* symbol_table::add_field(const std::string& name, u64 field, type* ptyp
     }
     
     st_field nf{field, ptype};
-    st_entry* ne = new st_entry{nf, est_entry_type::FIELD, name};
+    st_entry* ne = new st_entry{std::move(nf), est_entry_type::FIELD, name};
+    entries.insert({name, ne});
+    return ne;
+}
+
+st_entry* symbol_table::add_label(const std::string& name) {
+    using namespace std::string_literals;
+    if (has(name, false)) {
+        return nullptr;
+    }
+    
+    st_entry* ne = new st_entry{st_label{}, est_entry_type::LABEL, ":"s + name};
     entries.insert({name, ne});
     return ne;
 }
@@ -636,7 +665,12 @@ u64 symbol_table::get_size(bool borrowed) {
     return entries.size() + (borrowed ? borrowed_entries.size() : 0);
 }
 
+void symbol_table::set_owner(etable_owner owner) {
+    symbol_table::owner = owner;
+}
+
 symbol_table* symbol_table::make_child(etable_owner new_owner) {
-    return new symbol_table(new_owner == etable_owner::COPY ? owner : new_owner, this);
+    symbol_table* self = this;
+    return new symbol_table{new_owner == etable_owner::COPY ? owner : new_owner, self};
 }
 

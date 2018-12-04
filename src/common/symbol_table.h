@@ -18,7 +18,7 @@ enum class etable_owner {
 
 enum class est_entry_type {
     TYPE, VARIABLE, FUNCTION, NAMESPACE,
-    FIELD, MODULE
+    FIELD, MODULE, LABEL
 };
 
 struct overload {
@@ -92,7 +92,9 @@ struct st_field {
     type* ptype{nullptr};
 };
 
-using st_variant = std::variant<st_type, st_variable, st_function, st_namespace, st_field>;
+struct st_label {};
+
+using st_variant = std::variant<st_type, st_variable, st_function, st_namespace, st_field, st_label>;
 
 struct st_entry {
     st_variant entry;
@@ -100,14 +102,16 @@ struct st_entry {
     
     std::string name{};
     
-    static st_entry* variable(type* t, ast* value = nullptr, bool defined = false);
-    static st_entry* field(u64 field, type* ptype = nullptr);
+    static st_entry* variable(const std::string& name, type* t, ast* value = nullptr, bool defined = false);
+    static st_entry* field(const std::string& name, u64 field, type* ptype = nullptr);
     
     st_type& as_type();
     st_variable& as_variable();
     st_function& as_function();
     st_namespace& as_namespace();
     st_field& as_field();
+    st_namespace& as_module();
+    
     
     bool is_type();
     bool is_variable();
@@ -115,6 +119,7 @@ struct st_entry {
     bool is_namespace();
     bool is_field();
     bool is_module();
+    bool is_label();
     
     type* get_type();
 };
@@ -144,11 +149,14 @@ public:
     st_entry* add_namespace(const std::string& name, symbol_table* st = nullptr);
     st_entry* add_module(const std::string& name, symbol_table* st);
     st_entry* add_field(const std::string& name, u64 field, type* ptype);
+    st_entry* add_label(const std::string& name);
     
     st_entry* borrow(const std::string& name, st_entry* entry);
-    bool merge_st(symbol_table* st);
+    bool merge_st(symbol_table* st); // TODO Errors and merge conflicts
     
     u64 get_size(bool borrowed = true);
+    
+    void set_owner(etable_owner owner);
     
     symbol_table* make_child(etable_owner new_owner = etable_owner::COPY);
     

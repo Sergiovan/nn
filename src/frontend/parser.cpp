@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <sstream>
 #include <set>
 
@@ -29,19 +30,34 @@ void ctx_guard::deactivate() {
     }
 }
 
-parser::parser() {
+parser::parser() : types(*(new type_table{})) {
     root_st = new symbol_table(etable_owner::FREE);
+}
+
+parser::parser(type_table& tt) : types(tt) {
+    forked = true;
+    root_st = new symbol_table(etable_owner::FREE); // TODO Fix this, oof
+}
+
+parser::~parser() {
+    if (!forked) {
+        delete root_st;
+        delete &types; // Oofies
+    }
 }
 
 ast* parser::parse(lexer* l) {
     contexts.push({root_st, nullptr, nullptr, nullptr, nullptr, nullptr});
     parser::l = l;
     c = l->next();
-    return program();
+    return _parse();
 }
 
 ast* parser::parse(const std::string& str, bool is_file) {
     reader* r = (is_file ? reader::from_file : reader::from_string)(str);
+    if (is_file) {
+        file_path /= str;
+    }
     lexer* l = new lexer{r};
     ast* ret = parse(l);
     delete l; // Deletes r
@@ -49,11 +65,12 @@ ast* parser::parse(const std::string& str, bool is_file) {
 }
 
 symbol_table* parser::get_as_module() {
-    return nullptr;
+    root_st->set_owner(etable_owner::MODULE);
+    return root_st;
 }
 
 parser parser::fork() {
-    return parser{}; // TODO Actually implement
+    return parser{types}; 
 }
 
 bool parser::has_errors() {
@@ -68,6 +85,32 @@ void parser::print_errors() {
 
 void parser::print_types() {
     logger::log() << types.print() << logger::nend;
+}
+
+ast* parser::_parse() {
+    ast* ret = program();
+    if (unfinished.size()) {
+        finish();
+    }
+    return ret;
+}
+
+void parser::finish() {
+    for (auto& [val, ctx] : unfinished) {
+        if (val->is_unary() && val->as_unary().op == Symbol::KWGOTO) {
+            auto& unn = val->as_unary();
+            auto& str = unn.node->as_string();
+            std::string labelname((char*) str.chars, str.length);
+            if (auto label = labels.find(labelname); label != labels.end()) {
+                delete unn.node;
+                unn.node = label->second;
+            } else {
+                error("Unable to finish GOTO element");
+            }
+        } else {
+            error("Unable to finish element");
+        }
+    }
 }
 
 context& parser::ctx() {
@@ -395,12 +438,12 @@ ast* parser::iden(bool withthis, type** thistype) {
             if (t->is_struct() || t->is_union()) {
                 if (sym->is_function()) {
                     if (peek(Symbol::PAREN_LEFT)) {
-                        ctx().first_param = ast::symbol(self, "this");
+                        ctx().first_param = ast::symbol(self);
                     } else {
                         error("Method access on values or variables must be used as function calls");
                     }
                 } else if (sym->is_field()) {
-                    return ast::binary(Symbol::ACCESS, ast::symbol(self, "this"), ast::symbol(sym, tok.value));
+                    return ast::binary(Symbol::ACCESS, ast::symbol(self), ast::symbol(sym));
                 }
             }
         } else {
@@ -412,8 +455,9 @@ ast* parser::iden(bool withthis, type** thistype) {
         std::stringstream ss{};
         ss << '"' << tok.value << '"' << "does not exist";
         error(ss.str(), epanic_mode::NO_PANIC, &tok);
+        return ast::none();
     }
-    return ast::symbol(sym, tok.value);
+    return ast::symbol(sym);
 }
 
 ast* parser::compileriden() {
@@ -499,7 +543,7 @@ ast* parser::array() {
     
     cg.deactivate();
     
-    ast* ret = ast::array(nullptr, elems.size(), ctx().expected);
+    ast* ret = ast::array(new ast*[elems.size()], elems.size(), ctx().expected);
     std::memcpy(ret->as_array().elems, elems.data(), elems.size() * sizeof(ast*));
     return ret;
 }
@@ -860,7 +904,7 @@ ast* parser::forcond() {
             if (new_iden->is_binary() && new_iden->as_binary().op == Symbol::SYMDECL) {
                 for (auto& stmt : new_iden->as_binary().left->as_block().stmts) {
                     auto& sym = stmt->as_symbol();
-                    st()->add(sym.name, sym.symbol);
+                    st()->add(sym.get_name(), sym.symbol);
                 }
                 new_iden->as_binary().right = idenass;
                 start = new_iden;
@@ -931,7 +975,7 @@ ast* parser::forcond() {
             if (start->is_binary() && start->as_binary().op == Symbol::SYMDECL) {
                 for (auto& stmt : start->as_binary().left->as_block().stmts) {
                     auto& sym = stmt->as_symbol();
-                    st()->add(sym.name, sym.symbol);
+                    st()->add(sym.get_name(), sym.symbol);
                 }
                 start->as_binary().right = colon;
             }
@@ -1327,24 +1371,45 @@ ast* parser::gotostmt() {
     compiler_assert(Keyword::GOTO);
     next(); // goto
     
-    // TODO 
+    ast* ret = ast::unary(Symbol::KWGOTO, nullptr);
+    std::string labelname = c.value;
+    if (auto label = labels.find(labelname); label == labels.end()) {
+        ret->as_unary().node = ast::string(c.value);
+        unfinished.push_back({ret, ctx()});
+    } else {
+        ret->as_unary().node = label->second;
+    }
     
     next(); // iden
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
-    return error("Not yet implemented");
+    return ret;
 }
 
 ast* parser::labelstmt() {
     compiler_assert(Keyword::LABEL);
-    next(); // goto
+    next(); // label
     
-    // TODO 
+    ast* ret{nullptr};
+    
+    if (labels.find(c.value) != labels.end()) {
+        ret = error("Label already exists");
+    } else {
+        st_entry* label = st()->add_label(c.value);
+        ast* labelast{nullptr};
+        if (!label) {
+            labelast = error("Object with that name already exists ");
+        } else {
+            labelast = ast::symbol(label);
+        }
+        ret = ast::unary(Symbol::KWLABEL, ast::symbol(label));
+        labels.insert({c.value, ret});
+    }
     
     next(); // iden
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
-    return error("Not yet implemented");
+    return ret;
 }
 
 ast* parser::deferstmt() {
@@ -1385,31 +1450,62 @@ ast* parser::leavestmt() {
 }
 
 ast* parser::importstmt() {
+    using namespace std::string_literals;
+    namespace fs = std::filesystem;
+    
     compiler_assert(Keyword::IMPORT);
     next(); // import
     
+    ast* ret{nullptr}; 
+    
     ast* what{nullptr};
     std::string as{};
+    fs::path p{file_path.parent_path()};
+    bool asterisk{false};
     
     if (is(TokenType::STRING)) {
-        what = string();
+        p /= c.value;
+        if (fs::exists(p) && fs::is_regular_file(p)) {
+            p = fs::canonical(p);
+            what = ast::string(p.string());
+        } else {
+            what = error("Path does not exist or is not a file");
+        }
     } else {
         std::stringstream path{};
         path << c.value;
         as = c.value;
         next(); // iden
         while (is(Symbol::DOT)) {
+            if (asterisk) {
+                error("Cannot have more names after asterisk", epanic_mode::SEMICOLON);
+                break;
+            }
+            
+            p /= as;
+            if (!fs::exists(p) || !fs::is_directory(p)) {
+                error("Path does not exist");
+            }
             path << c.value;
             next(); // .
-            path << c.value; 
-            as = c.value;
-            next(); // iden
+            if (!is(TokenType::IDENTIFIER)) {
+                require(Symbol::ASTERISK, epanic_mode::SEMICOLON);
+                asterisk = true;
+            }
+            path << c.value;
+            if (!asterisk) {
+                as = c.value;
+            }
+            next(); // iden *
         }
-        std::string pathstr{path.str()};
-        what = ast::string(pathstr);
+        p /= (as + ".nn"s);
+        if (fs::exists(p) && fs::is_regular_file(p)) { // TODO Check we're not importing ourselves
+            p = fs::canonical(p);
+            what = ast::string(p.string());
+        } else {
+            what = error("Path does not exist or is not a file"); 
+        }
     }
-    
-    ast* ret = ast::binary(Symbol::KWIMPORT, what);
     
     if (is(Keyword::AS)) {
         next(); // as
@@ -1421,76 +1517,118 @@ ast* parser::importstmt() {
         next(); // iden
     }
     
-    ret->as_binary().right = ast::string(as);
-    
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
     
-    // TODO Do import
+    std::string module_name{p.string()};
+    symbol_table* mod{nullptr};
+    
+    if (auto stored_module = modules.find(module_name); stored_module == modules.end()) {
+        parser pars = fork();
+        ast* module = pars.parse(module_name, true);
+        if (pars.has_errors()) {
+            errors.insert(errors.end(), pars.errors.begin(), pars.errors.end());
+        }
+        for (auto& [name, val] : pars.modules) {
+            if (modules.find(name) == modules.end()) {
+                modules.insert({name, val});
+            }
+        }
+        mod = pars.get_as_module();
+        modules.insert({p.string(), mod});
+    } else {
+        mod = stored_module->second;
+    }
+    
+    if (asterisk) {
+        st()->merge_st(mod);
+        ret = ast::binary(Symbol::KWIMPORT, what, ast::none());
+    } else {
+        st_entry* sym = st()->add_module(as, mod);
+        ret = ast::binary(Symbol::KWIMPORT, what, ast::symbol(sym));
+    }
+    
     return ret;
 }
 
 ast* parser::usingstmt() {
+    using namespace std::string_literals;
     compiler_assert(Keyword::USING);
     
     std::vector<std::string> path{};
     std::string as{};
+    bool true_as{false};
+    bool asterisk = false;
     
     do {
-        next(); // using, .
-        require(TokenType::IDENTIFIER);
+        if (asterisk) {
+            error("Cannot have more names after asterisk", epanic_mode::SEMICOLON);
+            break;
+        }
         
-        path.push_back(c.value);
-        next(); //iden
+        next(); // using, .
+        if(!is(TokenType::IDENTIFIER)) {
+            require(Symbol::ASTERISK);
+            asterisk = true;
+        } else {
+            path.push_back(c.value);
+        }
+        next(); //iden *
         
     } while(is(Symbol::DOT));
     
     if (is(Keyword::AS)) {
-        next(); // as
-        require(TokenType::IDENTIFIER);
-        as = c.value;
-        next();
+        if (asterisk) {
+            error("Cannot give name to asterisk expression", epanic_mode::SEMICOLON);
+        } else {
+            true_as = true;
+            next(); // as
+            require(TokenType::IDENTIFIER);
+            as = c.value;
+            next();
+        }
     } else {
         as = path.back();
     }
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
+    next(); // ;
     
     symbol_table* cur{st()};
     bool first = true;
     bool last = false;
-    bool merge = false;
     st_entry* entry{nullptr};
     
     for (auto& str : path) {
         if (last) {
             return error("Path ends prematurely");
         }
+        
         entry = cur->get(str, first);
         first = false;
         if (!entry) {
             return error("Given identifier does not exist");
         } else if (entry->is_type()) {
-            merge = false;
             if (!entry->as_type().st) {
                 last = true;
             } else {
                 cur = entry->as_type().st;
             }
         } else if (entry->is_function()) {
-            merge = false;
             cur = entry->as_function().st;
-        } else if (entry->is_namespace()) {
+        } else if (entry->is_namespace() || entry->is_module()) {
             cur = entry->as_namespace().st;
-            merge = true;
         } else {
             return error("Cannot use element found");
         }
     }
     
-    if (merge) {
+    if (asterisk) {
         st()->merge_st(cur);
     } else {
+        if (as.empty()) {
+            as = entry->name;
+        }
         st()->borrow(as, entry);
     }
     
@@ -1561,7 +1699,7 @@ ast* parser::namespacescope() {
     ast* ns = ast::block(st());
     auto& stmts = ns->as_block().stmts;
     
-    while (true) {
+    while (!is(Symbol::BRACE_RIGHT) && !is(TokenType::END_OF_FILE)) {
         if (is(Keyword::USING)) {
             stmts.push_back(usingstmt());
         } else if (is(Keyword::NAMESPACE)) {
@@ -1575,7 +1713,8 @@ ast* parser::namespacescope() {
         }
     }
     
-    require(Symbol::BRACE_LEFT, epanic_mode::ESCAPE_BRACE);
+    require(Symbol::BRACE_RIGHT, epanic_mode::ESCAPE_BRACE);
+    next(); 
     
     return ns;
 }
@@ -2019,9 +2158,9 @@ ast* parser::freevardecliden(ast* t1) {
     next(); // iden
     
     type* expected = typ->as_nntype().t;
-    st_entry* entry{st_entry::variable(expected)};
+    st_entry* entry{st_entry::variable(name, expected)};
     
-    stmts.push_back(ast::symbol(entry, name));
+    stmts.push_back(ast::symbol(entry));
     
     if (is(Symbol::COMMA)) {
         type comb = type{ettype::COMBINATION};
@@ -2044,8 +2183,8 @@ ast* parser::freevardecliden(ast* t1) {
             next(); // iden
             
             expected = typ->as_nntype().t;
-            entry = st_entry::variable(expected);
-            stmts.push_back(ast::symbol(entry, name));
+            entry = st_entry::variable(name, expected);
+            stmts.push_back(ast::symbol(entry));
             types.push_back(expected);
         }
         
@@ -2086,7 +2225,7 @@ ast* parser::freevardecl(ast* t1) {
         
         for (u64 i = 0; i < stmts.size(); ++i) {
             auto& sym = stmts[i]->as_symbol();
-            st()->add(sym.name, sym.symbol);
+            st()->add(sym.get_name(), sym.symbol);
             
             if (i < value_types.size()) {
                 auto& [val, typ] = value_types[i];
@@ -2106,7 +2245,7 @@ ast* parser::freevardecl(ast* t1) {
         auto& stmts = iden->as_binary().left->as_block().stmts;
         for (auto& stmt : stmts) {
             auto& sym = stmt->as_symbol();
-            st()->add(sym.name, sym.symbol);
+            st()->add(sym.get_name(), sym.symbol);
             if (sym.symbol->as_variable().t == types.t_let) {
                 error("Variable has uninferrable type");
             }
@@ -2137,7 +2276,7 @@ ast* parser::structvardecliden(ast* t1) {
     next(); // iden
     
     type* expected = typ->as_nntype().t;
-    st_entry* entry{st_entry::field(fields.size(), ctx()._struct)};
+    st_entry* entry{st_entry::field(name, fields.size(), ctx()._struct)};
     
     field f;
     f.t = expected;
@@ -2161,7 +2300,7 @@ ast* parser::structvardecliden(ast* t1) {
     
     fields.push_back(f);
     
-    stmts.push_back(ast::symbol(entry, name));
+    stmts.push_back(ast::symbol(entry));
     
     if (is(Symbol::COMMA)) {
         type comb = type{ettype::COMBINATION};
@@ -2184,7 +2323,7 @@ ast* parser::structvardecliden(ast* t1) {
             next(); // iden
             
             expected = typ->as_nntype().t;
-            entry = st_entry::field(fields.size(), ctx()._struct);
+            entry = st_entry::field(name, fields.size(), ctx()._struct);
             
             field f;
             f.t = expected;
@@ -2208,7 +2347,7 @@ ast* parser::structvardecliden(ast* t1) {
             
             fields.push_back(f);
             
-            stmts.push_back(ast::symbol(entry, name));
+            stmts.push_back(ast::symbol(entry));
             types.push_back(expected);
         }
         
@@ -2249,7 +2388,7 @@ ast* parser::structvardecl(ast* t1) {
         
         for (u64 i = 0; i < stmts.size(); ++i) {
             auto& sym = stmts[i]->as_symbol();
-            st()->add(sym.name, sym.symbol);
+            st()->add(sym.get_name(), sym.symbol);
             
             if (i < value_types.size()) {
                 auto& [val, typ] = value_types[i];
@@ -2270,7 +2409,7 @@ ast* parser::structvardecl(ast* t1) {
         auto& stmts = iden->as_binary().left->as_block().stmts;
         for (auto& stmt : stmts) {
             auto& sym = stmt->as_symbol();
-            st()->add(sym.name, sym.symbol);
+            st()->add(sym.get_name(), sym.symbol);
             if (fields[sym.symbol->as_field().field].t == types.t_let) {
                 error("Variable has uninferrable type");
             }
@@ -2339,7 +2478,7 @@ ast* parser::simplevardecl(ast* t1) {
     }
     
     st_entry* entry = st()->add_field(name, fields.size(), ctx()._struct);
-    ast* ret = ast::symbol(entry, name);
+    ast* ret = ast::symbol(entry);
     
     return ast::binary(Symbol::SYMDECL, ret, exp ? exp : ast::none(), expected);
 }
@@ -2401,7 +2540,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
     
     symbol_table* parent = st();
     push_context();
-    ctx().st = st()->make_child(etable_owner::FUNCTION);
+    ctx().st = parent->make_child(etable_owner::FUNCTION);
     auto cg = guard();
     
     if (thistype) {
@@ -2484,7 +2623,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
 
     cg.deactivate();
     
-    return ast::binary(Symbol::SYMDECL, ast::symbol(entry, name), ol && ol->value ? ol->value : ast::none(), ftype);
+    return ast::binary(Symbol::SYMDECL, ast::symbol(entry), ol && ol->value ? ol->value : ast::none(), ftype);
 }
 
 ast* parser::funcval() {
@@ -2578,7 +2717,7 @@ ast* parser::funcval() {
                 t = types.get_or_add(nt);
             }
             
-            st()->add_variable(idn.name, t);
+            st()->add_variable(idn.get_name(), t);
             
             jailed.push_back(jail);
             
@@ -2710,7 +2849,7 @@ ast* parser::structdecl() {
 
     cg.deactivate();
     
-    return ast::binary(Symbol::SYMDECL, ast::symbol(entry, name), scontent ? scontent : ast::none(), stype);
+    return ast::binary(Symbol::SYMDECL, ast::symbol(entry), scontent ? scontent : ast::none(), stype);
 }
 
 ast* parser::structscope() {
@@ -2788,7 +2927,7 @@ ast* parser::uniondecl() {
 
     cg.deactivate();
     
-    return ast::binary(Symbol::SYMDECL, ast::symbol(entry, name), ucontent, utype);
+    return ast::binary(Symbol::SYMDECL, ast::symbol(entry), ucontent, utype);
 }
 
 ast* parser::unionscope() {
@@ -2834,22 +2973,19 @@ ast* parser::enumdecl() {
     } else {
         etype = types.add_type(type::_enum());
         entry = st()->add_type(name, etype, false);
-        etype->as_struct().ste = entry;
+        etype->as_enum().ste = entry;
     }
-    
-    type enumtype = *etype;
     
     symbol_table* parent = st();
     push_context();
     entry->as_type().st = ctx().st = st()->make_child(etable_owner::ENUM);
-    ctx()._struct = &enumtype;
+    ctx()._struct = etype;
     auto cg = guard();
     
     ast* econtent{nullptr};
     
     if (is(Symbol::BRACE_LEFT)) {
          econtent = enumscope();
-         types.update_type(etype->id, enumtype);
          entry->as_type().defined = true;
     } else {
         if (declared) {
@@ -2863,7 +2999,7 @@ ast* parser::enumdecl() {
 
     cg.deactivate();
     
-    return ast::binary(Symbol::SYMDECL, ast::symbol(entry, name), econtent, etype);
+    return ast::binary(Symbol::SYMDECL, ast::symbol(entry), econtent, etype);
 }
 
 ast* parser::enumscope() {
@@ -2889,7 +3025,7 @@ ast* parser::enumscope() {
             added = st()->add_field(name, st()->get_size(), ctx()._struct);
         }
         
-        stmts.push_back(ast::binary(Symbol::SYMDECL, ast::symbol(added, name), ast::qword(st()->get_size() - 1, ctx()._struct), ctx().expected));
+        stmts.push_back(ast::binary(Symbol::SYMDECL, ast::symbol(added), ast::qword(st()->get_size() - 1, ctx()._struct), ctx()._struct));
         
         if (is(Symbol::COMMA)) {
             next(); // ,
@@ -2898,6 +3034,7 @@ ast* parser::enumscope() {
         }
     }
     require(Symbol::BRACE_RIGHT);
+    next(); // }
     
     return block;
 }
@@ -2951,6 +3088,8 @@ ast* parser::assignment() {
     } else {
         ass = c.as_symbol();
     }
+    
+    // TODO Different assignments require different types
     
     next(); // =
     
@@ -3129,40 +3268,9 @@ ast* parser::e17() {
 
 ast* parser::e16() {
     ast* exp = e15();
-    while (is(Symbol::EQUALS) || is(Symbol::NOT_EQUALS)) {
-        Symbol sym = c.as_symbol();
-        next(); // == !=
-        ast* to = e15();
-        if (!type::weak_cast_target(exp->get_type(), to->get_type())) {
-            error("Incompatible types");
-        }
-        exp = ast::binary(sym, exp, to, types.t_bool);
-    }
-    return exp;
-}
-
-ast* parser::e15() {
-    ast* exp = e14();
-    while (is(Symbol::LESS) || is(Symbol::GREATER) || is(Symbol::LESS_OR_EQUALS) || is(Symbol::GREATER_OR_EQUALS)) {
-        Symbol sym = c.as_symbol();
-        next(); // < > <= >=
-        ast* to = e14();
-        if (!type::weak_cast_target(exp->get_type(), to->get_type())) {
-            error("Cannot compare order of incompatible types");
-        } else if (!exp->get_type()->is_numeric() && !exp->get_type()->is_primitive(etype_ids::STRING) && 
-                   !exp->get_type()->is_primitive(etype_ids::CHAR)) {
-            error("Cannot compare order of non-numbers or non-string-likes");
-        }
-        exp = ast::binary(sym, exp, to, types.t_bool);
-    }
-    return exp;
-}
-
-ast* parser::e14() {
-    ast* exp = e13();
     while (is(Symbol::LXOR)) {
         next(); // ^^
-        ast* to = e13();
+        ast* to = e15();
         if (!exp->get_type()->can_boolean() || !to->get_type()->can_boolean()) {
             error("Cannot perform logical XOR on non-booleanable types");
         }
@@ -3171,11 +3279,11 @@ ast* parser::e14() {
     return exp;
 }
 
-ast* parser::e13() {
-    ast* exp = e12();
+ast* parser::e15() {
+    ast* exp = e14();
     while (is(Symbol::LOR)) {
         next(); // ||
-        ast* to = e12();
+        ast* to = e14();
         if (!exp->get_type()->can_boolean() || !to->get_type()->can_boolean()) {
             error("Cannot perform logical OR on non-booleanable types");
         }
@@ -3184,15 +3292,46 @@ ast* parser::e13() {
     return exp;
 }
 
-ast* parser::e12() {
-    ast* exp = e11();
+ast* parser::e14() {
+    ast* exp = e13();
     while (is(Symbol::LAND)) {
         next(); // &&
-        ast* to = e11();
+        ast* to = e13();
         if (!exp->get_type()->can_boolean() || !to->get_type()->can_boolean()) {
             error("Cannot perform logical AND on non-booleanable types");
         }
         exp = ast::binary(Symbol::LAND, exp, to, types.t_bool);
+    }
+    return exp;
+}
+
+ast* parser::e13() {
+    ast* exp = e12();
+    while (is(Symbol::EQUALS) || is(Symbol::NOT_EQUALS)) {
+        Symbol sym = c.as_symbol();
+        next(); // == !=
+        ast* to = e12();
+        if (!type::weak_cast_target(exp->get_type(), to->get_type())) {
+            error("Incompatible types");
+        }
+        exp = ast::binary(sym, exp, to, types.t_bool);
+    }
+    return exp;
+}
+
+ast* parser::e12() {
+    ast* exp = e11();
+    while (is(Symbol::LESS) || is(Symbol::GREATER) || is(Symbol::LESS_OR_EQUALS) || is(Symbol::GREATER_OR_EQUALS)) {
+        Symbol sym = c.as_symbol();
+        next(); // < > <= >=
+        ast* to = e11();
+        if (!type::weak_cast_target(exp->get_type(), to->get_type())) {
+            error("Cannot compare order of incompatible types");
+        } else if (!exp->get_type()->is_numeric() && !exp->get_type()->is_primitive(etype_ids::STRING) && 
+                   !exp->get_type()->is_primitive(etype_ids::CHAR)) {
+            error("Cannot compare order of non-numbers or non-string-likes");
+        }
+        exp = ast::binary(sym, exp, to, types.t_bool);
     }
     return exp;
 }
@@ -3513,7 +3652,7 @@ ast* parser::e1() {
                         ctx().expected = params[i].t;
                         auto cg = guard();
                         
-                        auto [val, name] = argument(true);
+                        auto [val, name] = argument(true, exp->get_type());
                         type* argtype = val->get_type();
                         
                         u64 si = i;
@@ -3654,7 +3793,7 @@ ast* parser::e1() {
                 break;
             }
             case Symbol::BRACKET_LEFT: {
-                ast* to = e3();
+                ast* to = expression();
                 require(Symbol::BRACKET_RIGHT, epanic_mode::ESCAPE_BRACKET);
                 next(); // ]
                 if (!exp->get_type()->is_pointer(eptr_type::ARRAY)) {
@@ -3689,7 +3828,7 @@ ast* parser::e1() {
                                     } else {
                                         delete exp; // Bwuh?
                                     }
-                                    exp = ast::symbol(meth, name);
+                                    exp = ast::symbol(meth);
                                     continue;
                                 }
                             } else if (t.t->is_enum()) {
@@ -3721,20 +3860,18 @@ ast* parser::e1() {
                             }
                             break;
                         }
+                        case est_entry_type::MODULE: [[fallthrough]];
                         case est_entry_type::NAMESPACE: {
                             st_entry* e = symbol->as_namespace().st->get(name, false);
                             if (e) {
                                 delete exp;
-                                exp = ast::symbol(e, name);
+                                exp = ast::symbol(e);
                                 continue;
                             } else {
                                 error("No such name in namespace");
                             }
                             break;
                         }
-                        case est_entry_type::MODULE:
-                            error("Who implemented this?", epanic_mode::ULTRA_PANIC);
-                            break; // TODO
                         case est_entry_type::FIELD:
                             t = symbol->get_type();
                             if (!not_first) {
@@ -3742,9 +3879,12 @@ ast* parser::e1() {
                                 if (zhis->get_type()->as_pointer().t != symbol->as_field().ptype) {
                                     error("this does not have any such fields");
                                 } else {
-                                    exp = ast::binary(Symbol::ACCESS, ast::symbol(zhis, "this"), on, t, true);
+                                    exp = ast::binary(Symbol::ACCESS, ast::symbol(zhis), on, t, true);
                                 }
                             }
+                            break;
+                        case est_entry_type::LABEL:
+                            error("I thought colons could not be part of names...", epanic_mode::ULTRA_PANIC);
                             break;
                     }
                 } else {
@@ -3758,12 +3898,12 @@ ast* parser::e1() {
                             st_entry* e = find->get(name, false);
                             if (e) {
                                 if (e->is_field()) {
-                                    exp = ast::binary(Symbol::ACCESS, exp, ast::symbol(e, name), e->get_type(), true);
+                                    exp = ast::binary(Symbol::ACCESS, exp, ast::symbol(e), e->get_type(), true);
                                     goto access_type_fine;
                                 } else if (e->is_function()) {
                                     if (is(Symbol::PAREN_LEFT)) {
                                         ctx().first_param = ast::unary(Symbol::ADDRESS, exp, pointer_to(t));
-                                        exp = ast::symbol(e, name);
+                                        exp = ast::symbol(e);
                                         goto access_type_fine;
                                     } else {
                                         error("Method access on values or variables must be used as function calls");
@@ -3775,7 +3915,7 @@ ast* parser::e1() {
                         if (ff && ff->is_function()) {
                             if (is(Symbol::PAREN_LEFT)) {
                                 ctx().first_param = exp;
-                                exp = ast::symbol(ff, name);
+                                exp = ast::symbol(ff);
                                 goto access_type_fine;
                             } else {
                                 error("Function access on values or variables must be used as function calls");
@@ -3869,9 +4009,29 @@ ast* parser::fexpression(eexpression_type* expression_type) {
 
 ast* parser::mexpression(eexpression_type* expression_type) {
     ast* ret{nullptr};
-    u64 amount = peek_until({Symbol::ASSIGN, Symbol::SEMICOLON, Symbol::BRACE_LEFT}, true);
+    u64 amount = peek_until({
+        Symbol::ASSIGN, 
+        Symbol::ADD_ASSIGN, 
+        Symbol::SUBTRACT_ASSIGN, 
+        Symbol::MULTIPLY_ASSIGN, 
+        Symbol::POWER_ASSIGN, 
+        Symbol::DIVIDE_ASSIGN, 
+        Symbol::AND_ASSIGN, 
+        Symbol::OR_ASSIGN, 
+        Symbol::XOR_ASSIGN, 
+        Symbol::SHIFT_LEFT_ASSIGN, 
+        Symbol::SHIFT_RIGHT_ASSIGN, 
+        Symbol::ROTATE_LEFT_ASSIGN, 
+        Symbol::ROTATE_RIGHT_ASSIGN, 
+        Symbol::CONCATENATE_ASSIGN, 
+        Symbol::BIT_SET_ASSIGN, 
+        Symbol::BIT_CLEAR_ASSIGN, 
+        Symbol::BIT_TOGGLE_ASSIGN, 
+        Symbol::SEMICOLON, 
+        Symbol::BRACE_LEFT
+    }, true);
     token t = l->peek(amount);
-    if (t.as_symbol() == Symbol::ASSIGN) {
+    if (is_assignment_operator(t.as_symbol())) {
         ret = assignment();
         if (expression_type) {
             *expression_type = eexpression_type::ASSIGNMENT;
@@ -3893,8 +4053,6 @@ ast* parser::aexpression() {
     } else if (is(Symbol::NOTHING)) {
         next(); // ---
         return ast::byte(0, types.t_nothing);
-    } else if (is_type() || is_infer()) {
-        return funcval();
     } else {
         return expression();
     }
@@ -3944,32 +4102,30 @@ bool parser::is_compiler_token() {
     return is(TokenType::COMPILER_IDENTIFIER) || is(Symbol::COMPILER);
 }
 
-bool parser::is_assignment_operator() {
-    if (c.type == TokenType::SYMBOL) {
-        switch (c.as_symbol()) {
-            case Symbol::ASSIGN:
-            case Symbol::ADD_ASSIGN: [[fallthrough]];
-            case Symbol::SUBTRACT_ASSIGN: [[fallthrough]];
-            case Symbol::MULTIPLY_ASSIGN: [[fallthrough]];
-            case Symbol::POWER_ASSIGN: [[fallthrough]];
-            case Symbol::DIVIDE_ASSIGN: [[fallthrough]];
-            case Symbol::AND_ASSIGN: [[fallthrough]];
-            case Symbol::OR_ASSIGN: [[fallthrough]];
-            case Symbol::XOR_ASSIGN: [[fallthrough]];
-            case Symbol::SHIFT_LEFT_ASSIGN: [[fallthrough]];
-            case Symbol::SHIFT_RIGHT_ASSIGN: [[fallthrough]];
-            case Symbol::ROTATE_LEFT_ASSIGN: [[fallthrough]];
-            case Symbol::ROTATE_RIGHT_ASSIGN: [[fallthrough]];
-            case Symbol::CONCATENATE_ASSIGN: [[fallthrough]];
-            case Symbol::BIT_SET_ASSIGN: [[fallthrough]];
-            case Symbol::BIT_CLEAR_ASSIGN: [[fallthrough]];
-            case Symbol::BIT_TOGGLE_ASSIGN: 
-                return true;
-            default:
-                return false;
-        }
-    } else {
-        return false;
+bool parser::is_assignment_operator(Symbol sym) {
+    Symbol swtch = sym != Symbol::SYMBOL_INVALID ? sym : c.type == TokenType::SYMBOL ? c.as_symbol() : Symbol::SYMBOL_INVALID;
+    
+    switch (swtch) {
+        case Symbol::ASSIGN: [[fallthrough]];
+        case Symbol::ADD_ASSIGN: [[fallthrough]];
+        case Symbol::SUBTRACT_ASSIGN: [[fallthrough]];
+        case Symbol::MULTIPLY_ASSIGN: [[fallthrough]];
+        case Symbol::POWER_ASSIGN: [[fallthrough]];
+        case Symbol::DIVIDE_ASSIGN: [[fallthrough]];
+        case Symbol::AND_ASSIGN: [[fallthrough]];
+        case Symbol::OR_ASSIGN: [[fallthrough]];
+        case Symbol::XOR_ASSIGN: [[fallthrough]];
+        case Symbol::SHIFT_LEFT_ASSIGN: [[fallthrough]];
+        case Symbol::SHIFT_RIGHT_ASSIGN: [[fallthrough]];
+        case Symbol::ROTATE_LEFT_ASSIGN: [[fallthrough]];
+        case Symbol::ROTATE_RIGHT_ASSIGN: [[fallthrough]];
+        case Symbol::CONCATENATE_ASSIGN: [[fallthrough]];
+        case Symbol::BIT_SET_ASSIGN: [[fallthrough]];
+        case Symbol::BIT_CLEAR_ASSIGN: [[fallthrough]];
+        case Symbol::BIT_TOGGLE_ASSIGN: 
+            return true;
+        default:
+            return false;
     }
 }
 

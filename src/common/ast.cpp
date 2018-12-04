@@ -10,6 +10,15 @@
 
 using namespace Grammar;
 
+std::string ast_symbol::get_name() {
+    if (symbol) {
+        return symbol->name;
+    } else {
+        return {};
+    }
+}
+
+
 ast_string::~ast_string() {
     if (chars) {
         delete [] chars;
@@ -609,10 +618,10 @@ ast* ast::none() {
     return r;
 }
 
-ast* ast::symbol(st_entry* sym, const std::string& str) {
+ast* ast::symbol(st_entry* sym) {
     ast* r = new ast;
     r->t = east_type::SYMBOL;
-    r->n = ast_symbol{sym, str};
+    r->n = ast_symbol{sym};
     return r;
 }
 
@@ -652,7 +661,7 @@ ast* ast::string(const std::string& str) {
     ast_string ss{};
     ss.chars = chars;
     ss.length = str.length();
-    r->n = ss;
+    r->n = std::move(ss);
     return r;
 }
 
@@ -662,7 +671,7 @@ ast* ast::string(u8* chars, u64 length) {
     ast_string ss{};
     ss.chars = chars;
     ss.length = length;
-    r->n = ss;
+    r->n = std::move(ss);
     return r;
 }
 
@@ -673,7 +682,7 @@ ast* ast::array(ast** elems, u64 length, type* t) {
     as.elems = elems;
     as.length = length;
     as.t = t ? t : type_table::t_void;;
-    r->n = as;
+    r->n = std::move(as);
     return r;
 }
 
@@ -691,7 +700,7 @@ ast* ast::closure(ast* function, ast** elems, u64 size) {
     cs.function = function;
     cs.elems = elems;
     cs.size = size;
-    r->n = cs;
+    r->n = std::move(cs);
     return r;
 }
 
@@ -705,7 +714,7 @@ ast* ast::unary(Symbol op, ast* node, type* t, bool assignable, bool post, bool 
     us.assignable = assignable;
     us.post = post;
     us.owned = owned;
-    r->n = us;
+    r->n = std::move(us);
     return r;
 }
 
@@ -718,7 +727,7 @@ ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool assignable, boo
     bs.assignable = assignable;
     bs.lowned = lowned;
     bs.rowned = rowned;
-    ast* r = new ast{east_type::BINARY, bs};
+    ast* r = new ast{east_type::BINARY, std::move(bs)};
     return r;
 }
 
@@ -736,7 +745,7 @@ ast* ast::function(ast* block, type* t) {
     ast_function fs{};
     fs.block = block;
     fs.t = t ? t : type_table::t_void;;
-    r->n = fs;
+    r->n = std::move(fs);
     return r;
 }
 
@@ -745,7 +754,7 @@ ast* ast::nntype(type* t) {
     r->t = east_type::TYPE;
     ast_nntype ts{};
     ts.t = t ? t : type_table::t_void;;
-    r->n = ts;
+    r->n = std::move(ts);
     return r;
 }
 
@@ -939,7 +948,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
             case '\xbf': // ┐
                 sep += '\xc0';
                 break;
-            case '\xc3': // ├
+            case '': // ├
                 sep += '\xb3';
                 break;
             case '\xda': // ┌
@@ -965,6 +974,8 @@ std::string ast::print(u64 depth, const std::string& prev) {
             if (un.node) {
                 sep += "\xbf\xc4"s;
                 ss << un.node->print(depth + 1, sep);
+            } else {
+                ss << "NULLPTR\n";
             }
             return ss.str();
         }
@@ -997,7 +1008,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::SYMBOL: {
             ast_symbol& sym = as_symbol();
-            ss << "SYMBOL " << sym.name << " (" << sym.symbol->get_type()->print(true) << ") ";
+            ss << "SYMBOL " << sym.get_name() << " (" << sym.symbol->get_type()->print(true) << ") ";
             switch (sym.symbol->t) {
                 case est_entry_type::FIELD: 
                     ss << "FIELD\n"; 
@@ -1017,6 +1028,9 @@ std::string ast::print(u64 depth, const std::string& prev) {
                     break;
                 case est_entry_type::NAMESPACE: 
                     ss << "NAMESPACE\n"; 
+                    break;
+                case est_entry_type::LABEL:
+                    ss << "LABEL\n";
                     break;
             }
             return ss.str();

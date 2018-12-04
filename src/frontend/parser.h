@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <stack>
 #include <utility>
 
@@ -51,6 +52,14 @@ class parser_exception : public std::exception {
 class parser{
 public:
     parser();
+    parser(type_table& tt);
+    ~parser();
+    
+    parser(const parser&) = delete;
+    parser(parser&&) = delete;
+    parser& operator=(const parser&) = delete;
+    parser& operator=(parser&&) = delete;
+    
     ast* parse(lexer* l);
     ast* parse(const std::string& str, bool is_file = false);
     
@@ -61,6 +70,9 @@ public:
     void print_errors();
     void print_types();
 private:
+    ast* _parse();
+    void finish();
+    
     context& ctx();
     symbol_table* st();
     
@@ -226,7 +238,7 @@ private:
     bool is_infer();
     bool is_decl_start();
     bool is_compiler_token();
-    bool is_assignment_operator();
+    bool is_assignment_operator(Grammar::Symbol sym = Grammar::Symbol::SYMBOL_INVALID);
     bool is_pointer_type();
     
     type* pointer_to(type* to, eptr_type ptype = eptr_type::NAKED, u64 size = 0);
@@ -236,13 +248,16 @@ private:
     
     std::stack<context> contexts{};
     symbol_table* root_st{nullptr};
-    type_table types{};
+    type_table& types;
     
     dict<symbol_table*> modules{};
     std::vector<std::pair<token, std::string>> errors{};
     
     std::vector<std::pair<ast*, context>> unfinished{};
-    std::vector<ast*> labels{};
+    dict<ast*> labels{};
+    
+    bool forked{false};
+    std::filesystem::path file_path{std::filesystem::current_path()};
     
     friend struct ctx_guard;
 };

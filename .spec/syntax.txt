@@ -181,6 +181,7 @@ opbittoggleassign = "@^="
 opto = "->"
 opfrom = "<-"
 
+asterisk = "*"
 semicolon = ";"
 tilde = "~"
 comma = ","
@@ -306,8 +307,8 @@ breakstmt = cbreak, semicolon
 continuestmt = ccontinue, semicolon
 leavestmt = cleave, semicolon
 
-importstmt = kwimport, (iden, {opaccess, iden} | string), [kwas, iden], semicolon
-usingstmt = kwusing, iden, {opaccess, iden}, [kwas, iden], semicolon
+importstmt = kwimport, (iden, {opaccess, (iden | asterisk)} | string), [kwas, iden], semicolon
+usingstmt = kwusing, iden, {opaccess, (iden | asterisk)}, [kwas, iden], semicolon
 
 namespacestmt = kwnamespace, iden, {opaccess, iden}, namespacescope
 namespacescope = obrace, {usingstmt | namespacestmt | freedeclstmt}, cbrace
@@ -412,4 +413,4 @@ ee 	  = oparen, (expression | funcval), cparen | safe_literal | compound_literal
 argument = aexpression | iden, opassign, aexpression
 fexpression = freevardecl | mexpression
 mexpression = expression | assignment
-aexpression = compound_literal | newinit | expression | snothing | funcval
+aexpression = compound_literal | newinit | expression | snothing # | funcval

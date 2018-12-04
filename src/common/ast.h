@@ -21,7 +21,7 @@ struct ast_none{};
 
 struct ast_symbol {
     st_entry* symbol;
-    std::string name;
+    std::string get_name();
 };
 
 struct ast_byte {
@@ -187,7 +187,7 @@ struct ast {
     ast_variant n{};
     
     static ast* none();
-    static ast* symbol(st_entry* sym = nullptr, const std::string& str = {});
+    static ast* symbol(st_entry* sym = nullptr);
     static ast* byte(u8 value = 0, type* t = nullptr);
     static ast* word(u16 value = 0, type* t = nullptr);
     static ast* dword(u32 value = 0, type* t = nullptr);

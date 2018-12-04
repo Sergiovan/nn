@@ -1,0 +1,106 @@
+import std;
+using std.io;
+
+enum class {A, B, C, D}
+
+struct student {
+	class group;
+	int unsigned grade;
+	string name;
+}
+
+student[] sorted(student[] students, fun<byte signed(student, student)> comparison) {
+	if ~students < 2 {
+		return students;
+	}
+	
+	student[] merge(student[] a, student[] b) {
+		student[~a + ~b] ret;
+		long unsigned i, j = 0, 0;
+		label loop_begin;
+			if i == ~a && j == ~b {
+				goto loop_end;
+			} else if i == ~a {
+				ret[i + j] = b[j];
+				++j;
+			} else if j == ~b {
+				ret[i + j] = a[i];
+				++i;
+			} else {
+				byte signed z = comparison(a[i], b[j]);
+				ret[i + j] = z <= 0 ? a[i++] : b[j++]; 
+			}
+		goto loop_begin;
+		label loop_end;
+		return ret;
+	}
+	
+	using std.math as m;
+	
+	long pivot = m.floor(<double>(~students / 2));
+	student[] a;
+	student[] b;
+	student spivot = students[pivot];
+	
+	for student s : students {
+		if comparison(s, spivot) <= 0 {
+			# a ..= s;
+			a = a .. s;
+		} else {
+			# b ..= s;
+			b = b .. s;
+		}
+	}
+	
+	a = sorted(a, comparison);
+	b = sorted(b, comparison);
+	return merge(a, b);
+}
+
+int main(string[]) {
+	student[] students = [
+		{class.A, 10, "Christian"}, {class.A, 0, "Sergio"}, 
+		{class.B, 3, "Johnathan"}, {class.B, 8, "Oliver"}, 
+		{class.C, 5, "Sarah"}, {class.C, 7, "Peter"}, 
+		{class.D, 9, "Marta"}, {class.D, 2, "Maggy"}, {class.D, 1, "Francis"},
+	];
+	
+	#> student[] by_grade = sorted(comparison = (byte signed(student a, student b) {
+	#	return b.grade - a.grade; # Let's ignore the fact this might overflow
+	#}), students = students); <#
+	
+	student[] by_grade = sorted(students, (byte signed(student a, student b) {
+		return <byte signed>(b.grade - a.grade); # Let's ignore the fact this might overflow
+	}));
+	
+	for student s : by_grade {
+		io.print("Student: ");
+		io.print(s.name);
+		io.print("\nGrade: ");
+		io.print(<int>(s.grade));
+		io.print("\nGroup: ");
+		
+		string class_desc;
+		
+		using class.*;
+		switch s.group {
+			case A {
+				class_desc = "North highschool";
+			}
+			case B {
+				class_desc = "South highschool";
+			}
+			case C {
+				class_desc = "East highschool";
+			}
+			case D {
+				class_desc = "West highschool";
+			}
+		}
+		
+		io.print(class_desc);
+		io.print("\n\n");
+	}
+	
+	return 0;
+}
