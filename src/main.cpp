@@ -12,13 +12,17 @@
 #include "common/ast.h"
 #include "frontend/parser.h"
 
-
-
 int main(int argc, char** argv) {
-    auto start = std::chrono::high_resolution_clock::now();
-    
     parser p{};
-    ast* res = p.parse("examples/mastermind2.nn", true);
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    ast* res = p.parse("examples/fizzbuzz.nn", true);
+    
+    if (p.has_errors()) {
+        p.print_errors();
+    } else {
+        logger::log() << "\n" << res->print() << logger::nend;
+    }
     
     /*
     reader* r = reader::from_file("examples/mastermind2.nn");

@@ -27,7 +27,12 @@ struct overload {
     bool defined{false};
     symbol_table* st{nullptr}; // Owned
     
+    overload(type* t, ast* value = nullptr, bool defined = false, symbol_table* st = nullptr);
     ~overload();
+    overload(const overload& o);
+    overload(overload&& o);
+    overload& operator=(const overload& o);
+    overload& operator=(overload&& o);
 };
 
 struct st_type {
@@ -35,7 +40,12 @@ struct st_type {
     bool defined{false};
     symbol_table* st{nullptr}; // Owned
     
+    st_type(type* t, bool defined = false, symbol_table* st = nullptr);
     ~st_type();
+    st_type(const st_type& o);
+    st_type(st_type&& o);
+    st_type& operator=(const st_type& o);
+    st_type& operator=(st_type&& o);
 };
 
 struct st_variable {
@@ -43,7 +53,12 @@ struct st_variable {
     ast* value{nullptr}; // Owned
     bool defined{false};
     
+    st_variable(type* t, ast* value = nullptr, bool defined = false);
     ~st_variable();
+    st_variable(const st_variable& o);
+    st_variable(st_variable&& o);
+    st_variable& operator=(const st_variable& o);
+    st_variable& operator=(st_variable&& o);
 };
 
 struct st_function {
@@ -53,13 +68,23 @@ struct st_function {
     
     overload* get_overload(const std::vector<type*>& args);
     
+    st_function(const std::vector<overload> overloads = {}, symbol_table* st = nullptr);
     ~st_function();
+    st_function(const st_function& o);
+    st_function(st_function&& o);
+    st_function& operator=(const st_function& o);
+    st_function& operator=(st_function&& o);
 };
 
 struct st_namespace {
     symbol_table* st{nullptr}; // Owned
     
+    st_namespace(symbol_table* st = nullptr);
     ~st_namespace();
+    st_namespace(const st_namespace& o);
+    st_namespace(st_namespace&& o);
+    st_namespace& operator=(const st_namespace& o);
+    st_namespace& operator=(st_namespace&& o);
 };
 
 struct st_field {
@@ -72,6 +97,9 @@ using st_variant = std::variant<st_type, st_variable, st_function, st_namespace,
 struct st_entry {
     st_variant entry;
     est_entry_type t;
+    
+    static st_entry* variable(type* t, ast* value = nullptr, bool defined = false);
+    static st_entry* field(u64 field, type* ptype = nullptr);
     
     st_type& as_type();
     st_variable& as_variable();
@@ -92,7 +120,12 @@ struct st_entry {
 class symbol_table {
 public:
     symbol_table(etable_owner owner, symbol_table* parent = nullptr);
+    
     ~symbol_table();
+    symbol_table(const symbol_table& o);
+    symbol_table(symbol_table&& o);
+    symbol_table& operator=(const symbol_table& o);
+    symbol_table& operator=(symbol_table&& o);
     
     bool has(const std::string& name, bool propagate = true, etable_owner until = etable_owner::FREE);
     

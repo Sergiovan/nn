@@ -78,6 +78,8 @@ enum class Symbol : char {
 
     /*ACCESS,*/ CONCATENATE, SPREAD,
 
+    LENGTH,
+    
     TERNARY_CONDITION, /*TERNARY_CHOICE,*/
 
     BIT_SET, BIT_CLEAR, 
@@ -193,6 +195,8 @@ static const dict<Symbol>  string_to_symbol {
     
     {".", Symbol::ACCESS}, {"..", Symbol::CONCATENATE}, {"...", Symbol::SPREAD},
     
+    {"~", Symbol::LENGTH},
+    
     {":", Symbol::TERNARY_CHOICE}, {"?", Symbol::TERNARY_CONDITION},
     
     {"@|", Symbol::BIT_SET}, {"@&", Symbol::BIT_CLEAR}, {"@?", Symbol::BIT_CHECK}, {"@^", Symbol::BIT_TOGGLE},
@@ -217,7 +221,25 @@ static const dict<Symbol>  string_to_symbol {
     
     {"->", Symbol::TO}, {"<-", Symbol::FROM},
     
+    {"IF", Symbol::KWIF}, {"ELSE", Symbol::KWELSE}, {"FOR", Symbol::KWFOR}, 
+    {"CLASSIC FOR", Symbol::KWFORCLASSIC}, {"FOR EACH", Symbol::KWFOREACH}, {"LUA FOR", Symbol::KWFORLUA}, 
+    {"WHILE", Symbol::KWWHILE}, {"SWITCH", Symbol::KWSWITCH}, {"RETURN", Symbol::KWRETURN}, 
+    {"RAISE", Symbol::KWRAISE}, {"GOTO", Symbol::KWGOTO}, {"LABEL", Symbol::KWLABEL}, 
+    {"TRY", Symbol::KWTRY}, {"CATCH", Symbol::KWCATCH}, {"CASE", Symbol::KWCASE}, 
+    {"DEFER", Symbol::KWDEFER}, {"BREAK", Symbol::KWBREAK}, {"CONTINUE", Symbol::KWCONTINUE}, 
+    {"LEAVE", Symbol::KWLEAVE}, {"IMPORT", Symbol::KWIMPORT}, 
+    {"USING", Symbol::KWUSING}, {"NAMESPACE", Symbol::KWNAMESPACE}, 
+    {"NEW", Symbol::KWNEW}, {"DELETE", Symbol::KWDELETE}, 
+
+    {"FUNCTION CALL", Symbol::FUN_CALL}, {"FUNCTION RETURN", Symbol::FUN_RET}, 
+    {"CAST", Symbol::CAST}, {"INDEX", Symbol::INDEX}, 
+
+
+    {"DECLARE", Symbol::SYMDECL}, 
+    
     {"#", Symbol::COMMENT}, {"#>", Symbol::COMMENT_START}, {"<#", Symbol::COMMENT_END},
+    
+    {"INVALID", Symbol::SYMBOL_INVALID}
 };
 
 static const std::map<Symbol, std::string> symbol_names{swap_key(string_to_symbol)};

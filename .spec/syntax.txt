@@ -138,6 +138,8 @@ opaccess     = "."
 opconcat     = ".."
 opspread     = "..."
 
+oplength     = "~"
+
 opcond     = "?"
 opthen     = ":"
 
@@ -199,8 +201,8 @@ gt = ">"
 rarrow = "->"
 larrow = "<-"
 
-unop     = opinc | opdec | opsub | opaddress | opat | opnot | oplnot | opspread
-preunop  = opinc | opdec | opsub | opaddress | opat | opnot | oplnot
+unop     = opinc | opdec | opsub | opaddress | opat | opnot | oplnot | opspread | oplength
+preunop  = opinc | opdec | opsub | opaddress | opat | opnot | oplnot | oplength
 postunop = opinc | opdec | opspread
 binop    = opadd | opsub | opmul | oppow | opdiv | opmod | opand | opor | opxor | opland | oplor | oplxor | opaccess | opconcat | opbitset | opbitclear | opbitcheck | opbittoggle | opbitshiftl | opbitshiftr | oprotatel | oprotater | opequals | opnequals | opgt | opgeqt | oplt | opleqt
 ternop   = opcond | opthen
@@ -396,7 +398,7 @@ e5'	  = (opmul | opdiv | opmod), e4
 e4    = e3, [e4']
 e4'   = oppow, e4
 
-e3    = (opinc | opdec | opadd | opsub | opnot | oplnot | opat | opaddress) e3 | (lt, type, gt, e3) | e2
+e3    = (opinc | opdec | opadd | opsub | oplength | opnot | oplnot | opat | opaddress) e3 | (lt, type, gt, e3) | e2
 
 e2  = e1, {e2'}
 e2' = (opspread)

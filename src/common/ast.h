@@ -45,7 +45,7 @@ struct ast_qword {
 };
 
 struct ast_string {
-    u8* chars; // Owned
+    u8* chars{nullptr}; // Owned
     u64 length;
     
     ast_string() = default;
@@ -58,7 +58,7 @@ struct ast_string {
 };
 
 struct ast_array {
-    ast** elems; // Owned
+    ast** elems{nullptr}; // Owned
     u64 length;
     type* t;
     
@@ -72,7 +72,7 @@ struct ast_array {
 };
 
 struct ast_struct {
-    ast** elems; // Owned. As many elements as struct elements.
+    ast** elems{nullptr}; // Owned. As many elements as struct elements.
     type* t; // Struct type
     
     explicit ast_struct(type* t);
@@ -86,8 +86,8 @@ struct ast_struct {
 };
 
 struct ast_closure {
-    ast* function; // Owned. Ast of function type
-    ast** elems; // Owned
+    ast* function{nullptr}; // Owned. Ast of function type
+    ast** elems{nullptr}; // Owned
     u64 size;
     
     ast_closure() = default;
@@ -152,7 +152,7 @@ struct ast_block {
 };
 
 struct ast_function {
-    ast* block; // Owned
+    ast* block{nullptr}; // Owned
     type* t;
     
     ast_function() = default;
@@ -184,7 +184,7 @@ using ast_variant = std::variant<ast_none, ast_symbol, ast_byte, ast_word,
 
 struct ast {
     east_type t;
-    ast_variant n;
+    ast_variant n{};
     
     static ast* none();
     static ast* symbol(st_entry* sym = nullptr, const std::string& str = {});
@@ -237,4 +237,6 @@ struct ast {
     
     type* get_type();
     bool is_assignable();
+    
+    std::string print(u64 depth = 0, const std::string& prev = "");
 };

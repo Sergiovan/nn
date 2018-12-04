@@ -1,7 +1,7 @@
 0 : (e)
 1 : e++, e--, e(e), e[e], e.i
 2 : e...
-3 : ++e, --e, +e, -e, !e, !!e, @e, *e, <t>e
+3 : ++e, --e, +e, -e, ~e, !e, !!e, @e, *e, <t>e
 4 (RA): e ** e
 5 : e * e, e / e, e % e
 6 : e + e, e - e, e .. e

@@ -249,7 +249,7 @@ type type_table::unmangle(const std::string& mangled) {
             auto& params = t.as_pfunction().params;
             std::memcpy(&cti.str[0], mangled.data() + 2, sizeof(type_id));
             rets = types[cti.id];
-            u64 pt{9};
+            u64 pt{10};
             while (pt < mangled.length()) {
                 if (mangled[pt] != mangle_bytes::function_param) {
                     break;

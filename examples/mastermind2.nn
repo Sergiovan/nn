@@ -56,7 +56,7 @@ void print(linked_list list){
     }
 }
 
-long factorial(int number){
+long factorial(long number){
     #> One-liner if. Can be done with any control structure <#
     if number == 0 do return 1; # Maybe also add "return x if y"
     return number * factorial(number - 1); # Lovely recurstion
@@ -64,14 +64,14 @@ long factorial(int number){
 
 #> Default parameters <#
 int[] permutations(int digits, int[] used = []){
-    int[factorial(10 - used.length) / factorial(digits)] ret; # TBD if this is how you declare arrays
+    int[factorial(10 - ~used) / factorial(digits)] ret; # TBD if this is how you declare arrays
     int index; # Default initialization to 0. 
     for int i = 0, 9 { #Lua-style for loop. Counts from 0 to 9, both inclusive. Third parameter for step possible
         for int u : used do if u == i do continue; # A double one-liner. Will probably coalesce into array comprehension
         if digits > 1 {
             int[] perms = permutations(digits - 1, used .. [i]); # .. to concatenate 
             for int perm : perms { # A for-each loop
-                ret[index++] = perm * 10 ** (digits - 1) + perm;
+                ret[index++] = perm * <int>(10 ** (digits - 1)) + perm;
             }
         } else {
             ret[index++] = i;
@@ -90,7 +90,7 @@ void think(linked_list* list, int guess, int dead, int hurt){
     }
     
     #> There is no limit to how many "end parts" a C-style for can have <#
-    for linked_node* node, prev = list.head, null; node; prev = node { #; node = node.next { # Yikes
+    for linked_node* node, prev = list.head, null; node; prev = node; node = node.next { # Yikes
         int subdead, subhurt;
         for int i = 0, 4 {
             for int j = 0, 4 {
@@ -104,13 +104,13 @@ void think(linked_list* list, int guess, int dead, int hurt){
             }
         }
         #> Removing one from the list <#
-        if subdead != dead || subhurt != hurt {
+        if (subdead != dead) || (subhurt != hurt) {
             if prev {
                 prev.next = node.next;
                 delete node;
                 node = prev;
             } else {
-                # prev = {0, node.next};
+                @prev = {0, node.next};
                 prev.value = 0;
 				prev.next = node.next;
 				delete node;

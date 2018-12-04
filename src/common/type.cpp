@@ -12,10 +12,6 @@ field::~field() {
 }
 
 field::field(const field& o) {
-    if (value) {
-        delete value;
-    }
-    
     t = o.t;
     if (o.value) {
         value = new ast;
@@ -80,9 +76,6 @@ type_union::~type_union() {
 };
 
 type_union::type_union(const type_union& o) {
-    if (def_value) {
-        delete def_value;
-    }
     fields = o.fields;
     ste = o.ste;
     def_type = o.def_type;
@@ -312,6 +305,14 @@ bool type::can_weak_cast(type* o) {
         return false;
     }
     
+    if (is_primitive(etype_ids::NOTHING)) {
+        return true;
+    }
+    
+    if (is_primitive(etype_ids::NNULL) && is_ptr_type(o->tt)) { // Casting null to a pointer type
+        return true;
+    }
+    
     if (o->tt == ettype::PRIMITIVE) {
         type_primitive& op = o->as_primitive();
         if (op.t == etype_ids::LET) {
@@ -320,20 +321,19 @@ bool type::can_weak_cast(type* o) {
         if (op.t == etype_ids::FUN && is_function()) {
             return true; // Can cast functions to fun
         }
-        if (op.t == etype_ids::NNULL && is_ptr_type(tt)) { // Casting null to a pointer type
-            return true;
-        }
-        if (op.t ==  etype_ids::NOTHING) { // Casting Nothing to anything
-            return true;
-        }
     }
     
-    if (tt == ettype::PSTRUCT && o->tt == ettype::STRUCT && o->as_struct().pure == &as_pstruct()) {
-        return true;
-    }
+    //if (tt == ettype::PSTRUCT && o->tt == ettype::STRUCT && o->as_struct().pure == &as_pstruct()) {
+    //    return true;
+    //}
     
     if (tt == ettype::STRUCT || tt == ettype::UNION || tt == ettype::ENUM) { // Never allow POD casting
         return false;
+    }
+    
+    // Cast functions to pure functions
+    if (tt == ettype::FUNCTION && o->tt == ettype::PFUNCTION && as_function().pure == &o->as_pfunction()) {
+        return true;
     }
     
     if (tt == ettype::PRIMITIVE && o->tt == ettype::PRIMITIVE) {
@@ -381,6 +381,12 @@ bool type::can_cast(type* o) {
     if (tt == ettype::PRIMITIVE && o->tt == ettype::PRIMITIVE) {
         type_primitive& tp = as_primitive(), op = o->as_primitive(); 
         if (is_number_type(tp.t) && is_number_type(op.t)) { // Cast any number to any other number
+            return true;
+        }
+        
+        // Cast to and from sig
+        if ((is_integer_type(tp.t) && op.t == etype_ids::SIG) || 
+            (is_integer_type(op.t) && tp.t == etype_ids::SIG)) {
             return true;
         }
         

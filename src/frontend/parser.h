@@ -57,6 +57,7 @@ public:
     symbol_table* get_as_module();
     parser fork();
     
+    bool has_errors();
     void print_errors();
 private:
     context& ctx();
@@ -227,6 +228,7 @@ private:
     bool is_assignment_operator();
     bool is_pointer_type();
     
+    type* pointer_to(type* to, eptr_type ptype = eptr_type::NAKED, u64 size = 0);
     
     token c;
     lexer* l{nullptr};

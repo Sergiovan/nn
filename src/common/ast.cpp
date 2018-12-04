@@ -5,6 +5,8 @@
 #include "common/type_table.h"
 
 #include <cstring>
+#include <sstream>
+#include <iomanip>
 
 using namespace Grammar;
 
@@ -15,9 +17,6 @@ ast_string::~ast_string() {
 }
 
 ast_string::ast_string(const ast_string& o) {
-    if (chars) {
-        delete [] chars;
-    }
     if (o.chars) {
         chars = new u8[o.length];
         std::memcpy(chars, o.chars, o.length);
@@ -62,15 +61,9 @@ ast_array::~ast_array() {
 }
 
 ast_array::ast_array(const ast_array& o) {
-    if (elems) {
-        for (u64 i = 0; i < length; ++i) {
-            delete elems[i];
-        }
-        delete [] elems;
-    }
     elems = new ast*[o.length];
     for (u64 i = 0; i < o.length; ++i) {
-        if (o.elems[i]) {
+        if (o.elems && o.elems[i]) {
             elems[i] = new ast;
             *(elems[i]) = *(o.elems[i]);
         } else {
@@ -97,7 +90,7 @@ ast_array & ast_array::operator=(const ast_array& o) {
         }
         elems = new ast*[o.length];
         for (u64 i = 0; i < o.length; ++i) {
-            if (o.elems[i]) {
+            if (o.elems && o.elems[i]) {
                 elems[i] = new ast;
                 *(elems[i]) = *(o.elems[i]);
             } else {
@@ -140,17 +133,10 @@ ast_struct::~ast_struct() {
 }
 
 ast_struct::ast_struct(const ast_struct& o) {
-    u64 nelems = t->as_struct().fields.size();
-    if (elems) {
-        for (u64 i = 0; i < nelems; ++i) {
-            delete elems[i];
-        }
-        delete [] elems;
-    }
     u64 onelems = o.t->as_struct().fields.size();
     elems = new ast*[onelems];
     for (u64 i = 0; i < onelems; ++i) {
-        if (o.elems[i]) {
+        if (o.elems && o.elems[i]) {
             elems[i] = new ast;
             *(elems[i]) = *(o.elems[i]);
         } else {
@@ -177,7 +163,7 @@ ast_struct & ast_struct::operator=(const ast_struct& o) {
         u64 onelems = o.t->as_struct().fields.size();
         elems = new ast*[onelems];
         for (u64 i = 0; i < onelems; ++i) {
-            if (o.elems[i]) {
+            if (o.elems && o.elems[i]) {
                 elems[i] = new ast;
                 *(elems[i]) = *(o.elems[i]);
             } else {
@@ -210,15 +196,6 @@ ast_closure::~ast_closure() {
 }
 
 ast_closure::ast_closure(const ast_closure& o) {
-    if (function) {
-        delete function;
-    }
-    if (elems) {
-        for (u64 i = 0; i < size; ++i) {
-            delete elems[i];
-        }
-        delete [] elems;
-    }
     if (o.function) {
         function = new ast;
         *function = *o.function;
@@ -227,7 +204,7 @@ ast_closure::ast_closure(const ast_closure& o) {
     }
     elems = new ast*[o.size];
     for (u64 i = 0; i < o.size; ++i) {
-        if (o.elems[i]) {
+        if (o.elems && o.elems[i]) {
             elems[i] = new ast;
             *(elems[i]) = *(o.elems[i]);
         } else {
@@ -290,10 +267,6 @@ ast_unary::~ast_unary() {
 }
 
 ast_unary::ast_unary(const ast_unary& o) {
-    if (owned && node) {
-        delete node;
-    } 
-    
     op = o.op;
     
     if (o.owned) {
@@ -372,14 +345,7 @@ ast_binary::~ast_binary() {
     }
 }
 
-ast_binary::ast_binary(const ast_binary& o) {
-    if (lowned && left) {
-        delete left;
-    }
-    if (rowned && right) {
-        delete right;
-    }
-    
+ast_binary::ast_binary(const ast_binary& o) {    
     op = o.op;
     
     if (o.lowned) {
@@ -394,7 +360,7 @@ ast_binary::ast_binary(const ast_binary& o) {
     }
     
     if (o.rowned) {
-        if (o.left) {
+        if (o.right) {
             right = new ast;
             *right = *o.right;
         } else {
@@ -484,12 +450,6 @@ ast_block::~ast_block() {
 }
 
 ast_block::ast_block(const ast_block& o) {
-    for (ast* stmt : stmts) {
-        if (stmt) {
-            delete stmt;
-        }
-    }
-    
     stmts.resize(o.stmts.size());
     for (u64 i = 0; i < stmts.size(); ++i) {
         if (o.stmts[i]) {
@@ -546,10 +506,6 @@ ast_function::~ast_function() {
 }
 
 ast_function::ast_function(const ast_function& o) {
-    if (block) {
-        delete block;
-    }
-    
     if (o.block) {
         block = new ast;
         *block = *o.block;
@@ -600,11 +556,6 @@ ast_nntype::~ast_nntype() {
 }
 
 ast_nntype::ast_nntype(const ast_nntype& o) {
-    for (ast* size : array_sizes) {
-        if (size) {
-            delete size;
-        }
-    }
     t = o.t;
     array_sizes.resize(o.array_sizes.size());
     for (u64 i = 0; i < array_sizes.size(); ++i) {
@@ -650,7 +601,6 @@ ast_nntype & ast_nntype::operator=(ast_nntype && o) {
     }
     return *this;
 }
-
 
 ast* ast::none() {
     ast* r = new ast;
@@ -760,8 +710,6 @@ ast* ast::unary(Symbol op, ast* node, type* t, bool assignable, bool post, bool 
 }
 
 ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool assignable, bool lowned, bool rowned) {
-    ast* r = new ast;
-    r->t = east_type::BINARY;
     ast_binary bs{};
     bs.op = op;
     bs.left = left;
@@ -770,7 +718,7 @@ ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool assignable, boo
     bs.assignable = assignable;
     bs.lowned = lowned;
     bs.rowned = rowned;
-    r->n = bs;
+    ast* r = new ast{east_type::BINARY, bs};
     return r;
 }
 
@@ -938,7 +886,7 @@ type* ast::get_type() {
         case east_type::FUNCTION: return as_function().t;
         case east_type::CLOSURE: return as_closure().function->as_function().t;
         case east_type::TYPE: return as_nntype().t;
-        case east_type::NONE: [[fallthrough]];
+        case east_type::NONE: return type_table::t_nothing;
         case east_type::BLOCK: [[fallthrough]];   
         default:
             return type_table::t_void;
@@ -966,4 +914,220 @@ bool ast::is_assignable() {
         default:
             return false;
     }
+}
+
+std::string ast::print(u64 depth, const std::string& prev) {
+    using namespace std::string_literals;
+    std::stringstream ss{};
+    std::string sep(depth * 2, ' ');
+    /* for (char c : prev) {
+        switch (c) {
+            case '\xb3': [[fallthrough]]; // │
+            case ' ':
+                sep += c; 
+                break;
+            case '\xc4': // ─
+                if (sep.back() != ' ') {
+                    sep += c;
+                } else {
+                    sep += ' ';
+                }
+                break;
+            case '\xc0': // └
+                sep += ' ';
+                break;
+            case '\xbf': // ┐
+                sep += '\xc0';
+                break;
+            case '\xc3': // ├
+                sep += '\xb3';
+                break;
+            case '\xda': // ┌
+                sep += '\xc3';
+                break;
+        }
+    } */
+    ss << sep;
+    switch (t) {
+        case east_type::PRE_UNARY: 
+            ss << "PRE_"; 
+            [[fallthrough]];
+        case east_type::POST_UNARY: { 
+            ast_unary& un = as_unary();
+            ss << "UNARY (" << Grammar::symbol_names.at(un.op) << ")\n";
+            if (un.node) {
+                sep += "\xbf\xc4"s;
+                ss << un.node->print(depth + 1, sep);
+            }
+            return ss.str();
+        }
+        case east_type::BINARY: {
+            ast_binary& bin = as_binary();
+            ss << "BINARY (" << Grammar::symbol_names.at(bin.op) << ")\n";
+            sep += "\xda\xc4"s;
+            if (bin.left) {
+                ss << bin.left->print(depth + 1, sep);
+            } else {
+                ss << "NULLPTR\n";
+            }
+            *(sep.end() - 2) = '\xbf';
+            if (bin.right) {
+                ss << bin.right->print(depth + 1, sep);
+            } else {
+                ss << "NULLPTR\n";
+            }
+            return ss.str();
+        }
+        case east_type::SYMBOL: {
+            ast_symbol& sym = as_symbol();
+            ss << "SYMBOL (" << sym.name << ") ";
+            switch (sym.symbol->t) {
+                case est_entry_type::FIELD: 
+                    ss << "FIELD\n"; 
+                    break;
+                case est_entry_type::FUNCTION: {
+                    ss << "FUNCTION\n";
+                    break;
+                }
+                case est_entry_type::TYPE: 
+                    ss << "TYPE\n"; 
+                    break;
+                case est_entry_type::VARIABLE: 
+                    ss << "VARIABLE\n"; 
+                    break;
+                case est_entry_type::MODULE: 
+                    ss << "MODULE\n"; 
+                    break;
+                case est_entry_type::NAMESPACE: 
+                    ss << "NAMESPACE\n"; 
+                    break;
+            }
+            return ss.str();
+        }
+        case east_type::FUNCTION: {
+            ast_function& fun = as_function();
+            ss << "FUNCTION (type)\n";
+            sep += "\xbf\xc4"s;
+            if (fun.block) {
+                ss << fun.block->print(depth + 1, sep);
+            } else {
+                ss << "NULLPTR\n";
+            }
+            return ss.str();
+        }
+        case east_type::CLOSURE: {
+            ast_closure& cls = as_closure();
+            ss << "CLOSURE (type)\n";
+            sep += "\xda\xc4"s;
+            ss << cls.function->print(depth + 1, sep);
+            for (u64 i = 0; i < cls.size; ++i) {
+                if (i == cls.size - 1) {
+                    *(sep.end() - 2) = '\xbf';
+                }
+                if (cls.elems[i]) {
+                    ss << cls.elems[i]->print(depth + 1, sep);
+                } else {
+                    ss << "NULLPTR\n";
+                }
+            }
+            return ss.str();
+        }
+        case east_type::BLOCK: {
+            ast_block& blk = as_block();
+            ss << "BLOCK (" << blk.stmts.size() << ")\n";
+            sep += "\xda\xc4"s;
+            for (auto& stmt : blk.stmts) {
+                if (stmt == blk.stmts.back()) {
+                    *(sep.end() - 2) = '\xbf';
+                }
+                if (stmt) {
+                ss << stmt->print(depth + 1, prev);
+                } else {
+                    ss << "NULLPTR\n";
+                }
+            }
+            return ss.str();
+        }
+        case east_type::NONE: 
+            ss << "NONE\n"; 
+            return ss.str();
+        case east_type::BYTE: {
+            ast_byte& byt = as_byte();
+            ss << "BYTE (type) " << std::hex << (u16) byt.data << "\n";
+            return ss.str();
+        }
+        case east_type::WORD: {
+            ast_word& wrd = as_word();
+            ss << "WORD (type) " << std::hex << wrd.data << "\n";
+            return ss.str();
+        }
+        case east_type::DWORD: {
+            ast_dword& dwr = as_dword();
+            ss << "DWORD (type) " << std::hex << dwr.data << "\n";
+            return ss.str();
+        }
+        case east_type::QWORD: {
+            ast_qword& qwr = as_qword();
+            ss << "QWORD (type) " << std::hex << qwr.data << "\n";
+            return ss.str();
+        }
+        case east_type::STRING: {
+            ast_string& str = as_string();
+            ss << "STRING (" << str.length << ")\n";
+            return ss.str();
+        }
+        case east_type::ARRAY: {
+            ast_array& arr = as_array();
+            ss << "ARRAY (type) " << arr.length << "\n";
+            sep += "\xda\xc4"s;
+            for (u64 i = 0; i < arr.length; ++i) {
+                if (i == arr.length - 1) {
+                    *(sep.end() - 2) = '\xbf';
+                }
+                if (arr.elems[i]) {
+                    ss << arr.elems[i]->print(depth + 1, sep);
+                } else {
+                    ss << "NULLPTR\n";
+                }
+            }
+            return ss.str();
+        }
+        case east_type::STRUCT: {
+            ast_struct& stc = as_struct();
+            ss << "STRUCT (type)\n";
+            sep += "\xda\xc4"s;
+            u64 length = stc.t->as_struct().fields.size();
+            for (u64 i = 0; i < length; ++i) {
+                if (i == length - 1) {
+                    *(sep.end() - 2) = '\xbf';
+                }
+                if (stc.elems[i]) {
+                    ss << stc.elems[i]->print(depth + 1, sep);
+                } else {
+                    ss << "NULLPTR\n";
+                }
+            }
+            return ss.str();
+        }
+        case east_type::TYPE: {
+            ast_nntype& typ = as_nntype();
+            ss << "TYPE (type)\n";
+            sep += "\xda\xc4"s;
+            for (auto& size : typ.array_sizes) {
+                if (size == typ.array_sizes.back()) {
+                    *(sep.end() - 2) = '\xbf';
+                }
+                if (size) {
+                    ss << size->print(depth + 1, prev);
+                } else {
+                    ss << "NULLPTR\n";
+                }
+            }
+            return ss.str();
+        }
+        default:
+            ss << "ILLEGAL SHENANIGANS\n";
+            return ss.str();
+    }
+    
 }

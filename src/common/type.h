@@ -58,7 +58,7 @@ constexpr bool is_real_type(type_id id) {
 }
 
 constexpr bool is_number_type(type_id id) {
-    return is_integer_type(id) || is_number_type(id);
+    return is_integer_type(id) || is_real_type(id);
 }
 
 constexpr bool is_infer_type(type_id id) {
@@ -72,7 +72,7 @@ constexpr bool is_illegal_type(type_id id) {
 } 
 
 constexpr bool is_ptr_type(ettype id) {
-    return id == ettype::POINTER || id == ettype::FUNCTION;
+    return id == ettype::POINTER || id == ettype::FUNCTION || id == ettype::PFUNCTION;
 }
 
 constexpr bool is_pod_type(ettype id) {

@@ -1,0 +1,23 @@
+void print(string);
+void print(int);
+
+void fizzbuzz(int max) {
+    int count = 1;
+    while count <= max {
+        bool fizz = !!(count % 3);
+        bool buzz = !!(count % 5);
+        if fizz && buzz {
+            print("FizzBuzz");
+        }
+        else if fizz {
+            print("Fizz");
+        }
+        else if buzz {
+            print("Buzz");
+        }
+        else {
+            print(count);
+        }
+        count++;
+    }
+}
