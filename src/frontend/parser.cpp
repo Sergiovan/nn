@@ -66,6 +66,10 @@ void parser::print_errors() {
     }
 }
 
+void parser::print_types() {
+    logger::log() << types.print() << logger::nend;
+}
+
 context& parser::ctx() {
     return contexts.top();
 }

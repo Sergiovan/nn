@@ -98,6 +98,8 @@ struct st_entry {
     st_variant entry;
     est_entry_type t;
     
+    std::string name{};
+    
     static st_entry* variable(type* t, ast* value = nullptr, bool defined = false);
     static st_entry* field(u64 field, type* ptype = nullptr);
     

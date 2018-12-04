@@ -16,13 +16,17 @@ int main(int argc, char** argv) {
     parser p{};
     
     auto start = std::chrono::high_resolution_clock::now();
-    ast* res = p.parse("examples/fizzbuzz.nn", true);
+    ast* res = p.parse(argc > 1 ? argv[1] : "examples/mastermind2.nn", true);
+    
+    auto end = std::chrono::high_resolution_clock::now();
     
     if (p.has_errors()) {
         p.print_errors();
     } else {
         logger::log() << "\n" << res->print() << logger::nend;
     }
+    
+    p.print_types();
     
     /*
     reader* r = reader::from_file("examples/mastermind2.nn");
@@ -41,7 +45,6 @@ int main(int argc, char** argv) {
         logger::log() << "\n";
     } */
     
-    auto end = std::chrono::high_resolution_clock::now();
     logger::log() << logger::end;
     logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
     return 0;

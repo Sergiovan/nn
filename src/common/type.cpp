@@ -1,6 +1,8 @@
 #include "common/type.h"
+
 #include <cmath>
 #include <utility>
+#include <sstream>
 
 #include "common/ast.h"
 #include "common/symbol_table.h"
@@ -608,4 +610,176 @@ bool type::is_combination() {
 
 bool type::is_function(bool pure) {
     return tt == (pure ? ettype::PFUNCTION : ettype::FUNCTION);
+}
+
+std::string type::print(bool simple) {
+    std::stringstream ss{};
+    bool switch_signed{false};
+    switch (tt) {
+        case ettype::PRIMITIVE:
+            switch (as_primitive().t) {
+                case etype_ids::BYTE: ss << "byte"; break;
+                case etype_ids::SHORT: ss << "short"; switch_signed = true; break;
+                case etype_ids::INT: ss << "int"; switch_signed = true; break;
+                case etype_ids::LONG: ss << "long"; switch_signed = true; break;
+                case etype_ids::SIG: ss << "sig"; break;
+                case etype_ids::FLOAT: ss << "float"; break;
+                case etype_ids::DOUBLE: ss << "double"; break;
+                case etype_ids::BOOL: ss << "bool"; break;
+                case etype_ids::CHAR: ss << "char"; break;
+                case etype_ids::STRING: ss << "string"; break;
+                case etype_ids::VOID: ss << "void"; break;
+                case etype_ids::FUN: ss << "fun"; break;
+                case etype_ids::LET: ss << "let"; break;
+                case etype_ids::NNULL: ss << "null"; break;
+                case etype_ids::NOTHING: ss << "---"; break;
+            }
+            break;
+        case ettype::POINTER: {
+            type_pointer& ptr = as_pointer();
+            ss << ptr.t->print(true);
+            switch (ptr.ptr_t) {
+                case eptr_type::NAKED: ss << "*"; break;
+                case eptr_type::UNIQUE: ss << "*!"; break;
+                case eptr_type::SHARED: ss << "*+"; break;
+                case eptr_type::WEAK: ss << "*?"; break;
+                case eptr_type::ARRAY: 
+                    ss << "[";
+                    if (ptr.size) {
+                        ss << ptr.size;
+                    }
+                    ss << "]";
+                    break;
+            }
+            break;
+        }
+        case ettype::PSTRUCT: {
+            type_pstruct& psct = as_pstruct();
+            ss << "struct<";
+            for (auto& field : psct.fields) {
+                ss << field.t->print(true);
+                if (field.bitfield) {
+                    ss << ": " << field.bits;
+                }
+                if (&field != &psct.fields.back()) {
+                    ss << ", ";
+                }
+            }
+            ss << ">";
+            break;
+        }
+        case ettype::STRUCT: {
+            type_struct& sct = as_struct();
+            ss << "struct";
+            if (sct.ste->name.length()) {
+                ss << " " << sct.ste->name;
+            }
+            if (!simple && sct.ste->as_type().defined) {
+                ss << " {\n";
+                for (auto& field : sct.fields) {
+                    ss << "\t" << field.t->print(true);
+                    ss << " " << field.name;
+                    if (field.bitfield) {
+                        ss << ": " << field.bits;
+                    }
+                    if (field.value) {
+                        ss << " (defaulted)";
+                    }
+                    ss << "\n";
+                }
+                ss << "}";
+            }
+            break;
+        }
+        case ettype::UNION: {
+            type_union& unn = as_union();
+            ss << "union";
+            if (unn.ste->name.length()) {
+                ss << " " << unn.ste->name;
+            }
+            if (!simple && unn.ste->as_type().defined) {
+                ss << " [" << unn.def_type << "]";
+                ss << " {\n";
+                for (auto& field : unn.fields) {
+                    ss << "\t" << field.t->print(true);
+                    ss << " " << field.name << "\n";
+                }
+                ss << "}";
+            }
+            break;
+        }
+        case ettype::ENUM: {
+            type_enum& enm = as_enum();
+            ss << "enum " << enm.ste->name;
+        }
+        case ettype::FUNCTION: {
+            type_function& fun = as_function();
+            ss << fun.rets->print();
+            if (fun.ste->name.length()) {
+                ss << " " << fun.ste->name;
+            }
+            ss << "(";
+            for (auto& param : fun.params) {
+                ss << param.t->print(true);
+                if (param.name.length()) {
+                    ss << " " << param.name;
+                }
+                if (param.flags & eparam_flags::SPREAD) {
+                    ss << "...";
+                }
+                if (param.flags & eparam_flags::DEFAULTABLE) {
+                    ss << "=";
+                }
+                if (&param != &fun.params.back()) {
+                    ss << ", ";
+                }
+            }
+            ss << ")";
+            break;
+        }
+        case ettype::COMBINATION: {
+            type_combination& com = as_combination();
+            for (type*& t : com.types) {
+                ss << t->print(true);
+                if (&t != &com.types.back()) {
+                    ss << ":";
+                }
+            }
+            break;
+        }
+        case ettype::PFUNCTION: {
+            type_pfunction& pfun = as_pfunction();
+            ss << "fun<" << pfun.rets->print() << "(";
+            for (auto& param : pfun.params) {
+                ss << param.t->print(true);
+                if (param.flags & eparam_flags::SPREAD) {
+                    ss << "...";
+                }
+                if (param.flags & eparam_flags::DEFAULTABLE) {
+                    ss << "=";
+                }
+                if (&param != &pfun.params.back()) {
+                    ss << ", ";
+                }
+            }
+            ss << ")>";
+            break;
+        }
+    }
+    
+    if ((bool)(flags & etype_flags::SIGNED) != switch_signed) {
+        if (switch_signed) {
+            ss << " unsigned";
+        } else {
+            ss << " signed";
+        }
+    }
+    if (flags & etype_flags::CONST) {
+        ss << " const";
+    }
+    if (flags & etype_flags::VOLATILE) {
+        ss << " volatile";
+    }
+    
+    return ss.str();
 }

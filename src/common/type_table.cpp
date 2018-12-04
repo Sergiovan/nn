@@ -1,6 +1,7 @@
 #include "common/type_table.h"
 
 #include <cstring>
+#include <iomanip>
 #include <string>
 #include <sstream>
 #include "common/ast.h"
@@ -370,6 +371,24 @@ void type_table::merge(type_table&& o) {
     }
     o.types.clear();
     o.mangle_table.clear();
+}
+
+std::string type_table::print() {
+    std::stringstream ss{};
+    ss << "~~ Types ~~\n\n";
+    for (u64 i = 0; i < types.size(); ++i) {
+        ss << "[" << i << "]:\n" << types[i]->print() << "\n\n";
+    }
+    
+    ss << "~~ Mangles ~~\n\n" << std::setfill('0');
+    for (auto& [name, id] : mangle_table) {
+        ss <<  std::hex;
+        for (char c : name) {
+            ss << std::setw(2) << (u16) c;
+        }
+        ss << std::dec << ": " << id << "\n";
+    }
+    return ss.str();
 }
 
 type* type_table::t_void = new type{ettype::PRIMITIVE, etype_ids::VOID, 0};

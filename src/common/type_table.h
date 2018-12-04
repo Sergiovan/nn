@@ -50,6 +50,8 @@ public:
     
     void merge(type_table&& o);
     
+    std::string print();
+    
     static type* t_void;
     static type* t_byte;
     static type* t_short;

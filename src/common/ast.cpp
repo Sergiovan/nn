@@ -619,28 +619,28 @@ ast* ast::symbol(st_entry* sym, const std::string& str) {
 ast* ast::byte(u8 value, type* t) {
     ast* r = new ast;
     r->t = east_type::BYTE;
-    r->n = ast_byte{value, t};
+    r->n = ast_byte{value, t ? t : type_table::t_void};
     return r;
 }
 
 ast* ast::word(u16 value, type* t) {
     ast* r = new ast;
     r->t = east_type::WORD;
-    r->n = ast_word{value, t};
+    r->n = ast_word{value, t ? t : type_table::t_void};
     return r;
 }
 
 ast* ast::dword(u32 value, type* t) {
     ast* r = new ast;
     r->t = east_type::DWORD;
-    r->n = ast_dword{value, t};
+    r->n = ast_dword{value, t ? t : type_table::t_void};
     return r;
 }
 
 ast* ast::qword(u64 value, type* t) {
     ast* r = new ast;
     r->t = east_type::QWORD;
-    r->n = ast_qword{value, t};
+    r->n = ast_qword{value, t ? t : type_table::t_void};
     return r;
 }
 
@@ -672,7 +672,7 @@ ast* ast::array(ast** elems, u64 length, type* t) {
     ast_array as{};
     as.elems = elems;
     as.length = length;
-    as.t = t;
+    as.t = t ? t : type_table::t_void;;
     r->n = as;
     return r;
 }
@@ -680,7 +680,7 @@ ast* ast::array(ast** elems, u64 length, type* t) {
 ast* ast::_struct(type* t, ast** elems) {
     ast* r = new ast;
     r->t = east_type::STRUCT;
-    r->n = ast_struct{elems, t};
+    r->n = ast_struct{elems, t ? t : type_table::t_void};
     return r;
 }
 
@@ -701,7 +701,7 @@ ast* ast::unary(Symbol op, ast* node, type* t, bool assignable, bool post, bool 
     ast_unary us{};
     us.op = op;
     us.node = node;
-    us.t = t;
+    us.t = t ? t : type_table::t_void;
     us.assignable = assignable;
     us.post = post;
     us.owned = owned;
@@ -714,7 +714,7 @@ ast* ast::binary(Symbol op, ast* left, ast* right, type* t, bool assignable, boo
     bs.op = op;
     bs.left = left;
     bs.right = right;
-    bs.t = t;
+    bs.t = t ? t : type_table::t_void;
     bs.assignable = assignable;
     bs.lowned = lowned;
     bs.rowned = rowned;
@@ -735,7 +735,7 @@ ast* ast::function(ast* block, type* t) {
     r->t = east_type::FUNCTION;
     ast_function fs{};
     fs.block = block;
-    fs.t = t;
+    fs.t = t ? t : type_table::t_void;;
     r->n = fs;
     return r;
 }
@@ -744,7 +744,7 @@ ast* ast::nntype(type* t) {
     ast* r = new ast;
     r->t = east_type::TYPE;
     ast_nntype ts{};
-    ts.t = t;
+    ts.t = t ? t : type_table::t_void;;
     r->n = ts;
     return r;
 }
@@ -954,7 +954,14 @@ std::string ast::print(u64 depth, const std::string& prev) {
             [[fallthrough]];
         case east_type::POST_UNARY: { 
             ast_unary& un = as_unary();
-            ss << "UNARY (" << Grammar::symbol_names.at(un.op) << ")\n";
+            ss << "UNARY " << Grammar::symbol_names.at(un.op) << " (" << un.t->print(true) << ") ";
+            if (un.assignable) {
+                ss << "[=] ";
+            }
+            if (!un.owned) {
+                ss << "!OWNED ";
+            }
+            ss << "\n";
             if (un.node) {
                 sep += "\xbf\xc4"s;
                 ss << un.node->print(depth + 1, sep);
@@ -963,7 +970,17 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::BINARY: {
             ast_binary& bin = as_binary();
-            ss << "BINARY (" << Grammar::symbol_names.at(bin.op) << ")\n";
+            ss << "BINARY " << Grammar::symbol_names.at(bin.op) << " (" << bin.t->print(true) << ") ";
+            if (bin.assignable) {
+                ss << "[=] ";
+            }
+            if (!bin.lowned) {
+                ss << "!!LOWNED ";
+            }
+            if (!bin.rowned) {
+                ss << "!!ROWNED ";
+            }
+            ss << "\n";
             sep += "\xda\xc4"s;
             if (bin.left) {
                 ss << bin.left->print(depth + 1, sep);
@@ -980,7 +997,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::SYMBOL: {
             ast_symbol& sym = as_symbol();
-            ss << "SYMBOL (" << sym.name << ") ";
+            ss << "SYMBOL " << sym.name << " (" << sym.symbol->get_type()->print(true) << ") ";
             switch (sym.symbol->t) {
                 case est_entry_type::FIELD: 
                     ss << "FIELD\n"; 
@@ -1006,7 +1023,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::FUNCTION: {
             ast_function& fun = as_function();
-            ss << "FUNCTION (type)\n";
+            ss << "FUNCTION (" << fun.t->print(true) << ")\n";
             sep += "\xbf\xc4"s;
             if (fun.block) {
                 ss << fun.block->print(depth + 1, sep);
@@ -1017,7 +1034,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::CLOSURE: {
             ast_closure& cls = as_closure();
-            ss << "CLOSURE (type)\n";
+            ss << "CLOSURE (" << cls.function->get_type()->print(true) << ") [" << cls.size << "]\n";
             sep += "\xda\xc4"s;
             ss << cls.function->print(depth + 1, sep);
             for (u64 i = 0; i < cls.size; ++i) {
@@ -1034,7 +1051,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::BLOCK: {
             ast_block& blk = as_block();
-            ss << "BLOCK (" << blk.stmts.size() << ")\n";
+            ss << "BLOCK [" << blk.stmts.size() << "]\n";
             sep += "\xda\xc4"s;
             for (auto& stmt : blk.stmts) {
                 if (stmt == blk.stmts.back()) {
@@ -1053,32 +1070,32 @@ std::string ast::print(u64 depth, const std::string& prev) {
             return ss.str();
         case east_type::BYTE: {
             ast_byte& byt = as_byte();
-            ss << "BYTE (type) " << std::hex << (u16) byt.data << "\n";
+            ss << "BYTE (" << byt.t->print(true) << ") " << std::hex << (u16) byt.data << "\n";
             return ss.str();
         }
         case east_type::WORD: {
             ast_word& wrd = as_word();
-            ss << "WORD (type) " << std::hex << wrd.data << "\n";
+            ss << "WORD (" << wrd.t->print(true) << ") " << std::hex << wrd.data << "\n";
             return ss.str();
         }
         case east_type::DWORD: {
             ast_dword& dwr = as_dword();
-            ss << "DWORD (type) " << std::hex << dwr.data << "\n";
+            ss << "DWORD (" << dwr.t->print(true) << ") " << std::hex << dwr.data << "\n";
             return ss.str();
         }
         case east_type::QWORD: {
             ast_qword& qwr = as_qword();
-            ss << "QWORD (type) " << std::hex << qwr.data << "\n";
+            ss << "QWORD (" << qwr.t->print(true) << ") " << std::hex << qwr.data << "\n";
             return ss.str();
         }
         case east_type::STRING: {
             ast_string& str = as_string();
-            ss << "STRING (" << str.length << ")\n";
+            ss << "STRING [" << str.length << "]\n";
             return ss.str();
         }
         case east_type::ARRAY: {
             ast_array& arr = as_array();
-            ss << "ARRAY (type) " << arr.length << "\n";
+            ss << "ARRAY (" << arr.t->print(true) << ")[" << arr.length << "]\n";
             sep += "\xda\xc4"s;
             for (u64 i = 0; i < arr.length; ++i) {
                 if (i == arr.length - 1) {
@@ -1094,7 +1111,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::STRUCT: {
             ast_struct& stc = as_struct();
-            ss << "STRUCT (type)\n";
+            ss << "STRUCT (" << stc.t->print(true) << ")\n";
             sep += "\xda\xc4"s;
             u64 length = stc.t->as_struct().fields.size();
             for (u64 i = 0; i < length; ++i) {
@@ -1111,7 +1128,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::TYPE: {
             ast_nntype& typ = as_nntype();
-            ss << "TYPE (type)\n";
+            ss << "TYPE (" << typ.t->print(true) << ")\n";
             sep += "\xda\xc4"s;
             for (auto& size : typ.array_sizes) {
                 if (size == typ.array_sizes.back()) {

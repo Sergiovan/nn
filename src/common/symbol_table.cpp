@@ -526,6 +526,7 @@ st_entry* symbol_table::add(const std::string& name, st_entry* entry) {
     if (has(name, false)) {
         return nullptr;
     } else {
+        entry->name = name;
         entries.insert({name, entry});
         return entry;
     }
@@ -540,7 +541,7 @@ st_entry* symbol_table::add_type(const std::string& name, type* t, bool defined)
     if (t->is_struct() || t->is_union()) {
         nt.st = new symbol_table(etable_owner::STRUCT, this);
     }
-    st_entry* ne = new st_entry{nt, est_entry_type::TYPE};
+    st_entry* ne = new st_entry{nt, est_entry_type::TYPE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -551,7 +552,7 @@ st_entry* symbol_table::add_variable(const std::string& name, type* t, ast* valu
     }
     
     st_variable nv{t, value, value != nullptr};
-    st_entry* ne = new st_entry{nv, est_entry_type::VARIABLE};
+    st_entry* ne = new st_entry{nv, est_entry_type::VARIABLE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -561,7 +562,7 @@ st_entry* symbol_table::add_or_get_empty_function(const std::string& name) {
     if (f && !f->is_function()) {
         return nullptr;
     } else if (!f) {
-        f = new st_entry{st_function{}, est_entry_type::FUNCTION};
+        f = new st_entry{st_function{}, est_entry_type::FUNCTION, name};
         entries.insert({name, f});
     }
     
@@ -573,7 +574,7 @@ std::pair<st_entry*, overload*> symbol_table::add_function(const std::string& na
     if (f && !f->is_function()) {
         return {nullptr, nullptr};
     } else if (!f) {
-        f = new st_entry{st_function{}, est_entry_type::FUNCTION};
+        f = new st_entry{st_function{}, est_entry_type::FUNCTION, name};
         entries.insert({name, f});
     }
     
@@ -588,7 +589,7 @@ st_entry* symbol_table::add_namespace(const std::string& name, symbol_table* st)
     }
     
     st_namespace nn{st};
-    st_entry* ne = new st_entry{nn, est_entry_type::NAMESPACE};
+    st_entry* ne = new st_entry{nn, est_entry_type::NAMESPACE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -599,7 +600,7 @@ st_entry* symbol_table::add_module(const std::string& name, symbol_table* st) {
     }
     
     st_namespace nm{st};
-    st_entry* ne = new st_entry{nm, est_entry_type::MODULE};
+    st_entry* ne = new st_entry{nm, est_entry_type::MODULE, name};
     entries.insert({name, ne});
     return ne;
 }
@@ -610,7 +611,7 @@ st_entry* symbol_table::add_field(const std::string& name, u64 field, type* ptyp
     }
     
     st_field nf{field, ptype};
-    st_entry* ne = new st_entry{nf, est_entry_type::FIELD};
+    st_entry* ne = new st_entry{nf, est_entry_type::FIELD, name};
     entries.insert({name, ne});
     return ne;
 }

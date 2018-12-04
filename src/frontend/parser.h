@@ -59,6 +59,7 @@ public:
     
     bool has_errors();
     void print_errors();
+    void print_types();
 private:
     context& ctx();
     symbol_table* st();

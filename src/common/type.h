@@ -263,4 +263,6 @@ struct type {
     bool is_enum();
     bool is_combination();
     bool is_function(bool pure = false);
+    
+    std::string print(bool simple = false);
 };
