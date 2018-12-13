@@ -1,0 +1,142 @@
+import std;
+
+struct trie {
+	char value = '\0';
+	trie*[2] children = [null, null];
+	
+	void add(string key, char value, int pos = 0) {
+		if pos == ~key {
+			this.value = value;
+		} else {
+			int idx = 0;
+			if key[pos] == '-' {
+				idx = 1;
+			}
+			if !!children[idx] {
+				children[idx] = new trie;
+			}
+			children[idx].add(key, value, pos + 1);
+		}
+	}
+	
+	char get(string key, int pos = 0) {
+		if pos == ~key {
+			return value;
+		} else {
+			int idx = 0;
+			if key[pos] == '-' {
+				idx = 1;
+			}
+			if !!children[idx] {
+				return '?';
+			} else {
+				return children[idx].get(key, pos + 1);
+			}
+		}
+	}
+	
+	void clear() {
+		if children[0] {
+			children[0].clear();
+			delete children[0];
+			children[0] = null;
+		}
+		if children[1] {
+			children[1].clear();
+			delete children[1];
+			children[1] = null;
+		}
+	}
+}
+
+long const diff = <long> 'z' - <long> 'a';
+long const dist = <long> 'A' - <long> 'a';
+string[diff] const morse = [
+	".-", "-...", "-.-.", "-..", ".", 
+	"..-.", "--.", "....", "..", ".---", 
+	"-.-", ".-..", "--", "-.", "---", 
+	".--.", "--.-", ".-.", "...", "-", 
+	"..-", "...-", ".--", "-..-", "-.--", 
+	"--.."
+];
+
+trie morse_dict;
+
+string morse_to_english(string[] words) {
+	string ret = "";
+	for string word : words {
+		if word == "/" {
+			ret ..= " ";
+		} else {
+			ret ..= morse_dict.get(word);
+		}
+	}
+	return ret;
+} 
+
+void lowercase(string* str);
+
+string english_to_morse(string[] words) {
+	string ret = "";
+	for string word : words {
+		lowercase(*word);
+		for char c : word {
+			long idx = <long> c - <long> 'a';
+			ret ..= morse[idx] .. ' ';
+		}
+		ret ..= "/ ";
+	}
+	return ret;
+}
+
+void lowercase(string* str) {
+	for int i = 0; i < ~@str; ++i {
+		char c = (@str)[i];
+		if c >= 'A' && c <= 'Z' {
+			(@str)[i] = <char>(<long>c - dist);
+		}
+	}
+}
+
+string[] split(string in, char by = ' ') {
+	string[] ret = [];
+	string cur = "";
+	for char c : in {
+		if c != ' ' {
+			cur ..= c;
+		} else if ~cur {
+			ret ..= cur;
+			cur = "";
+		}
+	}
+	return ret;
+}
+
+string join(string[] in, char with = ',') {
+	string ret = "";
+	for string str : in {
+		ret ..= str .. with;
+	}
+	return ret;
+}
+
+int main(string[]) {
+	using std.io.*;
+	defer morse_dict.clear();
+	string in = "";
+	while !!~in {
+		print("Enter english or morse: ");
+		in = read();
+	}
+	
+	string[] words = in.split();
+	if words[0][0] == '.' || words[0][0] == '-' {
+		# We morse bois
+		words.morse_to_english().print();
+	} else {
+		# It's that pesky english
+		words.english_to_morse().print();
+	}
+	
+	return 0;
+}

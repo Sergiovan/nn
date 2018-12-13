@@ -132,13 +132,13 @@ inline LoggerMessage& error() { return internal::log << internal::error; }
 
 namespace utils {
     inline u8 utflen(u8 c) {
-        if (c > 0b10000000) {
+        if (c < 0b10000000) {
             return 1;
-        } else if (c > 0b11100000) {
+        } else if (c < 0b11100000) {
             return 2;
-        } else if (c > 0b11110000) {
+        } else if (c < 0b11110000) {
             return 3;
-        } else if (c > 0b11111000) {
+        } else if (c < 0b11111000) {
             return 4;
         } else {
             return 0;

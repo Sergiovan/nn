@@ -497,6 +497,74 @@ type* st_entry::get_type() {
     return nullptr; // What
 }
 
+std::string st_entry::print(u64 depth) {
+    std::string sep(depth * 2, ' ');
+    std::stringstream ss{};
+    ss << sep;
+    switch (t) {
+        case est_entry_type::FIELD:  {
+            type* ftype = as_field().ptype;
+            ss << "FIELD " << name << " (";
+            switch (ftype->tt) {
+                case ettype::FUNCTION:
+                    ss << type_table::t_sig->print(true);
+                    break;
+                case ettype::ENUM:
+                    ss << ftype->print(true);
+                    break;
+                case ettype::STRUCT:
+                    ss << ftype->as_struct().fields[as_field().field].t->print(true);
+                    break;
+                case ettype::UNION:
+                    ss << ftype->as_union().fields[as_field().field].t->print(true);
+                    break;
+                default:
+                    ss << "NULLPTR"; // Error, bad
+                    break;
+            }
+            ss << ")\n";
+            break;
+        }
+        case est_entry_type::FUNCTION:
+            ss << "FUNCTION " << name << "[" << as_function().overloads.size() << "]\n";
+            for (auto& ol : as_function().overloads) {
+                ss << sep << "  " << ol.t->print(true) << "\n";
+                if (ol.defined) {
+                    ss << sep << "  " << "Value: \n";
+                    ss << (ol.value ? ol.value->print(depth + 2) : "NULLPTR") << "\n";
+                    ss << sep << "  " << "Symbol table: \n";
+                    ss << (ol.st ? ol.st->print(depth + 2) : "NULLPTR") << "\n";
+                }
+            }
+            break;
+        case est_entry_type::TYPE:
+            ss << "TYPE " << name << "\n";
+            if (as_type().defined) {
+                ss << sep << "  " << as_type().t->print() << "\n";
+                ss << as_type().st->print(depth + 1);
+            }
+            break;
+        case est_entry_type::VARIABLE:
+            ss << "VARIABLE " << name << "(" << as_variable().t << ")\n";
+            if (as_variable().defined) {
+                ss << as_variable().value->print(depth + 1);
+            }
+            break;
+        case est_entry_type::MODULE: 
+            ss << "MODULE " << name << "\n";
+            ss << as_module().st->print(depth + 1);
+            break;
+        case est_entry_type::NAMESPACE: 
+            ss << "NAMESPACE " << name << "\n";
+            ss << as_module().st->print(depth + 1);
+            break;
+        case est_entry_type::LABEL: 
+            ss << "LABEL " << name << "\n";
+            break;;
+    }
+    return ss.str();
+}
+
 bool symbol_table::has(const std::string& name, bool propagate, etable_owner until) {
     return get(name, propagate, until) != nullptr;
 }
@@ -672,5 +740,60 @@ void symbol_table::set_owner(etable_owner owner) {
 symbol_table* symbol_table::make_child(etable_owner new_owner) {
     symbol_table* self = this;
     return new symbol_table{new_owner == etable_owner::COPY ? owner : new_owner, self};
+}
+
+std::string symbol_table::print(u64 depth) {
+    std::string sep(depth * 2, ' ');
+    std::stringstream ss{};
+    ss << sep;
+    
+    switch(owner) {
+        case etable_owner::BLOCK:
+            ss << "Block ";
+            break;
+        case etable_owner::ENUM:
+            ss << "Enum ";
+            break;
+        case etable_owner::FREE:
+            ss << "Top level ";
+            break;
+        case etable_owner::FUNCTION:
+            ss << "Function ";
+            break;
+        case etable_owner::MODULE:
+            ss << "Module ";
+            break;
+        case etable_owner::NAMESPACE:
+            ss << "Namespace ";
+            break;
+        case etable_owner::STRUCT:
+            ss << "Struct ";
+            break;
+        case etable_owner::UNION:
+            ss << "Union ";
+            break;
+        case etable_owner::COPY:
+            ss << "Bad ";
+            break;
+    }
+    ss << "symbol table: " << std::hex << (u64) this << "\n";
+    ss << sep << "Parent: " << (u64) parent << "\n";
+    ss << sep << "Entries: \n";
+    if (entries.empty()) {
+        ss << "None\n";
+    } else {
+        for (auto& entry : entries) {
+            ss << entry.second->print(depth + 1);
+        }
+    }
+    ss << sep << "Borrowed entries: \n";
+    if (borrowed_entries.empty()) {
+        ss << "None\n";
+    } else {
+        for (auto& entry : borrowed_entries) {
+            ss << sep << "  " << entry.first << "\n";
+        }
+    }
+    return ss.str();
 }
 

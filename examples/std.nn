@@ -9,6 +9,8 @@ void print(long);
 void print(float);
 void print(double);
 
+string read();
+
 }
 
 namespace math {

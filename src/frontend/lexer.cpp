@@ -173,8 +173,8 @@ token lexer::read() {
     
     // STRINGS!
     if (c == '"') {
-        c = r->next();
-        do {
+        c = r->next(); // "
+        while (c != '"' && !r->is_done()) {
             if (c == '\\' && r->peek() != EOF) {
                 c = r->next();
                 switch (c) {
@@ -192,14 +192,13 @@ token lexer::read() {
                         break;
                 }
             } else if (c == EOF) {
-                logger::warn() << "String literal extends past end of file" << logger::nend;
+                logger::warn() << r->get_info() << " - String literal extends past end of file" << logger::nend;
                 break;
             } else {
                 t.value += c;
             }
             c = r->next();
-        } while (c != '"' && !r->is_done());
-        
+        }
         t.type = TokenType::STRING;
         return t;
     }
@@ -208,9 +207,7 @@ token lexer::read() {
     if (c == '\'') {
         c = r->next(); // '
         u8 len = utils::utflen(c);
-        t.value += c;
         for (u8 i = 0; i < len; ++i) {
-            c = r->next();
             if (c == '\\' && r->peek() != EOF) {
                 c = r->next();
                 switch (c) {
@@ -228,15 +225,15 @@ token lexer::read() {
                         break;
                 }
             } else if (c == EOF) {
-                logger::warn() << "Char literal extends past end of file" << logger::nend;
+                logger::warn() << r->get_info() << " - Char literal extends past end of file" << logger::nend;
                 break;
             } else {
                 t.value += c;
             }
+            c = r->next();
         }
-        c = r->next(); // '
         if (c != '\'') {
-            logger::error() << "Char literal invalid" << logger::nend;
+            logger::error() << r->get_info() << " - Char literal invalid" << logger::nend;
             return t; // Returns invalid token
         }
         t.type = TokenType::CHARACTER;

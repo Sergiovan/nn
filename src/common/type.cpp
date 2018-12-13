@@ -303,9 +303,9 @@ bool type::can_weak_cast(type* o) {
         return true;
     }
     
-    if ((flags & etype_flags::CONST) && !(o->flags & etype_flags::CONST)) { // No casting const away
-        return false;
-    }
+    //if ((flags & etype_flags::CONST) && !(o->flags & etype_flags::CONST)) { // No casting const away
+    //    return false;
+    //}
     
     if (is_primitive(etype_ids::NOTHING)) {
         return true;
@@ -320,9 +320,9 @@ bool type::can_weak_cast(type* o) {
         if (op.t == etype_ids::LET) {
             return true; // Can always cast to let
         }
-        if (op.t == etype_ids::FUN && is_function()) {
-            return true; // Can cast functions to fun
-        }
+        //if (op.t == etype_ids::FUN && is_function()) {
+        //    return true; // Can cast functions to fun
+        //}
     }
     
     //if (tt == ettype::PSTRUCT && o->tt == ettype::STRUCT && o->as_struct().pure == &as_pstruct()) {
@@ -372,9 +372,9 @@ bool type::can_cast(type* o) {
         return true;
     }
     
-    if ((flags & etype_flags::CONST) && !(o->flags & etype_flags::CONST)) { // NEVER EVER CAST CONST AWAY
-        return false;
-    }
+    //if ((flags & etype_flags::CONST) && !(o->flags & etype_flags::CONST)) { // NEVER EVER CAST CONST AWAY
+    //    return false;
+    //}
     
     if (o->tt == ettype::PRIMITIVE && o->as_primitive().t == etype_ids::BOOL) { // Cast booleanables into booleans
         return can_boolean();
@@ -389,6 +389,12 @@ bool type::can_cast(type* o) {
         // Cast to and from sig
         if ((is_integer_type(tp.t) && op.t == etype_ids::SIG) || 
             (is_integer_type(op.t) && tp.t == etype_ids::SIG)) {
+            return true;
+        }
+        
+        // Cast to and from char
+        if((is_integer_type(tp.t) && op.t == etype_ids::CHAR) || 
+           (is_integer_type(op.t) && tp.t == etype_ids::CHAR)) {
             return true;
         }
         
@@ -610,6 +616,20 @@ bool type::is_combination() {
 
 bool type::is_function(bool pure) {
     return tt == (pure ? ettype::PFUNCTION : ettype::FUNCTION);
+}
+
+type_flags type::get_default_flags() {
+    if (is_primitive()) {
+        auto& prim = as_primitive();
+        if (prim.t == etype_ids::SHORT || prim.t == etype_ids::INT || prim.t == etype_ids::LONG) {
+            return etype_flags::SIGNED;
+        }
+    }
+    return 0;
+}
+
+bool type::has_special_flags() {
+    return flags != get_default_flags();
 }
 
 std::string type::print(bool simple) {

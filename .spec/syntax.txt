@@ -333,7 +333,7 @@ freevardecl = freevardecliden, [vardeclass]
 structvardecliden = (type | infer), iden, [colon, number], {comma, [type | infer], iden, [colon, number]}
 structvardecl = structvardecliden, [vardeclass]
 
-simplevardecl = (type | infer), iden, [assop, aexpression]
+simplevardecl = (type | infer), iden, [opassign, aexpression]
 
 funcdecl = (type, {colon, type} | tvoid | tlet), iden, oparen, [{parameter; comma}], cparen, (scope | semicolon)
 funcval  = (type, {colon, type} | tvoid | tlet), [iden], oparen, [{parameter; comma}], cparen, [obracket, {{[opaddress], iden; comma}}, cbracket], scope

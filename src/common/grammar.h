@@ -135,6 +135,45 @@ const std::map<V, K> swap_key(std::map<K, V> map) {
     return ret;
 }
 
+constexpr Symbol without_assign(Symbol ass) {
+    switch (ass) {
+        case Symbol::ADD_ASSIGN:
+            return Symbol::ADD;
+        case Symbol::SUBTRACT_ASSIGN:
+            return Symbol::SUBTRACT;
+        case Symbol::MULTIPLY_ASSIGN:
+            return Symbol::MULTIPLY;
+        case Symbol::POWER_ASSIGN:
+            return Symbol::POWER;
+        case Symbol::DIVIDE_ASSIGN:
+            return Symbol::DIVIDE;
+        case Symbol::AND_ASSIGN:
+            return Symbol::AND;
+        case Symbol::OR_ASSIGN:
+            return Symbol::OR;
+        case Symbol::XOR_ASSIGN:
+            return Symbol::XOR;
+        case Symbol::SHIFT_LEFT_ASSIGN:
+            return Symbol::SHIFT_LEFT;
+        case Symbol::SHIFT_RIGHT_ASSIGN:
+            return Symbol::SHIFT_RIGHT;
+        case Symbol::ROTATE_LEFT_ASSIGN:
+            return Symbol::ROTATE_LEFT;
+        case Symbol::ROTATE_RIGHT_ASSIGN:
+            return Symbol::ROTATE_RIGHT;
+        case Symbol::CONCATENATE_ASSIGN:
+            return Symbol::CONCATENATE;
+        case Symbol::BIT_SET_ASSIGN:
+            return Symbol::BIT_SET;
+        case Symbol::BIT_CLEAR_ASSIGN:
+            return Symbol::BIT_CLEAR;
+        case Symbol::BIT_TOGGLE_ASSIGN:
+            return Symbol::BIT_TOGGLE;
+        default:
+            return Symbol::SYMBOL_INVALID;
+    }
+}
+
 static const std::map<TokenType, std::string> tokentype_names {
     {TokenType::KEYWORD,               "Keyword"},
     {TokenType::SYMBOL,                "Symbol"},

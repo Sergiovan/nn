@@ -44,11 +44,9 @@ student[] sorted(student[] students, fun<byte signed(student, student)> comparis
 	
 	for student s : students {
 		if comparison(s, spivot) <= 0 {
-			# a ..= s;
-			a = a .. s;
+			a ..= s;
 		} else {
-			# b ..= s;
-			b = b .. s;
+			b ..= s;
 		}
 	}
 	
@@ -65,13 +63,9 @@ int main(string[]) {
 		{class.D, 9, "Marta"}, {class.D, 2, "Maggy"}, {class.D, 1, "Francis"},
 	];
 	
-	#> student[] by_grade = sorted(comparison = (byte signed(student a, student b) {
-	#	return b.grade - a.grade; # Let's ignore the fact this might overflow
-	#}), students = students); <#
-	
-	student[] by_grade = sorted(students, (byte signed(student a, student b) {
-		return <byte signed>(b.grade - a.grade); # Let's ignore the fact this might overflow
-	}));
+	student[] by_grade = sorted(comparison = (byte signed(student a, student b) {
+		return <byte signed> (b.grade - a.grade); # Let's ignore the fact this might overflow
+	}), students = students);
 	
 	for student s : by_grade {
 		io.print("Student: ");

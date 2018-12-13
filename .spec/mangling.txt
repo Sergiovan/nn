@@ -1,17 +1,17 @@
 Normal types:
- = 1 byte normal type + 8 bytes type + 1 byte flags + 6 zero bytes
+ = 1 byte normal type + 8 bytes type + 1 byte flags
  
 Pointer types:
- = 1 bytes pointer type + 1 byte pointer flags + 5 zero bytes + 8 bytes type
+ = 1 bytes pointer type + 1 byte pointer flags + 8 bytes type + 1 byte flags
  
  - Sub type array:
-  = 1 bytes array type + 1 byte pointer flags + 8 bytes size + padding to 8 + 8 bytes type
+  = 1 bytes array type + 1 byte pointer flags + 8 bytes size + 8 bytes type + 1 byte flags
  
 Function types:
- = 1 byte function start + 1 byte flags + 8 bytes return type + y * (1 bytes function parameter type + 8 bytes parameter type + 1 byte special parameter flags)
+ = 1 byte function start + 1 byte flags + 8 bytes return type + y * (1 bytes function parameter type + 8 bytes parameter type + 1 byte parameter type flags + 1 byte special parameter flags)
  
 Struct types:
- = 1 byte struct/union start + 1 byte flags + x * (1 bytes struct type + 8 bytes member type + 1 byte bitfield length)
+ = 1 byte struct/union start + 1 byte flags + x * (1 bytes struct type + 8 bytes member type + 1 byte member type flags + 1 byte bitfield length)
  
 Combination types:
- = 1 byte combination start + 8 bytes combination size + x * (8 bytes type)
+ = 1 byte combination start + 8 bytes combination size + x * (8 bytes type + 1 byte flags)

@@ -39,8 +39,8 @@ public:
     type* add_type(const std::string& mangled);
     
     type* update_type(type_id id, type& nvalue);
-    
-    type* get(type_id id);
+
+    type* get(type_id id, type_flags flags);
     type* get(type& t);
     type* get(const std::string& mangled);
     

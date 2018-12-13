@@ -68,6 +68,9 @@ public:
     
     bool has_errors();
     void print_errors();
+    void print_info();
+    void print_st();
+    void print_modules();
     void print_types();
 private:
     ast* _parse();
@@ -81,6 +84,8 @@ private:
     ctx_guard guard();
     
     ast* error(const std::string& msg, epanic_mode mode = epanic_mode::NO_PANIC, token* t = nullptr);
+    ast* operator_error(Grammar::Symbol op, type* t, bool post = true);
+    ast* operator_error(Grammar::Symbol op, type* l, type* r);
     void panic(epanic_mode mode);
     
     token next();
@@ -242,6 +247,9 @@ private:
     bool is_pointer_type();
     
     type* pointer_to(type* to, eptr_type ptype = eptr_type::NAKED, u64 size = 0);
+    
+    type* get_result_type(Grammar::Symbol op, type* t);
+    type* get_result_type(Grammar::Symbol op, type* lt, type* rt);
     
     token c;
     lexer* l{nullptr};

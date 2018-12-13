@@ -264,5 +264,8 @@ struct type {
     bool is_combination();
     bool is_function(bool pure = false);
     
+    type_flags get_default_flags();
+    bool has_special_flags();
+    
     std::string print(bool simple = false);
 };

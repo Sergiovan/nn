@@ -83,6 +83,25 @@ void parser::print_errors() {
     }
 }
 
+void parser::print_info() {
+    logger::log() << "~~ Modules ~~\n\n";
+    print_modules();
+    logger::log() << "\n~~ Symbol table~~\n\n";
+    print_st();
+    logger::log() << "\n~~ Type table~~\n\n";
+    print_types();
+}
+
+void parser::print_st() {
+    logger::log() << root_st->print() << logger::nend;
+}
+
+void parser::print_modules() {
+    for (auto& [n, m] : modules) {
+        logger::log() << n << ":\n" << m->print() << logger::nend;
+    }
+}
+
 void parser::print_types() {
     logger::log() << types.print() << logger::nend;
 }
@@ -142,6 +161,25 @@ ast* parser::error(const std::string& msg, epanic_mode mode, token* t) {
         parser::panic(mode);
     }
     return ast::none(); // In case we want to make an error AST or stub
+}
+
+ast* parser::operator_error(Symbol op, type* t, bool post) {
+    std::stringstream ss{};
+    ss << "Cannot use operator '" << symbol_names.at(op) << "' on type \"" << t->print(true) << "\"";
+    return error(ss.str());
+}
+
+ast* parser::operator_error(Symbol op, type* l, type* r) {
+    if (op != Symbol::ASSIGN) {
+        std::stringstream ss{};
+        ss << "Cannot use operator '" << symbol_names.at(op) << "' on types \"" << l->print(true) << 
+            "\" and \"" << r->print(true) << "\"";
+        return error(ss.str());
+    } else {
+        std::stringstream ss{};
+        ss << "Cannot cast \"" << r->print(true) << "\" to \"" << l->print(true) << "\" implicitly";
+        return error(ss.str());
+    }
 }
 
 void parser::panic(epanic_mode mode) {
@@ -435,7 +473,7 @@ ast* parser::iden(bool withthis, type** thistype) {
             } else if (t->is_union()) {
                 sym = t->as_union().ste->as_type().st->get(tok.value);
             }
-            if (t->is_struct() || t->is_union()) {
+            if (sym && (t->is_struct() || t->is_union())) {
                 if (sym->is_function()) {
                     if (peek(Symbol::PAREN_LEFT)) {
                         ctx().first_param = ast::symbol(self);
@@ -966,10 +1004,20 @@ ast* parser::forcond() {
             compiler_assert(Symbol::COLON);
             next(); // :
             ast* colon = expression();
-            if (!colon->get_type()->is_pointer(eptr_type::ARRAY)) {
-                colon = error("For each value must be an array");
-            } else if (!colon->get_type()->as_pointer().t->can_weak_cast(start->get_type())) {
-                colon = error("Cannot convert between types in for each");
+            type* ct = colon->get_type();
+            
+            if (!ct->is_pointer(eptr_type::ARRAY) && !ct->is_primitive(etype_ids::STRING)) {
+                std::stringstream ss{};
+                ss << "Cannot use for-each on \"" << ct->print(true) << "\"";
+                colon = error(ss.str());
+            } else if (ct->is_pointer(eptr_type::ARRAY) && !ct->as_pointer().t->can_weak_cast(start->get_type())) {
+                std::stringstream ss{};
+                ss << "Cannot cast \"" << ct->as_pointer().t->print(true) << "\" to \"" << start->get_type()->print(true) << "\" in foreach";
+                colon = error(ss.str());
+            } else if (ct->is_primitive(etype_ids::STRING) && !types.t_char->can_weak_cast(start->get_type())) {
+                std::stringstream ss{};
+                ss << "Cannot cast \"" << ct->print(true) << "\" to \"" << start->get_type()->print(true) << "\" in foreach";
+                colon = error(ss.str());
             }
             
             if (start->is_binary() && start->as_binary().op == Symbol::SYMDECL) {
@@ -1255,7 +1303,7 @@ ast* parser::returnstmt() {
                         break;
                     }
                     if (!uncomb.types[j]->can_weak_cast(rcomb.types[i])) {
-                        un.node = error("Cannot cast return type to function return type");
+                        un.node = operator_error(Symbol::ASSIGN, rcomb.types[i], uncomb.types[j]);
                         break;
                     }
                     
@@ -1283,19 +1331,21 @@ ast* parser::returnstmt() {
                 if (i >= rcomb.types.size()) {
                     un.node = error("Return type not found");
                 } else if (!un.t->can_weak_cast(rcomb.types[i])) {
-                    un.node = error("Cannot cast return type to function return type");
+                    un.node = operator_error(Symbol::ASSIGN, rcomb.types[i], un.t);
                 }
                 ++i;
                 while (i < rcomb.types.size() && rcomb.types[i] == types.t_sig) {
                     ++i;
                 }
                 if (i != rcomb.types.size()) {
-                    un.node = error("Only one return given when more were needed");
+                    std::stringstream ss{};
+                    ss << "Only " << i << " return type(s) given when " << rcomb.types.size() << " were needed";
+                    un.node = error(ss.str());
                 }
             }
         } else {
             if (!un.t->can_weak_cast(ret_type)) {
-                un.node = error("Cannot cast return type to function return type");
+                un.node = operator_error(Symbol::ASSIGN, ret_type, un.t);
             }
         }
     }
@@ -1416,9 +1466,7 @@ ast* parser::deferstmt() {
     compiler_assert(Keyword::DEFER);
     next(); // defer
     
-    ast* stmt = statement();
-    require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
-    next(); // ;
+    ast* stmt = statement(); // Semicolon handled by statement();
     return ast::unary(Symbol::KWDEFER, stmt);
 }
 
@@ -1632,7 +1680,7 @@ ast* parser::usingstmt() {
         st()->borrow(as, entry);
     }
     
-    return ast::unary(Symbol::KWUSING);
+    return ast::unary(Symbol::KWUSING, ast::symbol(entry));
 }
 
 ast* parser::namespacestmt() {
@@ -1849,7 +1897,7 @@ ast* parser::nntype(bool* endswitharray) {
     type constructed = *t;
     
     if (mods) {
-        constructed.flags = typemod();
+        constructed.flags = flags;
         t = types.get_or_add(constructed);
     }
     
@@ -3054,6 +3102,7 @@ ast* parser::assignment() {
     auto& rstmts = rhs->as_block().stmts;
     
     bool first{true};
+    bool done{false};
     
     std::vector<type*> lhtypes{};
     
@@ -3089,8 +3138,6 @@ ast* parser::assignment() {
         ass = c.as_symbol();
     }
     
-    // TODO Different assignments require different types
-    
     next(); // =
     
     u64 i{0};
@@ -3104,16 +3151,21 @@ ast* parser::assignment() {
             next(); // ,
         }
         
-        if (i >= lhtypes.size()) {
-            error("Too many assignments", epanic_mode::SEMICOLON);
-            break;
-        }
-        
         push_context();
-        ctx().expected = lhtypes[i];
+        if (i >= lhtypes.size()) {
+            // error("Too many assignments", epanic_mode::SEMICOLON);
+            done = true;
+            ctx().expected = types.t_let;
+        } else {
+            ctx().expected = lhtypes[i];
+        }
         auto cg = guard();
         
         ast* aexp = aexpression();
+        
+        if (done) {
+            continue;
+        }
         
         rstmts.push_back(aexp);
         
@@ -3121,14 +3173,21 @@ ast* parser::assignment() {
         if (t->is_combination()) {
             auto& comb = t->as_combination().types;
             for (type* ct : comb) {
-                if (!ct->can_weak_cast(lhtypes[i++])) {
-                    error("Cannot cast expression to assign");
+                type* restype = get_result_type(ass, lhtypes[i++], t);
+                if (!restype) {
+                    operator_error(ass, lhtypes[i - 1], t);
                     continue;
+                }
+                
+                if (i >= lhtypes.size()) {
+                    done = true;
+                    break;
                 }
             }
         } else {
-            if (!t->can_weak_cast(lhtypes[i++])) {
-                error("Cannot cast expression to assign");
+            type* restype = get_result_type(ass, lhtypes[i++], t);
+            if (!restype) {
+                operator_error(ass, lhtypes[i - 1], t);
                 continue;
             }
         }
@@ -3254,9 +3313,13 @@ ast* parser::e17() {
         next(); // :
         ast* no = e17();
         if (!exp->get_type()->can_boolean()) {
-            error("Ternary condition cannot be converted to boolean");
+            std::stringstream ss{};
+            ss << "Ternary condition of type \"" << exp->get_type()->print(true) << "\" cannot be converted to boolean";
+            error(ss.str());
         } else if (!yes->get_type()->is_weak_equalish(no->get_type())) {
-            error("Both sides of the ternary expression must return the same type");
+            std::stringstream ss{};
+            ss << "Types \"" << yes->get_type()->print(true) << "\" and \"" << no->get_type()->print(true) << "\" of ternary condition results are not compatible";
+            error(ss.str());
         }
         ast* block = ast::block(st());
         block->as_block().stmts.push_back(yes);
@@ -3271,10 +3334,12 @@ ast* parser::e16() {
     while (is(Symbol::LXOR)) {
         next(); // ^^
         ast* to = e15();
-        if (!exp->get_type()->can_boolean() || !to->get_type()->can_boolean()) {
-            error("Cannot perform logical XOR on non-booleanable types");
+        type* restype = get_result_type(Symbol::LXOR, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(Symbol::LXOR, exp->get_type(), to->get_type());
+            restype = types.t_bool;
         }
-        exp = ast::binary(Symbol::LXOR, exp, to, types.t_bool);        
+        exp = ast::binary(Symbol::LXOR, exp, to, restype);        
     }
     return exp;
 }
@@ -3284,10 +3349,12 @@ ast* parser::e15() {
     while (is(Symbol::LOR)) {
         next(); // ||
         ast* to = e14();
-        if (!exp->get_type()->can_boolean() || !to->get_type()->can_boolean()) {
-            error("Cannot perform logical OR on non-booleanable types");
+        type* restype = get_result_type(Symbol::LOR, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(Symbol::LOR, exp->get_type(), to->get_type());
+            restype = types.t_bool;
         }
-        exp = ast::binary(Symbol::LOR, exp, to, types.t_bool);        
+        exp = ast::binary(Symbol::LOR, exp, to, restype);        
     }
     return exp;
 }
@@ -3296,11 +3363,13 @@ ast* parser::e14() {
     ast* exp = e13();
     while (is(Symbol::LAND)) {
         next(); // &&
-        ast* to = e13();
-        if (!exp->get_type()->can_boolean() || !to->get_type()->can_boolean()) {
-            error("Cannot perform logical AND on non-booleanable types");
+        ast* to = e14();
+        type* restype = get_result_type(Symbol::LAND, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(Symbol::LAND, exp->get_type(), to->get_type());
+            restype = types.t_bool;
         }
-        exp = ast::binary(Symbol::LAND, exp, to, types.t_bool);
+        exp = ast::binary(Symbol::LAND, exp, to, restype);
     }
     return exp;
 }
@@ -3311,10 +3380,12 @@ ast* parser::e13() {
         Symbol sym = c.as_symbol();
         next(); // == !=
         ast* to = e12();
-        if (!type::weak_cast_target(exp->get_type(), to->get_type())) {
-            error("Incompatible types");
+        type* restype = get_result_type(sym, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(sym, exp->get_type(), to->get_type());
+            restype = types.t_bool;
         }
-        exp = ast::binary(sym, exp, to, types.t_bool);
+        exp = ast::binary(sym, exp, to, restype);
     }
     return exp;
 }
@@ -3325,13 +3396,12 @@ ast* parser::e12() {
         Symbol sym = c.as_symbol();
         next(); // < > <= >=
         ast* to = e11();
-        if (!type::weak_cast_target(exp->get_type(), to->get_type())) {
-            error("Cannot compare order of incompatible types");
-        } else if (!exp->get_type()->is_numeric() && !exp->get_type()->is_primitive(etype_ids::STRING) && 
-                   !exp->get_type()->is_primitive(etype_ids::CHAR)) {
-            error("Cannot compare order of non-numbers or non-string-likes");
+        type* restype = get_result_type(sym, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(sym, exp->get_type(), to->get_type());
+            restype = types.t_bool;
         }
-        exp = ast::binary(sym, exp, to, types.t_bool);
+        exp = ast::binary(sym, exp, to, restype);
     }
     return exp;
 }
@@ -3341,10 +3411,12 @@ ast* parser::e11() {
     while (is(Symbol::XOR)) {
         next(); // ^
         ast* to = e10();
-        if (!exp->get_type()->is_integer() || !to->get_type()->is_integer()) {
-            error("Cannot perform XOR on non-integer types");
+        type* restype = get_result_type(Symbol::XOR, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(Symbol::XOR, exp->get_type(), to->get_type());
+            restype = type::weak_cast_result(exp->get_type(), to->get_type());
         }
-        exp = ast::binary(Symbol::XOR, exp, to, type::weak_cast_result(exp->get_type(), to->get_type()));        
+        exp = ast::binary(Symbol::XOR, exp, to, restype);
     }
     return exp;
 }
@@ -3354,10 +3426,12 @@ ast* parser::e10() {
     while (is(Symbol::OR)) {
         next(); // |
         ast* to = e9();
-        if (!exp->get_type()->is_integer() || !to->get_type()->is_integer()) {
-            error("Cannot perform OR on non-integer types");
+        type* restype = get_result_type(Symbol::XOR, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(Symbol::OR, exp->get_type(), to->get_type());
+            restype = type::weak_cast_result(exp->get_type(), to->get_type());
         }
-        exp = ast::binary(Symbol::OR, exp, to, type::weak_cast_result(exp->get_type(), to->get_type()));        
+        exp = ast::binary(Symbol::OR, exp, to, restype);        
     }
     return exp;
 }
@@ -3367,10 +3441,12 @@ ast* parser::e9() {
     while (is(Symbol::AND)) {
         next(); // &
         ast* to = e8();
-        if (!exp->get_type()->is_integer() || !to->get_type()->is_integer()) {
-            error("Cannot perform AND on non-integer types");
+        type* restype = get_result_type(Symbol::XOR, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(Symbol::AND, exp->get_type(), to->get_type());
+            restype = type::weak_cast_result(exp->get_type(), to->get_type());
         }
-        exp = ast::binary(Symbol::AND, exp, to, type::weak_cast_result(exp->get_type(), to->get_type()));
+        exp = ast::binary(Symbol::AND, exp, to, restype);
     }
     return exp;
 }
@@ -3381,10 +3457,12 @@ ast* parser::e8() {
         Symbol sym = c.as_symbol();
         next(); // @| @& @? @^
         ast* to = e7();
-        if (!exp->get_type()->is_integer() || !to->get_type()->is_integer()) {
-            error("Cannot perform bit manipulation on non-integer types");
+        type* restype = get_result_type(sym, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(sym, exp->get_type(), to->get_type());
+            restype = sym == Symbol::BIT_CHECK ? types.t_bool : exp->get_type();
         }
-        exp = ast::binary(sym, exp, to, sym == Symbol::BIT_CHECK ? types.t_bool : exp->get_type());
+        exp = ast::binary(sym, exp, to, restype);
     }
     return exp;
 }
@@ -3395,10 +3473,12 @@ ast* parser::e7() {
         Symbol sym = c.as_symbol();
         next(); // << >> <<< >>>
         ast* to = e6();
-        if (!exp->get_type()->is_integer() || !to->get_type()->is_integer()) {
-            error("Cannot perform bit manipulation on non-integer types");
+        type* restype = get_result_type(sym, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(sym, exp->get_type(), to->get_type());
+            restype = exp->get_type();
         }
-        exp = ast::binary(sym, exp, to, exp->get_type());
+        exp = ast::binary(sym, exp, to, restype);
     }
     return exp;
 }
@@ -3409,25 +3489,12 @@ ast* parser::e6() {
         Symbol sym = c.as_symbol();
         next(); // + - ..
         ast* to = e6();
-        if (sym == Symbol::CONCATENATE) {
-            if (exp->get_type()->is_pointer(eptr_type::ARRAY)) {
-                type* arrel = exp->get_type()->as_pointer().t;
-                if (!(to->get_type()->is_pointer(eptr_type::ARRAY) && to->get_type() == exp->get_type()) && !to->get_type()->can_weak_cast(arrel)) {
-                    error("Cannot concatenate element to array");
-                }
-            } else if (exp->get_type()->is_primitive(etype_ids::STRING)) {
-                type* tt = to->get_type();
-                if (!tt->is_numeric() && !tt->is_primitive(etype_ids::STRING) && !tt->is_primitive(etype_ids::CHAR)) {
-                    error("Cannot concatenate element to string");
-                }
-            }
-            exp = ast::binary(sym, exp, to, exp->get_type());
-        } else {
-            if (!exp->get_type()->is_numeric() || !to->get_type()->is_numeric()) {
-                error("Cannot perform arithmetic on non-numeric types");
-            }
-            exp = ast::binary(sym, exp, to, type::weak_cast_result(exp->get_type(), to->get_type()));
+        type* restype = get_result_type(sym, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(sym, exp->get_type(), to->get_type());
+            restype = sym == Symbol::CONCATENATE ? exp->get_type() : type::weak_cast_result(exp->get_type(), to->get_type());
         }
+        exp = ast::binary(sym, exp, to, restype);
     }
     return exp;
 }
@@ -3438,16 +3505,12 @@ ast* parser::e5() {
         Symbol sym = c.as_symbol();
         next(); // * / %
         ast* to = e4();
-        if (sym == Symbol::MODULO) {
-            if (!exp->get_type()->is_integer() || !to->get_type()->is_integer()) {
-                error("Cannot perform modulo on non-integer types");
-            }
-        } else {
-            if (!exp->get_type()->is_numeric() || !to->get_type()->is_numeric()) {
-                error("Cannot perform arithmetic on non-numeric types");
-            }
+        type* restype = get_result_type(sym, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(sym, exp->get_type(), to->get_type());
+            restype = sym == Symbol::MODULO ? exp->get_type() : type::weak_cast_result(exp->get_type(), to->get_type());
         }
-        exp = ast::binary(sym, exp, to, sym == Symbol::MODULO ? exp->get_type() : type::weak_cast_result(exp->get_type(), to->get_type()));
+        exp = ast::binary(sym, exp, to, restype);
     }
     return exp;
 }
@@ -3457,10 +3520,12 @@ ast* parser::e4() {
     if (is(Symbol::POWER)) {
         next();
         ast* to = e4();
-        if (!exp->get_type()->is_numeric() || !to->get_type()->is_numeric()) {
-            error("Cannot perform arithmetic on non-numeric types");
+        type* restype = get_result_type(Symbol::POWER, exp->get_type(), to->get_type());
+        if (!restype) {
+            operator_error(Symbol::POWER, exp->get_type(), to->get_type());
+            restype = types.t_double;
         }
-        exp = ast::binary(Symbol::POWER, exp, to, types.t_double);
+        exp = ast::binary(Symbol::POWER, exp, to, restype);
     }
     return exp;
 }
@@ -3470,50 +3535,47 @@ ast* parser::e3() {
         Symbol sym = c.as_symbol();
         next(); // ++ -- + - ~ ! !! @ *
         ast* exp = e3();
-        type* etype{exp->get_type()};
+        type* etype = get_result_type(sym, exp->get_type());
+        if (!etype) {
+            operator_error(sym, exp->get_type(), false);
+        }
         bool assignable{false};
         switch (sym) {
             case Symbol::INCREMENT: [[fallthrough]];
             case Symbol::DECREMENT: 
-                if (!exp->get_type()->is_integer() || !exp->is_assignable()) {
-                    error("Cannot increment or decrement non-integers");
+                if (!etype) {
+                    etype = exp->get_type();
                 }
                 break;
             case Symbol::ADD: [[fallthrough]];
             case Symbol::SUBTRACT: 
-                if (!exp->get_type()->is_numeric()) {
-                    error("Cannot sign non-numbers");
+                if (!etype) {
+                    etype = exp->get_type();
                 }
                 break;
             case Symbol::LENGTH:
-                if (!exp->get_type()->is_pointer(eptr_type::ARRAY) && !exp->get_type()->is_primitive(etype_ids::STRING)) {
-                    error("Cannot get length of non-string non-array");
+                if (!etype) {
+                    etype = types.t_long;
                 }
-                etype = types.t_long;
                 break;
             case Symbol::NOT: 
-                if (!exp->get_type()->is_integer()) {
-                    error("Cannot perform bitwise NOT on non-numbers");
+                if (!etype) {
+                    etype = exp->get_type();
                 }
                 break;
             case Symbol::LNOT:
-                if (!exp->get_type()->can_boolean()) {
-                    error("Cannot perform logical NOT on non-booleanable type");
+                if (!etype) {
+                    etype = types.t_bool;
                 }
-                etype = types.t_bool;
                 break;
             case Symbol::AT:
-                if (!exp->get_type()->is_pointer()) {
-                    error("Cannot dereference non-pointer");
+                if (!etype) {
+                    etype = types.t_void;
                 } else {
-                    etype = exp->get_type()->as_pointer().t;
                     assignable = true;
                 }
                 break;
-            case Symbol::ADDRESS:
-                {
-                    etype = pointer_to(exp->get_type());
-                }
+            case Symbol::ADDRESS: // Cannot go wrong?
                 break;
             default:
                 error("How did we get here", epanic_mode::ULTRA_PANIC);
@@ -3532,11 +3594,15 @@ ast* parser::e3() {
         
         ast* from = e3();
         
-        if (!from->get_type()->can_cast(typ->get_type())) {
-            error("Impossible cast");
+        type* etype = get_result_type(Symbol::CAST, typ->get_type(), from->get_type());
+        if (!etype) {
+            std::stringstream ss{};
+            ss << "Cannot cast \"" << from->get_type()->print(true) << "\" to \"" << typ->get_type()->print(true) << "\"";
+            error(ss.str());
+            etype = typ->get_type();
         }
         
-        return ast::binary(Symbol::CAST, from, typ, typ->get_type());
+        return ast::binary(Symbol::CAST, from, typ, etype);
     } else {
         return e2();
     }
@@ -3547,7 +3613,7 @@ ast* parser::e2() {
     while (is(Symbol::SPREAD)) {
         next(); // ...
         if (!exp->get_type()->is_combination() && !exp->get_type()->is_pointer(eptr_type::ARRAY)) {
-            error("Cannot SPREAD non-arrays or non-function calls");
+            operator_error(Symbol::SPREAD, exp->get_type());
         }
         exp = ast::binary(Symbol::SPREAD, exp, exp, exp->get_type());
     }
@@ -3560,13 +3626,16 @@ ast* parser::e1() {
            is(Symbol::BRACKET_LEFT) || is(Symbol::ACCESS)) {
         Symbol sym = c.as_symbol();
         next(); // ++ -- ( [ .
+        type* restype{nullptr};
         switch (sym) {
             case Symbol::INCREMENT: [[fallthrough]];
             case Symbol::DECREMENT: 
-                if (!exp->get_type()->is_integer() || !exp->is_assignable()) {
-                    error("Cannot increment non-integer non-variable");
+                restype = get_result_type(sym, exp->get_type());
+                if (!restype) {
+                    operator_error(sym, exp->get_type());
+                    restype = exp->get_type();
                 }
-                exp = ast::unary(sym, exp, exp->get_type());
+                exp = ast::unary(sym, exp, restype);
                 break;
             case Symbol::PAREN_LEFT: {
                 ast* args = ast::block(st());
@@ -3736,7 +3805,14 @@ ast* parser::e1() {
                         }
                     }
                     
-                    if (i < params.size() && !(params[i].flags & eparam_flags::DEFAULTABLE) && !(params[i].flags & eparam_flags::SPREAD)) {
+                    u64 last_passed = 0;
+                    for (; last_passed < passed.size(); ++last_passed) {
+                        if (!passed[last_passed]) {
+                            break;
+                        }
+                    }
+                    
+                    if (last_passed < params.size() && !(params[last_passed].flags & eparam_flags::DEFAULTABLE) && !(params[last_passed].flags & eparam_flags::SPREAD)) {
                         error("Not enough arguments");
                     } 
                 } else if (exp->is_symbol() && exp->get_type() == types.t_fun) {
@@ -3774,7 +3850,7 @@ ast* parser::e1() {
                     if (!ol) {
                         error("Cannot find overload taking those parameters");
                         next(); // )
-                        rtype = types.t_nothing;
+                        rtype = types.t_void;
                         continue;
                     } else {
                         rtype = ol->t->as_function().rets;
@@ -3782,7 +3858,7 @@ ast* parser::e1() {
                 } else {
                     error("Cannot call non-function", epanic_mode::ESCAPE_PAREN);
                     next(); // )
-                    rtype = types.t_nothing;
+                    rtype = types.t_void;
                     continue;
                 }
                 
@@ -3796,14 +3872,12 @@ ast* parser::e1() {
                 ast* to = expression();
                 require(Symbol::BRACKET_RIGHT, epanic_mode::ESCAPE_BRACKET);
                 next(); // ]
-                if (!exp->get_type()->is_pointer(eptr_type::ARRAY)) {
-                    error("Can only index arrays");
-                    continue;
+                type* restype = get_result_type(Symbol::INDEX, exp->get_type(), to->get_type());
+                if (!restype) {
+                    operator_error(Symbol::INDEX, exp->get_type(), to->get_type());
+                    restype = exp->get_type()->is_pointer(eptr_type::ARRAY) ? exp->get_type()->as_pointer().t : types.t_void;
                 }
-                if (!to->get_type()->is_integer()) {
-                    error("Array index must be integral");
-                }
-                exp = ast::binary(Symbol::INDEX, exp, to, exp->get_type()->as_pointer().t, true);
+                exp = ast::binary(Symbol::INDEX, exp, to, restype, true);
                 break;
             }
             case Symbol::ACCESS: {
@@ -4152,3 +4226,210 @@ type* parser::pointer_to(type* to, eptr_type ptype, u64 size) {
     np.as_pointer().size = size;
     return types.get_or_add(np);
 }
+
+type* parser::get_result_type(Symbol op, type* t) {
+    switch (op) {
+        case Symbol::INCREMENT: [[fallthrough]];
+        case Symbol::DECREMENT: 
+            if (t->is_integer() || t->is_pointer()) {
+                return t;
+            } else {
+                return nullptr;
+            }
+        case Symbol::ADD:
+            if (t->is_numeric()) {
+                return t;
+            } else {
+                return nullptr;
+            }
+        case Symbol::SUBTRACT: 
+            if (t->is_numeric()) {
+                return t;
+            } else {
+                return nullptr;
+            }
+        case Symbol::LENGTH:
+            if (t->is_primitive(etype_ids::STRING) || t->is_pointer(eptr_type::ARRAY)) {
+                return types.t_long;
+            } else {
+                return nullptr;
+            }
+        case Symbol::NOT:
+            if (t->is_integer()) {
+                return t;
+            } else if (t->is_primitive(etype_ids::BOOL)) {
+                return types.t_bool;
+            } else {
+                return nullptr;
+            }
+        case Symbol::LNOT:
+            if (t->can_boolean()) {
+                return types.t_bool;
+            } else {
+                return nullptr;
+            }
+        case Symbol::AT:
+            if (t->is_pointer()) {
+                return t->as_pointer().t;
+            } else {
+                return nullptr;
+            }
+        case Symbol::POINTER:
+            return pointer_to(t);
+        default:
+            return nullptr;
+    }
+}
+
+type* parser::get_result_type(Symbol op, type* l, type* r) {
+    switch (op) {
+        case Symbol::FUN_CALL:
+            return nullptr;
+        case Symbol::INDEX:
+            if (l->is_pointer(eptr_type::ARRAY) && r->is_integer()) {
+                return l->as_pointer().t;
+            } else if (l->is_primitive(etype_ids::STRING) && r->is_integer()) {
+                return types.t_char;
+            } else {
+                return nullptr;
+            }
+        case Symbol::CAST:
+            if (r->can_cast(l)) {
+                return l;
+            } else {
+                return nullptr;
+            }
+        case Symbol::POWER:
+            if (l->is_numeric() && r->is_numeric()) {
+                return types.t_double;
+            } else {
+                return nullptr;
+            }
+        case Symbol::MULTIPLY: [[fallthrough]];
+        case Symbol::DIVIDE:
+            if (l->is_numeric() && r->is_numeric()) {
+                return type::weak_cast_result(l, r);
+            } else {
+                return nullptr;
+            }
+        case Symbol::MODULO:
+            if (l->is_numeric() && r->is_integer()) {
+                return l;
+            } else {
+                return nullptr;
+            }
+        case Symbol::ADD: [[fallthrough]];
+        case Symbol::SUBTRACT:
+            if (l->is_numeric() && r->is_numeric()) {
+                return type::weak_cast_result(l, r);
+            } else if ((l->is_pointer() ^ r->is_pointer()) && (l->is_numeric() ^ r->is_numeric())) {
+                return l->is_pointer() ? l : r;
+            } else {
+                return nullptr;
+            }
+        case Symbol::CONCATENATE:
+            if (l->is_primitive(etype_ids::STRING)) {
+                if (r->is_primitive(etype_ids::STRING) || r->is_primitive(etype_ids::CHAR)) {
+                    return l;
+                } else {
+                    return nullptr;
+                }
+            } else if (l->is_pointer(eptr_type::ARRAY)) {
+                type* lptr = l->as_pointer().t;
+                if (r->can_weak_cast(l) || r->can_weak_cast(lptr)) {
+                    return l;
+                } else {
+                    return nullptr;
+                }
+            } else {
+                return nullptr;
+            }
+        case Symbol::SHIFT_LEFT: [[fallthrough]];
+        case Symbol::SHIFT_RIGHT: [[fallthrough]];
+        case Symbol::ROTATE_LEFT: [[fallthrough]];
+        case Symbol::ROTATE_RIGHT:
+            if (l->is_integer() && r->is_integer()) {
+                return l;
+            } else {
+                return nullptr;
+            }
+        case Symbol::BIT_SET: [[fallthrough]];
+        case Symbol::BIT_CLEAR: [[fallthrough]];
+        case Symbol::BIT_TOGGLE:
+            if (l->is_integer() && r->is_integer()) {
+                return l;
+            } else {
+                return nullptr;
+            }
+        case Symbol::BIT_CHECK:
+            if (l->is_integer() && r->is_integer()) {
+                return types.t_bool;
+            } else {
+                return nullptr;
+            }
+        case Symbol::AND: [[fallthrough]];
+        case Symbol::OR: [[fallthrough]];
+        case Symbol::XOR:
+            if ((l->is_integer() && r->is_integer()) || (l->is_primitive(etype_ids::BOOL) && r->is_primitive(etype_ids::BOOL))) {
+                return l;
+            } else {
+                return nullptr;
+            }
+        case Symbol::LESS: [[fallthrough]];
+        case Symbol::GREATER: [[fallthrough]];
+        case Symbol::LESS_OR_EQUALS: [[fallthrough]];
+        case Symbol::GREATER_OR_EQUALS: 
+            if ((l->is_numeric() && r->is_numeric()) || 
+                (l->is_primitive(etype_ids::CHAR) && r->is_primitive(etype_ids::CHAR)) || 
+                (l->is_primitive(etype_ids::STRING) && r->is_primitive(etype_ids::STRING))) {
+                return types.t_bool;
+            } else {
+                return nullptr;
+            }
+        case Symbol::EQUALS: [[fallthrough]];
+        case Symbol::NOT_EQUALS:
+            if (type::weak_cast_result(l, r)) {
+                return types.t_bool;
+            } else {
+                return nullptr;
+            }
+        case Symbol::LAND: [[fallthrough]];
+        case Symbol::LOR: [[fallthrough]];
+        case Symbol::LXOR:
+            if (l->can_boolean() && r->can_boolean()) {
+                return types.t_bool;
+            } else {
+                return nullptr;
+            }
+        case Symbol::ASSIGN: 
+            if (r->can_weak_cast(l) && ((l->flags & etype_flags::CONST) == 0)) {
+                return l;
+            } else {
+                return nullptr;
+            }
+        case Symbol::ADD_ASSIGN: [[fallthrough]];
+        case Symbol::SUBTRACT_ASSIGN: [[fallthrough]];
+        case Symbol::MULTIPLY_ASSIGN: [[fallthrough]];
+        case Symbol::POWER_ASSIGN: [[fallthrough]];
+        case Symbol::DIVIDE_ASSIGN: [[fallthrough]];
+        case Symbol::AND_ASSIGN: [[fallthrough]];
+        case Symbol::OR_ASSIGN: [[fallthrough]];
+        case Symbol::XOR_ASSIGN: [[fallthrough]];
+        case Symbol::SHIFT_LEFT_ASSIGN: [[fallthrough]];
+        case Symbol::SHIFT_RIGHT_ASSIGN: [[fallthrough]];
+        case Symbol::ROTATE_LEFT_ASSIGN: [[fallthrough]];
+        case Symbol::ROTATE_RIGHT_ASSIGN: [[fallthrough]];
+        case Symbol::CONCATENATE_ASSIGN: [[fallthrough]];
+        case Symbol::BIT_SET_ASSIGN: [[fallthrough]];
+        case Symbol::BIT_CLEAR_ASSIGN: [[fallthrough]];
+        case Symbol::BIT_TOGGLE_ASSIGN:
+            if (type* t = get_result_type(without_assign(op), l, r)) {
+                return get_result_type(Symbol::ASSIGN, l, t);
+            } else {
+                return nullptr;
+            }
+        default:
+            return nullptr;
+    }
+}
+

@@ -122,6 +122,8 @@ struct st_entry {
     bool is_label();
     
     type* get_type();
+    
+    std::string print(u64 depth = 0);
 };
 
 class symbol_table {
@@ -160,6 +162,7 @@ public:
     
     symbol_table* make_child(etable_owner new_owner = etable_owner::COPY);
     
+    std::string print(u64 depth = 0);
 private:
     symbol_table* parent;
     etable_owner owner;
