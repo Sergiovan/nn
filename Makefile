@@ -40,6 +40,11 @@ debug: $(target)
 release: CXXFLAGS += $(CXXRFLAGS)
 release: $(target)
 
+profile: CXXFLAGS += -pg
+profile: CXXFLAGS += $(CXXDFLAGS)
+profile: LDFLAGS += -pg
+profile: $(target)
+
 $(target): $(obj)
 	@echo [$(CXX)] $@
 	@$(CXX) $(LDFLAGS) -o $@ $(obj) $(LDLIBS)

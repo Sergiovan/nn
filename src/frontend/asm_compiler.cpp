@@ -14,90 +14,6 @@ asm_compiler::asm_compiler(const std::string& filename) : file(filename, std::io
     }
     
     ready = true;
-    
-    using namespace nnasm::op;
-    
-    auto add_instruction = [this](code c, operand op1 = OP_NONE, operand op2 = OP_NONE, operand op3 = OP_NONE) {
-        instructions[c].push_back({c, op1, op2, op3});
-    };
-    
-    auto add_any_instruction = [this](code c, int anies = 1) {
-        instruction_format inf{c, OP_ANY};
-        switch (anies) {
-            case 3:
-                inf.op3 = OP_ANY;
-                [[fallthrough]];
-            case 2:
-                inf.op2 = OP_ANY;
-                [[fallthrough]];
-            case 1:
-            default:
-                break;
-        }
-        instructions[c].push_back(inf);
-    };
-    
-    auto add_1op_arithmetic_instruction = [this](code c) {
-        instructions[c].push_back({c, OP_REG_ADDR});
-        instructions[c].push_back({c, OP_ANY, OP_REG_ADDR});
-    };
-    
-    auto add_2op_arithmetic_instruction = [this](code c) {
-        instructions[c].push_back({c, OP_ANY, OP_REG_ADDR});
-        instructions[c].push_back({c, OP_ANY, OP_ANY, OP_REG_ADDR});
-    };
-    
-    add_instruction(NOP);
-    add_instruction(MV, OP_ANY, OP_REG_ADDR);
-    add_instruction(CP, OP_REG_ADDR, OP_REG_ADDR, OP_ANY);
-    add_instruction(ZRO, OP_REG_ADDR, OP_ANY);
-    add_instruction(SET, OP_ANY, OP_REG_ADDR, OP_ANY);
-    add_instruction(BRK);
-    add_instruction(HLT);
-    
-    add_instruction(PUSH, OP_VAL);
-    add_instruction(PUSH, OP_REG);
-    add_instruction(PUSH, OP_ADDR, OP_ANY);
-    add_instruction(POP, OP_VAL);
-    add_instruction(POP, OP_ADDR, OP_ANY);
-    add_instruction(POP, OP_REG);
-    add_instruction(CALL, OP_VAL);
-    add_instruction(CALL, OP_REG_ADDR);
-    add_instruction(RET);
-    
-    add_any_instruction(JMP);
-    add_any_instruction(JZ, 2);
-    add_any_instruction(JNZ, 2);
-    add_any_instruction(JEQ, 3);
-    add_any_instruction(JNE, 3);
-    add_any_instruction(JL, 3);
-    add_any_instruction(JLE, 3);
-    add_any_instruction(JG, 3);
-    add_any_instruction(JGE, 3);
-    
-    add_1op_arithmetic_instruction(INC);
-    add_1op_arithmetic_instruction(DEC);
-    add_1op_arithmetic_instruction(ABS);
-    add_1op_arithmetic_instruction(NEG);
-    
-    add_2op_arithmetic_instruction(ADD);
-    add_2op_arithmetic_instruction(SUB);
-    add_2op_arithmetic_instruction(MUL);
-    add_2op_arithmetic_instruction(DIV);
-    add_2op_arithmetic_instruction(MOD);
-    add_2op_arithmetic_instruction(SHR);
-    add_2op_arithmetic_instruction(SHL);
-    add_2op_arithmetic_instruction(RTR);
-    add_2op_arithmetic_instruction(RTL);
-    add_2op_arithmetic_instruction(AND);
-    add_2op_arithmetic_instruction(OR);
-    add_2op_arithmetic_instruction(XOR);
-    add_2op_arithmetic_instruction(NOT);
-    
-    add_instruction(VAL, OP_IDN, OP_VAL);
-    add_instruction(DB, OP_IDN, OP_VAL);
-    add_instruction(DBS, OP_IDN, OP_VAL);
-    add_instruction(LBL, OP_IDN);
 }
 
 void asm_compiler::compile() {
@@ -154,9 +70,10 @@ void asm_compiler::compile() {
         OPERAND_INVALID, REGISTER_INVALID, SIZE_INVALID, VALUE_INVALID,
         RAW_INVALID,
         
-        ADDRESS_INCOMPLETE,
+        ADDRESS_INCOMPLETE, VALUE_INCOMPLETE, 
         
-        REGISTER, ADDRESS, SIZE, INTEGER, REAL
+        UNSIGNED_REGISTER, SIGNED_REGISTER, FLOAT_REGISTER, 
+        ADDRESS, SIZE, UNSIGNED_INTEGER, SIGNED_INTEGER, REAL
     };
     
     auto number_to_raw = [](auto n) {
@@ -177,11 +94,20 @@ void asm_compiler::compile() {
         std::regex real{"^-?[0-9]+\\.[0-9]+(_(d|f))?$"};
         switch (data[0]) {
             case '$': { // Register
-                std::regex reg{"^\\$r([a-n]|pc|sp)(64|s|8s?|16s?|32s?|f|d)?$"};
+                std::regex reg{"^\\$(r[a-m]|pc|sp|sf)(64|s|8s?|16s?|32s?|f|d)?$"};
                 if (!std::regex_match(data, reg)) {
                     return operand_type::REGISTER_INVALID;
+                } else if (data.length() > 3) {
+                    if (data.back() == 's') {
+                        return operand_type::SIGNED_REGISTER;
+                    } else if (data.back() == 'f' || data.back() == 'd') {
+                        return operand_type::FLOAT_REGISTER;
+                    } else {
+                        return operand_type::UNSIGNED_REGISTER;
+                    }
+                } else {
+                    return operand_type::UNSIGNED_REGISTER;
                 }
-                return operand_type::REGISTER;
             }
             case '@': { // Address
                 std::string raddr = data.substr(1);
@@ -210,13 +136,30 @@ void asm_compiler::compile() {
                 }
                 return check_format(value->second);
             }
-            default: {
+            case '1': [[fallthrough]];
+            case '2': [[fallthrough]];
+            case '3': [[fallthrough]];
+            case '4': [[fallthrough]];
+            case '5': [[fallthrough]];
+            case '6': [[fallthrough]]; 
+            case '7': [[fallthrough]];
+            case '8': [[fallthrough]];
+            case '9': [[fallthrough]];
+            case '0': {
                 if (std::regex_match(data, real)) {
                     return operand_type::REAL;
                 } else if (std::regex_match(data, integer)) {
-                    return operand_type::INTEGER;
+                    bool sign = data.find_first_of("-s") != std::string::npos;
+                    return sign ? operand_type::SIGNED_INTEGER : operand_type::UNSIGNED_INTEGER;
                 } else {
                     return operand_type::RAW_INVALID;
+                }
+            }
+            default: {
+                if (labels.find(data) == labels.end()) {
+                    return operand_type::VALUE_INCOMPLETE;
+                } else {
+                    return operand_type::UNSIGNED_INTEGER;
                 }
             }
         }
@@ -230,14 +173,14 @@ void asm_compiler::compile() {
         }
         switch (data[0]) {
             case '$': { // Register
+                std::string rname = data.substr(1, 2);
                 u8 val = 0;
-                u8 end = 3;
-                if (data[2] == 's') {
+                if (rname == "sp"s) {
                     val = 15;
-                    end = 4;
-                } else if (data[2] == 'p') {
+                } else if (rname == "sf"s) {
                     val = 14;
-                    end = 4;
+                } else if (rname == "pc"s) {
+                    val = 13;
                 } else {
                     val = data[2] - 'a';
                 }
@@ -245,21 +188,21 @@ void asm_compiler::compile() {
                 std::string part = data;
                 if (sign) {
                     part = data.substr(0, data.length() - 1);
-                    val |= SIGNED;
+                    val |= REG_SIGNED;
                 } 
-                part = part.substr(end);
+                part = part.substr(3);
                 if (part == "8"s) {
-                    val |= BYTE;
+                    val |= REG_BYTE;
                 } else if (part == "16"s) {
-                    val |= WORD;
+                    val |= REG_WORD;
                 } else if (part == "32"s) {
-                    val |= DWORD;
+                    val |= REG_DWORD;
                 } else if (part == "f"s) {
-                    val |= FLOAT;
+                    val |= REG_FLOAT;
                 } else if (part == "d"s) {
-                    val |= DOUBLE;
+                    val |= REG_DOUBLE;
                 } else {
-                    val |= QWORD;
+                    val |= REG_QWORD;
                 }
                 return {val};
             }
@@ -284,7 +227,16 @@ void asm_compiler::compile() {
                 auto value = internal_values.find(data.substr(1));
                 return to_raw(value->second, force_64);
             }
-            default: {
+            case '1': [[fallthrough]];
+            case '2': [[fallthrough]];
+            case '3': [[fallthrough]];
+            case '4': [[fallthrough]];
+            case '5': [[fallthrough]];
+            case '6': [[fallthrough]]; 
+            case '7': [[fallthrough]];
+            case '8': [[fallthrough]];
+            case '9': [[fallthrough]];
+            case '0': {
                 u8 type = 3;
                 std::string number = data;
                 bool sign = false;
@@ -357,6 +309,14 @@ void asm_compiler::compile() {
                     }
                 }
             }
+            default: {
+                auto lbl = labels.find(data);
+                if (lbl == labels.end()) {
+                    return number_to_raw((u64) 0ull);
+                } else {
+                    return number_to_raw(lbl->second);
+                }
+            }
         }
     };
     
@@ -422,7 +382,7 @@ void asm_compiler::compile() {
                 do {
                     std::string value = until_space();
                     auto valtype = check_format(value);
-                    if (valtype != operand_type::INTEGER && valtype != operand_type::REAL) {
+                    if (valtype < operand_type::UNSIGNED_INTEGER && valtype > operand_type::REAL) {
                         error("Invalid value given");
                         fine = false;
                         break;
@@ -448,7 +408,7 @@ void asm_compiler::compile() {
                     continue;
                 }
                 skip_spaces();
-                std::vector<u8> data{};
+                std::vector<u8> data{}; // TODO this is all wrong
                 bool fine = true;
                 do {
                     std::string value = until_space();
@@ -496,7 +456,7 @@ void asm_compiler::compile() {
                         }
                     } else {
                         auto valtype = check_format(value);
-                        if (valtype != operand_type::INTEGER && valtype != operand_type::REAL) {
+                        if (valtype < operand_type::UNSIGNED_INTEGER && valtype > operand_type::REAL) {
                             error("Invalid value given");
                             fine = false;
                             break;
@@ -540,12 +500,14 @@ void asm_compiler::compile() {
         ins.code = opcode;
         
         addr += 2;
-        auto formats = instructions[opcode];
+        auto formats = nnasm::format::instructions.at(opcode);
         skip_spaces();
+        
+        using opformat = nnasm::format::operand_format;
         
         std::vector<u8> opdata{};
         std::string op[3];
-        operand optyp[3] {OP_NONE, OP_NONE, OP_NONE};
+        opformat optyp[3] {opformat::OP_NONE, opformat::OP_NONE, opformat::OP_NONE};
         for (int i = 0; i < 3; ++i) {
             if (file.peek() == ';' || file.peek() == '\n' || file.eof()) {
                 break;
@@ -560,91 +522,84 @@ void asm_compiler::compile() {
                 case operand_type::SIZE_INVALID: [[fallthrough]];
                 case operand_type::VALUE_INVALID: 
                     error("Invalid value");
-                    optyp[i] = OP_NONE;
+                    optyp[i] = opformat::OP_NONE;
                     break;
                 case operand_type::REGISTER_INVALID:
                     error("Invalid register");
-                    optyp[i] = OP_NONE;
+                    optyp[i] = opformat::OP_NONE;
                     break;
                 case operand_type::ADDRESS_INCOMPLETE:
-                    optyp[i] = OP_ADDR;
+                    optyp[i] = opformat::OP_ADDR;
                     unfinished.push_back({addr, op[i].substr(1)});
                     addr += 8;
                     break;
+                case operand_type::VALUE_INCOMPLETE:
+                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_UINT;
+                    unfinished.push_back({addr, op[i]});
+                    addr += 8;
+                    break;
                 case operand_type::ADDRESS:
-                    optyp[i] = OP_ADDR;
+                    optyp[i] = opformat::OP_ADDR;
                     addr += 8;
                     break;
                 case operand_type::REAL:
-                    switch (opcode) {
-                        case ADD:
-                            ins.code = ADDF;
-                            break;
-                        case SUB:
-                            ins.code = SUBF;
-                            break;
-                        case MUL:
-                            ins.code = MULF;
-                            break;
-                        case DIV:
-                            ins.code = ADDF;
-                            break;
-                        case MOD:
-                            ins.code = MODF;
-                            break;
-                        case ABS:
-                            ins.code = ABSF;
-                            break;
-                        case NEG:
-                            ins.code = NEGF;
-                            break;
-                        case MV:
-                            break;
-                        default:
-                            error("Cannot use real values with this opcode");
-                            optyp[i] = OP_NONE;
-                            break;
-                    }
-                    optyp[i] = OP_VAL;
+                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_FLOAT;
                     addr += 8;
                     break;
-                case operand_type::INTEGER: [[fallthrough]];
+                case operand_type::SIGNED_INTEGER: 
+                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_SINT;
+                    addr += 8;
+                    break;
+                case operand_type::UNSIGNED_INTEGER: [[fallthrough]];
                 case operand_type::SIZE:
-                    optyp[i] = OP_VAL;
+                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_UINT;
                     addr += 8;
                     break;
-                case operand_type::REGISTER:
-                    optyp[i] = OP_REG;
+                case operand_type::SIGNED_REGISTER:
+                    optyp[i] = opformat::OP_REG | opformat::OP_FLAGS_SINT;
+                    ++addr;
+                    break;                    
+                case operand_type::UNSIGNED_REGISTER:
+                    optyp[i] = opformat::OP_REG | opformat::OP_FLAGS_UINT;
+                    ++addr;
+                    break;
+                case operand_type::FLOAT_REGISTER:
+                    optyp[i] = opformat::OP_REG | opformat::OP_FLAGS_FLOAT;
                     ++addr;
                     break;
             }
             
-            if (optyp[i] != OP_NONE) {
+            if (optyp[i] != opformat::OP_NONE) {
                 auto val = to_raw(op[i], true);
                 opdata.insert(opdata.end(), val.begin(), val.end());
             }
         }
         
-        ins.op1 = optyp[0];
-        ins.op2 = optyp[1];
-        ins.op3 = optyp[2];
+        ins.op1 = (optyp[0] & opformat::OP_TYPE) == opformat::OP_ADDR ? OP_ADDR : (optyp[0] & opformat::OP_TYPE);
+        ins.op2 = (optyp[1] & opformat::OP_TYPE) == opformat::OP_ADDR ? OP_ADDR : (optyp[1] & opformat::OP_TYPE);
+        ins.op3 = (optyp[2] & opformat::OP_TYPE) == opformat::OP_ADDR ? OP_ADDR : (optyp[2] & opformat::OP_TYPE);
         
         bool found = false;
         
-        constexpr auto complies = [](operand inst, operand form){
-            if (inst == form) {
-                return true;
-            } else if (form == OP_ANY && inst != OP_NONE) {
-                return true;
-            } else if (form == OP_REG_ADDR && (inst == OP_REG || inst == OP_ADDR)) {
-                return true;
-            } else {
+        constexpr auto complies = [](opformat inst, opformat form) {
+            if (form == opformat::OP_NONE) {
+                return inst == opformat::OP_NONE;
+            }
+            u8 instype = inst & opformat::OP_TYPE;
+            u8 insflags = inst & opformat::OP_FLAGS;
+            u8 type_complies = instype & form;
+            u8 flag_complies = insflags & form;
+            if (!type_complies) {
                 return false;
             }
+            if ((form & opformat::OP_FLAGS) && !flag_complies) {
+                return false;
+            }
+            return true;
         };
         
         for (auto& format : formats) {
-            if (complies((operand) ins.op1, format.op1) && complies((operand) ins.op2, format.op2) && complies((operand) ins.op3, format.op3)) {
+            if (complies(optyp[0], format.op1) && complies(optyp[1], format.op2) && complies(optyp[2], format.op3)) {
                 found = true;
                 break;
             }

@@ -13,16 +13,17 @@
 VAL num 0x9
 
 LBL fib
-MV 0 $ra
-MV 0 $rb
-MV 1 $rc
+MOV 0 $ra
+MOV 0 $rb
+MOV 1 $rc
 LBL while_cond
-	JL $ra <num @while_body
+	CLT $ra <num
+	JCH while_body
 	HLT
 
 LBL while_body
-	MV $rc $rd
+	MOV $rc $rd
 	ADD $rb $rc
-	MV $rd $rb
+	MOV $rd $rb
 	ADD 1 $ra
-	JMP @while_cond
+	JMP while_cond

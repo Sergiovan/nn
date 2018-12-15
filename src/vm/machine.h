@@ -36,8 +36,8 @@ private:
     vmregister& rk = registers[10];
     vmregister& rl = registers[11];
     vmregister& rm = registers[12];
-    vmregister& rn = registers[13];
-    vmregister& pc = registers[14];
+    vmregister& pc = registers[13];
+    vmregister& sf = registers[14];
     vmregister& sp = registers[15];
     
     u8* memory{nullptr};

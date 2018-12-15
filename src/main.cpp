@@ -17,7 +17,7 @@
 int main(int argc, char** argv) {
     
     auto start = std::chrono::high_resolution_clock::now();
-    asm_compiler asmc{"examples/fib.nna"};
+    asm_compiler asmc{"examples/pithagoras.nna"};
     asmc.compile();
     auto end = std::chrono::high_resolution_clock::now();
     

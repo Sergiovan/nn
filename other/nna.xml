@@ -24,7 +24,7 @@
             <Keywords name="Folders in comment, open"></Keywords>
             <Keywords name="Folders in comment, middle"></Keywords>
             <Keywords name="Folders in comment, close"></Keywords>
-            <Keywords name="Keywords1">NOP MV CP ZRO SET BRK HLT JMP JZ JNZ JEQ JNE JL JLE JG JGE CALL RET ADD INC SUB DEC MUL DIV MOD ABS NEG SHR SHL RTR RTL AND OR XOR NOT</Keywords>
+            <Keywords name="Keywords1">NOP MOV MVI CPY ZRO SET BRK HLT CZRO CNZR CEQ CNEQ CLT CLTS CLTF CLE CLES CLEF CGT CGTS CGTF CGE CGES CGEF CBS CBNS JMP JMPR JCH JNCH PUSH POP CALL RET DRF IDX ADD INC SUB DEC MUL DIV MOD ABS NEG SHR SHL RTR RTL AND OR XOR NOT ADDS INCS SUBS DECS MULS DIVS MODS ABSS NEGS SHRS SHLS ADDF SUBF MULF DIVF MODF ABSF NEGF </Keywords>
             <Keywords name="Keywords2">VAL DB DBS LBL</Keywords>
             <Keywords name="Keywords3">$</Keywords>
             <Keywords name="Keywords4">@</Keywords>
