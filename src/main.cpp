@@ -12,7 +12,16 @@
 #include "common/ast.h"
 #include "frontend/parser.h"
 
+#include "frontend/asm_compiler.h"
+
 int main(int argc, char** argv) {
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    asm_compiler asmc{"examples/fib.nna"};
+    asmc.compile();
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    /*
     parser p{};
     
     auto start = std::chrono::high_resolution_clock::now();
@@ -25,7 +34,7 @@ int main(int argc, char** argv) {
     } else {
         p.print_info();
     }
-    
+    */
     /*
     reader* r = reader::from_file("examples/mastermind2.nn");
     lexer  l{r};

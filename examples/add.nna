@@ -1,0 +1,7 @@
+DB num1 3_8
+DB num2 5_8
+LBL program_start ; Begin of program
+MV @num1 $ra8
+MV @num2 $rb8
+ADD $ra8 $rb8 $rc8
+HLT 

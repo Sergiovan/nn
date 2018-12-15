@@ -1,0 +1,26 @@
+DB a 3_8
+DB b 4_8
+DB c 0_8
+LBL program_start ; Begin of program
+MV @a $ra8
+MUL $ra8 $ra8 ; a^2
+MV @b $rb8
+MUL $rb8 $rb8 ; b^2 
+ADD $rb8 $ra8 ; a^2 + b^2
+CALL @sqrt8
+MV $ra8 @c
+HLT
+LBL sqrt8 ; byte sqrt(byte n)
+MV $ra8 $rb8 ; byte x = n
+SHR 1_8 $ra8 $rc8 ; byte e = n >> 1
+MV 0 $rd8 ; byte i = 0
+LBL loop_start ; while (i < e)
+JGE $rc8 $rd8 @loop_end
+DIV $rb8 $ra8 $re8 ; _ = n / x
+ADD $rb8 $re8 ; _ = _ + x
+SHR 1_8 $rb8 ; x = _ >> 1
+INC $rd8 ; ++i
+JMP @loop_start
+LBL loop_end ; while end
+MV $rb8 $ra8
+RET

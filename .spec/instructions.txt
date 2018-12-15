@@ -1,0 +1,91 @@
+Registers: 
+14 + program counter + stack pointer.
+Named A-N.
+Program counter named PC.
+Stack pointer named SP.
+Can hold 8 bytes each.
+Register names are prefixed by r and suffixed with one of the following:
+- Nothing: 8 bytes.
+- s: 8 bytes. Signed.
+- 64: 8 bytes.
+- 64s: 8 bytes. Signed.
+- 8: First byte.
+- 8s: First byte. Signed.
+- 16: First 2 bytes.
+- 16s: First 2 bytes. Signed.
+- 32: First 4 bytes.
+- 32s: First 4 bytes. Signed.
+- f: Float, 4 bytes.
+- d: Double, 8 bytes.
+
+Instructions:
+All instructions take at least 2 bytes. Operands may take more bytes. First 10 bits are instruction, then 6 bits for operand flags.
+<reg> = Any register. 1 byte. Preceeded by $.
+<val> = Any value. 8 bytes. Can be suffexed with _64, _64s, s, _8, _8s, _16, _16s, _32, _32s, _f or _d to indicate type and sign.
+<addr> = Any valid address or identifier. 8 bytes. Preceded by @.
+<idn> = An identifier. No quotes.
+<x,y> = x or y.
+<any> = Anything.
+<:x> = Exactly x bytes.
+<:x+> = x or more bytes.
+<:x-> = x or less bytes.
+<>? = Optional.
+
+~~ General ~~
+General instructions.
+NOP - No operation.
+MV <any> <reg,addr> - Copy value of op1 to op2.
+CP <reg,addr> <reg,addr> <any> - Copy op3 bytes from location op1 to op2.
+ZRO - <reg,addr> <any> - Zero op2 bytes at location op1.
+SET - <any:1> <reg,addr> <any> - Set op3 bytes at location op2 to value op1.
+BRK - Break and jump to debugger.
+HLT - Stops the program.
+
+~~ Flow control ~~
+Instructions to jump around the program.
+JMP <any> - Copy value of op1 to program counter.
+JZ <any> <any> - If op1 is zero, jump to op2.
+JNZ <any> <any> - If op1 is not zero, jump to op2.
+JEQ <any> <any> <any> - If op1 equals op2, jump to op3.
+JNE <any> <any> <any> - If op1 does not equal op2, jump to op3.
+JL <any> <any> <any> - If op1 is less than op2, jump to op3.
+JLE <any> <any> <any> - If op1 is less or equal to op2, jump to op3.
+JG <any> <any> <any> - If op1 is greater than op2, jump to op3. 
+JGE <any> <any> <any> - If op1 is greater or equal than op2, jump to op3.
+
+~~ Stack ~~
+PUSH <val> - Push op1 onto the stack, move the stack pointer up by size of op1.
+PUSH <reg> - Push op1 onto the stack, move the stack pointer up by size of op1.
+PUSH <addr> <any> - Push op2 bytes from op1 onto the stack, move the stack pointer up by op2.
+POP <val> - Move the stack pointer down by op1 bytes.
+POP <addr> <any> - Pop op2 bytes from stack pointer to op1. Move stack pointer down op2 bytes.
+POP <reg> - Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
+CALL <val> - Call built-in function. Pushes pc + 1 onto stack.
+CALL <reg,addr> - Call function. Pushes pc + 1 onto stack.
+RET - Return from function. Pops from the stack to pc.
+
+~~ Arithmetic and bit manip ~~
+Instructions to perform arithmetic and bit manipulation. They all have a version with an extra parameter where the result is stored, instead of overwriting.
+ADD <any> <reg,addr> - Add op1 and op2. Store in op2.
+INC <reg,addr> - Increment op1.
+SUB <any> <reg,addr> - Subtract op1 from op2. Store in op2.
+DEC <reg,addr> - Decrement op2.
+MUL <any> <reg,addr> - Multiply op1 and op2. Store in op2.
+DIV <any> <reg,addr> - Divide op2 by op1. Store in op2.
+MOD <any> <reg,addr> - Divide op2 and op1. Store remainder in op2.
+ABS <reg,addr> - Get absolute value of op1. Store in op1.
+NEG <reg,addr> - Get negative of op1. Store in op1.
+SHR <any> <reg,addr> - Shift op2 right by op1. Store in op2.
+SHL <any> <reg,addr> - Shift op2 left by op1. Store in op2.
+RTR <any> <reg,addr> - Rotate op2 right by op1. Store in op2.
+RTL <any> <reg,addr> - Rotate op2 left by op1. Store in op2.
+AND <any> <reg,addr> - And op1 and op2. Store in op2.
+OR  <any> <reg,addr> - Or op1 and op2. Store in op2.
+XOR <any> <reg,addr> - Xor op1 and op2. Store in op2.
+NOT <any> <reg,addr> - Not op1 and op2. Store in op2.
+
+~~ Pseudoinstructions ~~
+VAL <idn> <val> - Create internal value op2 with name op1. Can be used anywhere, preceded by <.
+DB <idn> <val>... - Statically store value op3... of size op2 with name op1. Used as an address. Can be preceeded by ~ to get size and be used as a value.
+DBS <idn> <val>... - Statically store string value op2... with name op1. Used as an address. Can be preceeded by ~ to get size and be used as a value.
+LBL <idn> - Create label with name op1.

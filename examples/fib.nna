@@ -1,0 +1,28 @@
+; It's ya boy, Greyoda
+; Bringing you that hot, hot
+; and probably broken assembly!
+;
+; It's gonna be Fibonacci
+; because that's cool
+;
+; ra --> iterator
+; rb --> fib i
+; rc --> fib i+1
+; rd --> temp
+
+VAL num 0x9
+
+LBL fib
+MV 0 $ra
+MV 0 $rb
+MV 1 $rc
+LBL while_cond
+	JL $ra <num @while_body
+	HLT
+
+LBL while_body
+	MV $rc $rd
+	ADD $rb $rc
+	MV $rd $rb
+	ADD 1 $ra
+	JMP @while_cond

@@ -4,6 +4,15 @@
 #include <string>
 #include <map>
 
+template <typename K, typename V> 
+const std::map<V, K> swap_key(std::map<K, V> map) {
+    std::map<V, K> ret{};
+    for (auto elem : map) {
+        ret.insert({elem.second, elem.first});
+    }
+    return ret;
+}
+
 using u8  = uint8_t;
 using u16 = uint16_t;
 using u32 = uint32_t;

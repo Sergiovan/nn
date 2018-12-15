@@ -126,15 +126,6 @@ enum class Symbol : char {
     SYMBOL_INVALID
 };
 
-template <typename K, typename V> 
-const std::map<V, K> swap_key(std::map<K, V> map) {
-    std::map<V, K> ret{};
-    for (auto elem : map) {
-        ret.insert({elem.second, elem.first});
-    }
-    return ret;
-}
-
 constexpr Symbol without_assign(Symbol ass) {
     switch (ass) {
         case Symbol::ADD_ASSIGN:

@@ -1,0 +1,13 @@
+Header: 128 bytes.
+4 bytes magic number: NNEP.
+8 bytes version, starting at 0.
+8 bytes code start. (128)
+8 bytes file size.
+8 bytes initial memory.
+Rest is reserved.
+
+Runnable code: From address code start to file size, padded to 8 bytes with 00.
+
+Static memory: Memory available from the beginning.
+
+Memory: Heap grows downwards, stack grows upwards. Negative pointers for the stack, positive pointers for the rest.
