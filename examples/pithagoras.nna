@@ -2,13 +2,13 @@ DB a 3_8
 DB b 4_8
 DB c 0_8
 LBL program_start ; Begin of program
-MOV @a $ra8
+MOV 8@a $ra8
 MUL $ra8 $ra8 ; a^2
-MOV @b $rb8
+MOV 8@b $rb8
 MUL $rb8 $rb8 ; b^2 
 ADD $rb8 $ra8 ; a^2 + b^2
-CALL @sqrt8
-MOV $ra8 @c
+CALL sqrt8
+MOV $ra8 c
 HLT
 LBL sqrt8 ; byte sqrt(byte n)
 MOV $ra8 $rb8 ; byte x = n

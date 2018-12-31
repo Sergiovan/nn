@@ -1,13 +1,14 @@
 #include "frontend/asm_compiler.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <regex>
 #include "common/utils.h" 
 #include "common/type.h"
+#include "vm/machine.h"
 
 
-asm_compiler::asm_compiler(const std::string& filename) : file(filename, std::ios_base::in) {
+asm_compiler::asm_compiler(const std::string& filename) : filename(filename), file(filename, std::ios_base::in) {
     if (!file || !file.good()) {
         logger::error() << "Could not open file " << filename << logger::nend;
         // TODO why tho
@@ -16,677 +17,939 @@ asm_compiler::asm_compiler(const std::string& filename) : file(filename, std::io
     ready = true;
 }
 
-void asm_compiler::compile() {
-    using namespace nnasm;
-    using namespace nnasm::op;
+asm_compiler::~asm_compiler() {
+    delete [] buffer;
+    buffer = nullptr;
+    if (compiled) {
+        delete compiled;
+        compiled = nullptr;
+    }
+    
+    compiled_size = 0;
+    
+    for (auto& [name, value] : database) {
+        if (value.data) {
+            delete [] value.data;
+        }
+    }
+}
 
-    bool broken = false;
-    u64 addr = 128;
+bool conforms(nnasm::format::operand_format format, nnasm::instruction_code::operand op) {
+    using namespace nnasm::op;
+    if (op.optype == ASM_TYPE_INVALID) {
+        return false;
+    }
     
-    dict<std::vector<u8>> stored_values{};
-    dict<std::string> internal_values{};
-    dict<u64> labels{};
-    std::vector<std::pair<u64, std::string>> unfinished{};
-    u64 line{1};
+    if (format == nnasm::format::OP_NONE && op.optype) {
+        return false;
+    }
     
-    auto until_space = [&]() {
-        std::string ret{};
-        char c = file.peek();
-        while (c != '\t' && c != ' ' && c != '\r' && c != '\n' && !file.eof()) {
-            file.get(c);
-            ret += c;
-            c = file.peek();
-        }
-        return ret;
-    };
+    if (format != nnasm::format::OP_NONE && !op.optype) {
+        return false;
+    }
     
-    auto skip_spaces = [&]() {
-        char c = file.peek();
-        while (c == '\t' || c == ' ' || c == '\r') {
-            file.get(c);
-            c = file.peek();
-        }
-    };
+    if (((format & nnasm::format::OP_TYPE) & op.optype) != op.optype) {
+        return false;
+    }
     
-    auto skip_to_next = [&]() {
-        char c;
-        while (!file.eof()) {
-            file.get(c);
-            if (c == '\n') {
-                ++line;
-                break;
-            }
-        }
-        skip_spaces();
-    };
+    if (op.optype == OP_NONE) {
+        return true;
+    }
     
-    auto error = [&](const std::string& msg) {
-        logger::error() << "Line: " << line << " - " << msg << logger::nend;
-        broken = true;
-        skip_to_next();
-    };
+    if (!(format & nnasm::format::OP_FLAGS)) {
+        return true;
+    }
     
-    enum class operand_type {
-        OPERAND_INVALID, REGISTER_INVALID, SIZE_INVALID, VALUE_INVALID,
-        RAW_INVALID,
-        
-        ADDRESS_INCOMPLETE, VALUE_INCOMPLETE, 
-        
-        UNSIGNED_REGISTER, SIGNED_REGISTER, FLOAT_REGISTER, 
-        ADDRESS, SIZE, UNSIGNED_INTEGER, SIGNED_INTEGER, REAL
-    };
+    u8 type = op.deref ? op.deref : op.valtype;
     
-    auto number_to_raw = [](auto n) {
-        std::vector<u8> ret{};
-        u8* dat = reinterpret_cast<u8*>(&n);
-        for (u8 i = 0; i < sizeof(n); ++i) {
-            ret.push_back(dat[i]);
-        }
-        return ret;
-    };
+    if ((format & nnasm::format::OP_FLAGS_FLOAT) && (type & ASM_TYPE_FLOATING)) {
+        return true;
+    }
     
-    std::function<operand_type(const std::string&)> check_format;
-    check_format = [&](const std::string& data) {
-        if (!data.length()) {
-            return operand_type::OPERAND_INVALID;
-        }
-        std::regex integer{"^(0x[0-9a-fA-F]+|0b[01]+|0o[0-7]+|-?[0-9]+)(_(8|16|32|64|f|d)s?|s)?$"};
-        std::regex real{"^-?[0-9]+\\.[0-9]+(_(d|f))?$"};
-        switch (data[0]) {
-            case '$': { // Register
-                std::regex reg{"^\\$(r[a-m]|pc|sp|sf)(64|s|8s?|16s?|32s?|f|d)?$"};
-                if (!std::regex_match(data, reg)) {
-                    return operand_type::REGISTER_INVALID;
-                } else if (data.length() > 3) {
-                    if (data.back() == 's') {
-                        return operand_type::SIGNED_REGISTER;
-                    } else if (data.back() == 'f' || data.back() == 'd') {
-                        return operand_type::FLOAT_REGISTER;
-                    } else {
-                        return operand_type::UNSIGNED_REGISTER;
-                    }
-                } else {
-                    return operand_type::UNSIGNED_REGISTER;
-                }
-            }
-            case '@': { // Address
-                std::string raddr = data.substr(1);
-                if (std::regex_match(data, integer)) {
-                    return operand_type::ADDRESS;
-                }
-                if (labels.find(raddr) == labels.end()) {
-                    return operand_type::ADDRESS_INCOMPLETE;
-                } else {
-                    return operand_type::ADDRESS;
-                }
-            }
-            case '~': { // Size of data
-                std::string rdata = data.substr(1);
-                auto value = stored_values.find(rdata);
-                if (value == stored_values.end()) {
-                    return operand_type::SIZE_INVALID;
-                }
-                return operand_type::SIZE;
-            }
-            case '<': { // internal value
-                std::string rdata = data.substr(1);
-                auto value = internal_values.find(rdata);
-                if (value == internal_values.end()) {
-                    return operand_type::VALUE_INVALID;
-                }
-                return check_format(value->second);
-            }
-            case '1': [[fallthrough]];
-            case '2': [[fallthrough]];
-            case '3': [[fallthrough]];
-            case '4': [[fallthrough]];
-            case '5': [[fallthrough]];
-            case '6': [[fallthrough]]; 
-            case '7': [[fallthrough]];
-            case '8': [[fallthrough]];
-            case '9': [[fallthrough]];
-            case '0': {
-                if (std::regex_match(data, real)) {
-                    return operand_type::REAL;
-                } else if (std::regex_match(data, integer)) {
-                    bool sign = data.find_first_of("-s") != std::string::npos;
-                    return sign ? operand_type::SIGNED_INTEGER : operand_type::UNSIGNED_INTEGER;
-                } else {
-                    return operand_type::RAW_INVALID;
-                }
-            }
-            default: {
-                if (labels.find(data) == labels.end()) {
-                    return operand_type::VALUE_INCOMPLETE;
-                } else {
-                    return operand_type::UNSIGNED_INTEGER;
-                }
-            }
-        }
-    };
+    if ((format & nnasm::format::OP_FLAGS_SINT) && (type & ASM_TYPE_SIGNED)) {
+        return true;
+    }
     
-    std::function<std::vector<u8>(const std::string&, bool)> to_raw;
-    to_raw = [&](const std::string& data, bool force_64) -> std::vector<u8> {
-        using namespace std::string_literals;
-        if (!data.length()) {
-            return {};
-        }
-        switch (data[0]) {
-            case '$': { // Register
-                std::string rname = data.substr(1, 2);
-                u8 val = 0;
-                if (rname == "sp"s) {
-                    val = 15;
-                } else if (rname == "sf"s) {
-                    val = 14;
-                } else if (rname == "pc"s) {
-                    val = 13;
-                } else {
-                    val = data[2] - 'a';
-                }
-                bool sign = data.back() == 's';
-                std::string part = data;
-                if (sign) {
-                    part = data.substr(0, data.length() - 1);
-                    val |= REG_SIGNED;
-                } 
-                part = part.substr(3);
-                if (part == "8"s) {
-                    val |= REG_BYTE;
-                } else if (part == "16"s) {
-                    val |= REG_WORD;
-                } else if (part == "32"s) {
-                    val |= REG_DWORD;
-                } else if (part == "f"s) {
-                    val |= REG_FLOAT;
-                } else if (part == "d"s) {
-                    val |= REG_DOUBLE;
-                } else {
-                    val |= REG_QWORD;
-                }
-                return {val};
-            }
-            case '@': { // Address
-                if (data[1] >= '0' && data[1] <= '9') {
-                    u64 addr = std::stoull(data.substr(1));
-                    return number_to_raw(addr);
-                } else {
-                    auto lbl = labels.find(data.substr(1));
-                    if (lbl == labels.end()) {
-                        return number_to_raw((u64) 0ull);
-                    } else {
-                        return number_to_raw(lbl->second);
-                    }
-                }
-            }
-            case '~': { // Size of data
-                auto value = stored_values.find(data.substr(1));
-                return number_to_raw((u64) value->second.size());
-            }
-            case '<': { // internal value
-                auto value = internal_values.find(data.substr(1));
-                return to_raw(value->second, force_64);
-            }
-            case '1': [[fallthrough]];
-            case '2': [[fallthrough]];
-            case '3': [[fallthrough]];
-            case '4': [[fallthrough]];
-            case '5': [[fallthrough]];
-            case '6': [[fallthrough]]; 
-            case '7': [[fallthrough]];
-            case '8': [[fallthrough]];
-            case '9': [[fallthrough]];
-            case '0': {
-                u8 type = 3;
-                std::string number = data;
-                bool sign = false;
-                if (data.back() == 's') {
-                    sign = true;
-                    number = data.substr(0, data.length() - 1);
-                }
-                if (u64 pos = number.find('_'); pos != std::string::npos) {
-                    std::string suffix = number.substr(pos);
-                    number = number.substr(0, pos);
-                    if (!force_64) {
-                        if (suffix == "_8"s) {
-                            type = 0;
-                        } else if (suffix == "_16"s) {
-                            type = 1;
-                        } else if (suffix == "_32"s) {
-                            type = 2;
-                        } else if (suffix == "_64"s) {
-                            type = 3;
-                        } else if (suffix == "_f"s) {
-                            type = 4;
-                        } else if (suffix == "_d"s) {
-                            type = 5;
-                        }
-                    }
-                }
-                if (type == 4) {
-                    return number_to_raw(std::stof(number));
-                } else if (type == 5) {
-                    return number_to_raw(std::stod(number));
-                } else if (sign) {
-                    i64 bign;
-                    if (number.find("0x") == 0) {
-                        bign = std::stoll(number.substr(2), nullptr, 16);
-                    } else if (number.find("0o") == 0) {
-                        bign = std::stoll(number.substr(2), nullptr, 8);
-                    } else if (number.find("0b") == 0) {
-                        bign = std::stoll(number.substr(2), nullptr, 2);
-                    } else {
-                        bign = std::stoll(number);
-                    }
-                    if (type == 0) {
-                        return number_to_raw((i8) bign);
-                    } else if (type == 1) {
-                        return number_to_raw((i16) bign);
-                    } else if (type == 2) {
-                        return number_to_raw((i32) bign);
-                    } else {
-                        return number_to_raw(bign);
-                    }
-                } else {
-                    u64 bign;
-                    if (number.find("0x") == 0) {
-                        bign = std::stoull(number.substr(2), nullptr, 16);
-                    } else if (number.find("0o") == 0) {
-                        bign = std::stoull(number.substr(2), nullptr, 8);
-                    } else if (number.find("0b") == 0) {
-                        bign = std::stoull(number.substr(2), nullptr, 2);
-                    } else {
-                        bign = std::stoull(number);
-                    }
-                    if (type == 0) {
-                        return number_to_raw((u8) bign);
-                    } else if (type == 1) {
-                        return number_to_raw((u16) bign);
-                    } else if (type == 2) {
-                        return number_to_raw((u32) bign);
-                    } else {
-                        return number_to_raw(bign);
-                    }
-                }
-            }
-            default: {
-                auto lbl = labels.find(data);
-                if (lbl == labels.end()) {
-                    return number_to_raw((u64) 0ull);
-                } else {
-                    return number_to_raw(lbl->second);
-                }
-            }
-        }
-    };
+    if ((format & nnasm::format::OP_FLAGS_UINT) && !(type & ASM_TYPE_SIGNED)) {
+        return true;
+    }
     
-    skip_spaces();
-    char c;
+    return false;
+}
+
+void asm_compiler::compile() {
+    using namespace std::string_literals;
     
-    compiled.resize(addr);
+    if (!ready) {
+        errors.push_back(filename + ":1 - Nothing to compile.");
+        return;
+    }
+    
+    nnexe_header hdr;
+    
+    compiled = new u8[1024];
+    compiled_size = 1024;
+    std::memset(compiled, 0, compiled_size);
+    
+    shaddr = addr = hdr.code_start; // Programs start at address 128
+    
+    nnasm::instruction_code hlt{0};
+    hlt.opcode = nnasm::op::HLT;
     
     while (!file.eof()) {
-        c = file.peek();
-        switch (c) {
-            case ';':
-                skip_to_next();
-                continue;
-            case ' ': [[fallthrough]];
-            case '\t':
-                skip_spaces();
-                continue;
-            case '\n': [[fallthrough]];
-            case '\r':
-                skip_to_next();
-                continue;
-            case EOF:
-                goto out_while;
-            default:
-                break;
-        }
+        using namespace nnasm;
+        using namespace op;
         
-        // We are at an instruction
-        std::string opcodestr = until_space();
-        auto elem = nnasm::name_to_op.find(opcodestr);
-        code opcode = elem != nnasm::name_to_op.end() ? elem->second : INVALID_CODE;
+        instruction ins = next_instruction();
         
-        switch (opcode) {
+        switch (ins.code.opcode) {
+            case INVALID_CODE:
+                add(hlt);
+                shaddr = addr;
+                continue;
             case VAL: {
-                skip_spaces();
-                std::string name = until_space();
-                skip_spaces();
-                std::string val = until_space();
-                if (name.empty() || (name[0] >= '0' && name[0] <= '9')) {
-                    error("Invalid name given");
-                    continue;
-                } else if (val.empty()) {
-                    error("No value given");
+                std::string idn{};
+                while (!peek_separator() && !peek_eol()) {
+                    idn += next_char();
                 }
-                auto valtype = check_format(val);
-                if (valtype >= operand_type::OPERAND_INVALID && valtype <= operand_type::RAW_INVALID) {
-                    error("Invalid value given");
-                }
-                internal_values.insert({name, val});
-                continue;
-            }
-            case DB: {
-                skip_spaces();
-                std::string name = until_space();
-                if (name.empty() || (name[0] >= '0' && name[0] <= '9')) {
-                    error("Invalid value name given");
+                next_char(); // Skip, skip, SKIP
+                std::string valstr{};
+                next_value(ins, 0, &valstr, false);
+                next_char();
+                
+                if (std::toupper(idn[0]) < 'A' || std::toupper(idn[0]) > 'Z') {
+                    std::stringstream ss{};
+                    ss << "Invalid start of identifier '" << idn[0] << "'";
+                    error(ss.str());
                     continue;
                 }
-                skip_spaces();
-                std::vector<u8> data{};
-                bool fine = true;
-                do {
-                    std::string value = until_space();
-                    auto valtype = check_format(value);
-                    if (valtype < operand_type::UNSIGNED_INTEGER && valtype > operand_type::REAL) {
-                        error("Invalid value given");
-                        fine = false;
-                        break;
-                    } else {
-                        auto nd = to_raw(value, false);
-                        data.insert(data.end(), nd.begin(), nd.end());
-                    }
-                    skip_spaces();
-                    if (file.peek() == ';' || file.peek() == '\n' || file.eof()) {
-                        break;
-                    }
-                } while (true);
-                if (fine) {
-                    stored_values.insert({name, data});
-                }
-                continue;
-            }
-            case DBS: {
-                skip_spaces();
-                std::string name = until_space();
-                if (name.empty() || (name[0] >= '0' && name[0] <= '9')) {
-                    error("Invalid value name given");
+                
+                if (auto it = literals.find(idn); it != literals.end()) {
+                    std::stringstream ss{};
+                    ss << "Literal with name \"" << idn << "\" already exists, with value \"" << it->second << "\"";
+                    error(ss.str());
                     continue;
                 }
-                skip_spaces();
-                std::vector<u8> data{}; // TODO this is all wrong
-                bool fine = true;
-                do {
-                    std::string value = until_space();
-                    if (value[0] == '"') {
-                        u64 i = 1;
-                        while (true) {
-                            if (i >= value.size()) {
-                                break;
-                            }
-                            char cc = value[i];
-                            if(cc == '\\') {
-                                ++i;
-                                if (i >= value.size()) {
-                                    break;
-                                }
-                                cc = value[i];
-                                switch (cc) {
-                                    case 'n':
-                                        data.push_back('\n');
-                                        break;
-                                    case 't':
-                                        data.push_back('\t');
-                                        break;
-                                    case 'r':
-                                        data.push_back('\r');
-                                        break;
-                                    case '0':
-                                        data.push_back('\0');
-                                        break;
-                                    default:
-                                        data.push_back(cc);
-                                        break;
-                                }
-                            } else if (cc == '"') {
-                                break;
-                            } else {
-                                data.push_back(cc);
-                            }
-                            ++i;
-                        }
-                        if (i != value.size() || value[value.size() - 1] != '"') {
-                            error("Invalid value given");
-                            fine = false;
-                            break;
-                        }
-                    } else {
-                        auto valtype = check_format(value);
-                        if (valtype < operand_type::UNSIGNED_INTEGER && valtype > operand_type::REAL) {
-                            error("Invalid value given");
-                            fine = false;
-                            break;
-                        } else {
-                            auto nd = to_raw(value, false);
-                            data.insert(data.end(), nd.begin(), nd.end());
-                        }
-                    }
-                    skip_spaces();
-                    if (file.peek() == ';' || file.peek() == '\n' || file.eof()) {
-                        break;
-                    }
-                } while (true);
-                if (fine) {
-                    auto strsize = number_to_raw((u64) data.size());
-                    auto strtype = number_to_raw((u64) etype_ids::STRING);
-                    data.insert(data.begin(), strsize.begin(), strsize.end());
-                    data.insert(data.begin(), strtype.begin(), strtype.end());
-                    stored_values.insert({name, data});
+                
+                if (ins.code.ops[0].valtype != ASM_TYPE_INVALID) {
+                    literals.insert({idn, valstr});
+                } else {
+                    literals.insert({idn, "0"s});
                 }
                 continue;
             }
             case LBL: {
-                skip_spaces();
-                std::string label = until_space();
-                if (label.empty() || (label[0] >= '0' && label[0] <= '9')) {
-                    error("Invalid label name given");
+                std::string idn{};
+                while (!peek_separator() && !peek_eol()) {
+                    idn += next_char();
+                }
+                next_char(); // Skip, skip, SKIP
+                
+                if (std::toupper(idn[0]) < 'A' || std::toupper(idn[0]) > 'Z') {
+                    std::stringstream ss{};
+                    ss << "Invalid start of identifier '" << idn[0] << "'";
+                    error(ss.str());
                     continue;
                 }
-                labels.insert({label, addr});
+                
+                if (auto it = labels.find(idn); it != labels.end()) {
+                    std::stringstream ss{};
+                    ss << "Label with name \"" << idn << "\" already exists, with value \"" << std::hex << it->second << "\"";
+                    error(ss.str());
+                    continue;
+                }
+                
+                labels.insert({idn, addr});
                 continue;
             }
-            case INVALID_CODE:
-                error("Uknknown opcode"); // TODO Better
+            case DB: [[fallthrough]];
+            case DBS: {
+                vmregister converter{};
+                bool nnstr = false;
+                if (ins.code.opcode == DBS) {
+                    nnstr = true;
+                }
+                
+                std::string idn{};
+                while (!peek_separator() && !peek_eol()) {
+                    idn += next_char();
+                }
+                next_char(); // Skip, skip, SKIP
+                
+                if (std::toupper(idn[0]) < 'A' || std::toupper(idn[0]) > 'Z') {
+                    std::stringstream ss{};
+                    ss << "Invalid start of identifier '" << idn[0] << "'";
+                    error(ss.str());
+                    
+                    char s = next_char();
+                    while (!file.eof() && s != '"') {
+                        s = next_char();
+                    }
+                    
+                    continue;
+                }
+                
+                if (auto it = labels.find(idn); it != labels.end()) {
+                    std::stringstream ss{};
+                    ss << "Label with name \"" << idn << "\" already exists, with value \"" << std::hex << it->second << "\"";
+                    error(ss.str());
+                    
+                    char s = next_char();
+                    while (!file.eof() && s != '"') {
+                        s = next_char();
+                    }
+                    
+                    continue;
+                }
+                
+                char c = ' ';
+                db_value dbval;
+                dbval.data = new u8[64];
+                dbval.size = 64;
+                dbval.addr = nnstr ? 16 : 0;
+                
+                if (nnstr) {
+                    u64 strtype = etype_ids::STRING;
+                    std::memcpy(dbval.data, &strtype, sizeof(strtype));
+                }
+                
+                while (c != '\n') {
+                    if (file.peek() == '"') {
+                        char s = next_char();
+                        std::string val{};
+                        while (!file.eof()) {
+                            s = next_char();
+                            if (s == '\\') {
+                                s = next_char();
+                                switch (s) {
+                                    case 'n':
+                                        val += '\n';
+                                        break;
+                                    case 't':
+                                        val += '\t';
+                                        break;
+                                    case '0':
+                                        val += '\0';
+                                        break;
+                                    case '\r':
+                                        if (file.peek() != '\n') {
+                                            val += '\r';
+                                            break;
+                                        }
+                                        s = next_char();
+                                        [[fallthrough]];
+                                    case '\n':
+                                        val += ' ';
+                                        break;
+                                    default:
+                                        val += s;
+                                        break;
+                                }
+                            } else if (s == '"') {
+                                break;
+                            } else if (s == '\n') {
+                                std::stringstream ss{};
+                                ss << "String has unescaped newline";
+                                error(ss.str());
+                                
+                                while (!file.eof() && s != '"') {
+                                    s = next_char();
+                                }
+                                
+                                break;
+                            } else {
+                                val += s;
+                            }
+                        }
+                        
+                        for (u64 i = 0; i < val.length();) {
+                            u8 charlen;
+                            if (nnstr) {
+                                charlen = utils::utflen(val[i]);
+                            } else {
+                                charlen = 1;
+                            }
+                            if (dbval.addr + charlen > dbval.size) {
+                                u8* buff = new u8[dbval.size * 2];
+                                std::memcpy(buff, dbval.data, dbval.size);
+                                delete [] dbval.data;
+                                dbval.data = buff;
+                                dbval.size *= 2;
+                            }
+                            std::memcpy(dbval.data + dbval.addr, &val[i], charlen);
+                            dbval.addr += charlen;
+                            i += charlen;
+                        }
+                        
+                    } else {
+                        u64 val = next_value(ins, 0, nullptr, false, false);
+                        u8 valsize;
+                        switch (ins.code.ops[0].valtype) {
+                            case ASM_TYPE_BYTE: [[fallthrough]];
+                            case ASM_TYPE_SBYTE:
+                                valsize = 1;
+                                break;
+                            case ASM_TYPE_WORD: [[fallthrough]];
+                            case ASM_TYPE_SWORD:
+                                valsize = 2;
+                                break;
+                            case ASM_TYPE_DWORD: [[fallthrough]];
+                            case ASM_TYPE_SDWORD: [[fallthrough]];
+                            case ASM_TYPE_FLOAT:
+                                valsize = 4;
+                                break;
+                            case ASM_TYPE_QWORD: [[fallthrough]];
+                            case ASM_TYPE_SQWORD: [[fallthrough]];
+                            case ASM_TYPE_DOUBLE: 
+                                valsize = 8;
+                                break;
+                        }
+                        if (nnstr) {
+                            valsize = std::min((u8) 4, valsize);
+                        }
+                        if (dbval.addr + valsize > dbval.size) {
+                            u8* buff = new u8[dbval.size * 2];
+                            std::memcpy(buff, dbval.data, dbval.size);
+                            delete [] dbval.data;
+                            dbval.data = buff;
+                            dbval.size *= 2;
+                        }
+                        std::memcpy(dbval.data + dbval.addr, &val, valsize);
+                        dbval.addr += valsize;
+                    }
+                    c = next_char();
+                }
+                
+                if (nnstr) {
+                    u64 len = (dbval.addr - 8) / 8;
+                    std::memcpy(dbval.data + 8, &len, sizeof(len));
+                }
+                
+                dbval.size = dbval.addr;
+                dbval.addr = 0;
+                
+                database.insert({idn, dbval});
+                
                 continue;
-            default:
-                break;
-        }
-        
-        instruction ins;
-        ins.code = opcode;
-        
-        addr += 2;
-        auto formats = nnasm::format::instructions.at(opcode);
-        skip_spaces();
-        
-        using opformat = nnasm::format::operand_format;
-        
-        std::vector<u8> opdata{};
-        std::string op[3];
-        opformat optyp[3] {opformat::OP_NONE, opformat::OP_NONE, opformat::OP_NONE};
-        for (int i = 0; i < 3; ++i) {
-            if (file.peek() == ';' || file.peek() == '\n' || file.eof()) {
-                break;
-            }
-            op[i] = until_space();
-            skip_spaces();
-            
-            auto optype = check_format(op[i]);
-            switch (optype) {
-                case operand_type::OPERAND_INVALID: [[fallthrough]];
-                case operand_type::RAW_INVALID: [[fallthrough]];
-                case operand_type::SIZE_INVALID: [[fallthrough]];
-                case operand_type::VALUE_INVALID: 
-                    error("Invalid value");
-                    optyp[i] = opformat::OP_NONE;
-                    break;
-                case operand_type::REGISTER_INVALID:
-                    error("Invalid register");
-                    optyp[i] = opformat::OP_NONE;
-                    break;
-                case operand_type::ADDRESS_INCOMPLETE:
-                    optyp[i] = opformat::OP_ADDR;
-                    unfinished.push_back({addr, op[i].substr(1)});
-                    addr += 8;
-                    break;
-                case operand_type::VALUE_INCOMPLETE:
-                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_UINT;
-                    unfinished.push_back({addr, op[i]});
-                    addr += 8;
-                    break;
-                case operand_type::ADDRESS:
-                    optyp[i] = opformat::OP_ADDR;
-                    addr += 8;
-                    break;
-                case operand_type::REAL:
-                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_FLOAT;
-                    addr += 8;
-                    break;
-                case operand_type::SIGNED_INTEGER: 
-                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_SINT;
-                    addr += 8;
-                    break;
-                case operand_type::UNSIGNED_INTEGER: [[fallthrough]];
-                case operand_type::SIZE:
-                    optyp[i] = opformat::OP_VAL | opformat::OP_FLAGS_UINT;
-                    addr += 8;
-                    break;
-                case operand_type::SIGNED_REGISTER:
-                    optyp[i] = opformat::OP_REG | opformat::OP_FLAGS_SINT;
-                    ++addr;
-                    break;                    
-                case operand_type::UNSIGNED_REGISTER:
-                    optyp[i] = opformat::OP_REG | opformat::OP_FLAGS_UINT;
-                    ++addr;
-                    break;
-                case operand_type::FLOAT_REGISTER:
-                    optyp[i] = opformat::OP_REG | opformat::OP_FLAGS_FLOAT;
-                    ++addr;
-                    break;
-            }
-            
-            if (optyp[i] != opformat::OP_NONE) {
-                auto val = to_raw(op[i], true);
-                opdata.insert(opdata.end(), val.begin(), val.end());
             }
         }
         
-        ins.op1 = (optyp[0] & opformat::OP_TYPE) == opformat::OP_ADDR ? OP_ADDR : (optyp[0] & opformat::OP_TYPE);
-        ins.op2 = (optyp[1] & opformat::OP_TYPE) == opformat::OP_ADDR ? OP_ADDR : (optyp[1] & opformat::OP_TYPE);
-        ins.op3 = (optyp[2] & opformat::OP_TYPE) == opformat::OP_ADDR ? OP_ADDR : (optyp[2] & opformat::OP_TYPE);
-        
-        bool found = false;
-        
-        constexpr auto complies = [](opformat inst, opformat form) {
-            if (form == opformat::OP_NONE) {
-                return inst == opformat::OP_NONE;
-            }
-            u8 instype = inst & opformat::OP_TYPE;
-            u8 insflags = inst & opformat::OP_FLAGS;
-            u8 type_complies = instype & form;
-            u8 flag_complies = insflags & form;
-            if (!type_complies) {
-                return false;
-            }
-            if ((form & opformat::OP_FLAGS) && !flag_complies) {
-                return false;
-            }
-            return true;
-        };
-        
+        auto& formats = nnasm::format::instructions.at((nnasm::op::code) ins.code.opcode);
+        u8 conforms_to{0};
         for (auto& format : formats) {
-            if (complies(optyp[0], format.op1) && complies(optyp[1], format.op2) && complies(optyp[2], format.op3)) {
-                found = true;
-                break;
+            if (conforms(format.op1, ins.code.ops[0]) && conforms(format.op2, ins.code.ops[1]) && conforms(format.op3, ins.code.ops[2])) {
+                ++conforms_to;
             }
         }
         
-        if (!found) {
-            error("Instruction with those operands does not exist");
-        } 
-        auto insdata = number_to_raw(ins.raw);
-        opdata.insert(opdata.begin(), insdata.begin(), insdata.end());
-        compiled.insert(compiled.end(), opdata.begin(), opdata.end());
-    }
-    out_while:;
-    
-    u64 pad = 8 * std::ceil((double) addr / 8.0);
-    if (pad > addr) {
-        compiled.resize(pad);
-        std::fill(compiled.begin() + addr, compiled.end(), 0x00);
-        addr = pad;
-    }
-    
-    for (auto& [name, data] : stored_values) {
-        auto lbl = labels.find(name);
-        if (lbl != labels.end()) {
-            error("Label exists with same name as stored value");
-        } else {
-            u64 prev_size = data.size();
-            u64 size = 8 * std::ceil((double) prev_size / 8.0);
-            labels.insert({name, addr});
-            if (prev_size < size) {
-                data.resize(size);
-                std::fill(data.begin() + prev_size, data.end(), 0x00);
+        if (conforms_to != 1) {
+            std::stringstream ss{};
+            ss << "Invalid operands for opcode";
+            error(ss.str());
+            shaddr = addr;
+            continue;
+        }
+        
+        add(reinterpret_cast<u8*>(&ins.code), sizeof(ins.code));
+        for (u8 i = 0; i < 3; ++i) {
+            if (ins.code.ops[i].optype == OP_NONE) {
+                break;
+            } else if (ins.code.ops[i].optype == OP_REG) {
+                continue;
             }
-            compiled.insert(compiled.end(), data.begin(), data.end());
-            addr += size;
+            add(reinterpret_cast<u8*>(&ins.values[i]), sizeof(ins.values[i]));
         }
     }
     
-    for (auto& [addr, name] : unfinished) {
-        auto lbl = labels.find(name);
-        if (lbl == labels.end()) {
-            error("Label does not exist");
-        } else {
-            auto val = number_to_raw(lbl->second);
-            for (int i = 0; i < val.size(); ++i) {
-                compiled[addr + i] = val[i];
+    hdr.data_start = addr;
+    
+    if (!database.empty()) {
+        for (auto& [name, value] : database) {
+            value.addr = addr;
+            add(value.data, value.size);
+            delete [] value.data;
+            value.data = nullptr;
+            labels.insert({"&"s + name, value.addr});
+            
+            u8 padding = ((8 - (value.size % 8)) % 8);
+            u64 zero = 0ull;
+            add(reinterpret_cast<u8*>(&zero), padding);
+        }
+    }
+    
+    hdr.size = addr;
+    
+    if (!pending.empty()) {
+        for (auto& [addr, name] : pending) {
+            auto it = labels.find(name);
+            if (it == labels.end()) {
+                std::stringstream ss{};
+                ss << "\"" << name << "\" does not exist";
+                error(ss.str());
+                continue;
+            } else {
+                std::memcpy(compiled + addr, &it->second, sizeof(it->second));
             }
         }
     }
     
-    struct { // TODO Clean up, my god
-        char magic[4] = {'N', 'N', 'E', 'P'};
-        u32 version = 0;
-        u64 start = 128;
-        u64 size = 0;
-        u64 initial = 4 << 20;
-    } header;
-    header.size = compiled.size();
-    auto headerdata = number_to_raw(header);
-    headerdata.resize(128);
-    std::fill(headerdata.begin() + sizeof(header), headerdata.end(), 0x00);
-    for (int i = 0; i < headerdata.size(); ++i) {
-        compiled[i] = headerdata[i];
-    }
+    std::memcpy(compiled, &hdr, sizeof(hdr));
     
+    u8 padding = ((8 - (hdr.size % 8)) % 8);
+    u8* buff = new u8[hdr.size + padding];
+    std::memcpy(buff, compiled, hdr.size + padding);
+    delete [] buff;
+    compiled_size = hdr.size + padding;
+    
+    if (!errors.empty()) {
+        print_errors();
+    }
+}
+
+void asm_compiler::print_errors() {
+    for (auto& error : errors) {
+        logger::error() << error << logger::nend;
+    }
 }
 
 u8* asm_compiler::get() {
-    return compiled.data();
+    return compiled;
 }
 
 u8* asm_compiler::move() {
-    if (!compiled.size()) {
-        return nullptr;
-    }
-    
-    u8* data = new u8[compiled.size()];
-    std::memcpy(data, compiled.data(), sizeof(u8) * compiled.size());
-    compiled.clear();
-    return data;
+    u8* buff = compiled;
+    compiled = nullptr;
+    compiled_size = 0;
+    return buff;
+}
+
+u64 asm_compiler::size() {
+    return compiled_size;
 }
 
 void asm_compiler::store_to_file(const std::string& filename) {
-    std::ofstream file{filename, std::ios_base::out | std::ios_base::binary};
+
+}
+
+void asm_compiler::add(u8* data, u64 length) {
+    if (addr + length > compiled_size) {
+        u8* buff = new u8[compiled_size * 2];
+        std::memcpy(buff, compiled, compiled_size);
+        compiled_size = compiled_size * 2;
+        delete [] compiled;
+        compiled = buff;
+    }
     
-    if (!file || !file.good()) {
-        logger::error() << "Could not open file " << filename << logger::nend;
-        return;
+    std::memcpy(compiled + addr, data, length);
+    addr += length;
+}
+
+nnasm::instruction asm_compiler::next_instruction() {
+    using namespace nnasm::op;
+    
+    nnasm::instruction ins{0};
+    
+    while ((peek_separator() || peek_eol()) && !file.eof()) {
+        next_char();
+    }
+    
+    char n;
+    ins.code.opcode = next_opcode();
+    n = next_char(); // SKIP
+    
+    switch (ins.code.opcode) {
+        case INVALID_CODE: [[fallthrough]];
+        case VAL: [[fallthrough]];
+        case LBL: [[fallthrough]];
+        case DB: [[fallthrough]];
+        case DBS:
+            return ins;
+    }
+    
+    shaddr += 8;
+    
+    for (u8 i = 0; i < 3; ++i) {
+        if (peek_separator() || peek_eol()) {
+            n = next_char();
+        }
+        if (file.eof() || peek_eol() || n == '\n') {
+            return ins;
+        }
+        
+        ins.values[i] = next_value(ins, i);
+        
+        if (ins.code.ops[i].optype != OP_REG) {
+            shaddr += 8;
+        }
+    }
+    return ins;
+}
+
+nnasm::op::code asm_compiler::next_opcode() {
+    std::string code{};
+    while (!peek_separator() && !peek_eol()) {
+        code += next_char();
+    }
+    std::transform(code.begin(), code.end(), code.begin(), ::toupper);
+    
+    auto it = nnasm::name_to_op.find(code);
+    if (it == nnasm::name_to_op.end()) {
+        std::stringstream ss{};
+        ss << "Invalid opcode \"" << code << "\"";
+        error(ss.str());
+        return nnasm::op::INVALID_CODE;
+    } else {
+        return it->second;
     }
 }
+
+inline nnasm::op::asm_type asm_type_from_string(std::string str) {
+    using namespace std::string_literals;
+    
+    if (!str.length()) {
+        return nnasm::op::ASM_TYPE_QWORD;
+    }
+    
+    switch (str[0]) {
+        case '8': {
+            if (str.length() == 1) {
+                return nnasm::op::ASM_TYPE_BYTE;
+            } else if (str == "8S"s) {
+                return nnasm::op::ASM_TYPE_SBYTE;
+            }
+            break;
+        }
+        case '1': {
+            if (str == "16"s) {
+                return nnasm::op::ASM_TYPE_WORD;
+            } else if (str == "16S"s) {
+                return nnasm::op::ASM_TYPE_SWORD;
+            }
+            break;
+        }
+        case '3': {
+            if (str == "32"s) {
+                return nnasm::op::ASM_TYPE_DWORD;
+            } else if (str == "32S"s) {
+                return nnasm::op::ASM_TYPE_SDWORD;
+            }
+            break;
+        }
+        case '6': {
+            if (str == "64"s) {
+                return nnasm::op::ASM_TYPE_QWORD;
+            } else if (str == "64S"s) {
+                return nnasm::op::ASM_TYPE_SQWORD;
+            }
+            break;
+        }
+        case 'S': {
+            if (str.length() == 1) {
+                return nnasm::op::ASM_TYPE_QWORD;
+            }
+            break;
+        }
+        case 'F': {
+            if (str.length() == 1) {
+                return nnasm::op::ASM_TYPE_FLOAT;
+            }
+            break;
+        }
+        case 'D': {
+            if (str.length() == 1) {
+                return nnasm::op::ASM_TYPE_DOUBLE;
+            }
+            break;
+        }
+    }
+    return nnasm::op::ASM_TYPE_INVALID;
+}
+
+u64 asm_compiler::value_from_string(const std::string& str, nnasm::instruction_code::operand& op) {
+    using namespace std::string_literals;
+    std::string val = str;
+    vmregister converter{0};
+    
+    if (u64 uspos = val.find('_'); uspos != std::string::npos) { // Type given
+        std::string aft = val.substr(uspos + 1);
+        val = val.substr(0, uspos);
+        if (aft.length() == 0 || val.length() == 0) {std::stringstream ss{};
+            ss << "Invalid value \"" << val << "_" << aft << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            return 0;
+        }
+        op.valtype = asm_type_from_string(aft);
+    } else { // 64, 64s, or d
+        if (val.find('.') != std::string::npos) {
+            op.valtype = nnasm::op::ASM_TYPE_DOUBLE;
+        } else if (val[0] == '-') {
+            op.valtype = nnasm::op::ASM_TYPE_SQWORD;
+        } else {
+            op.valtype = nnasm::op::ASM_TYPE_QWORD;
+        }
+    }
+    
+    if (!(op.valtype & nnasm::op::ASM_TYPE_SIGNED) && val[0] == '-') {
+        std::stringstream ss{};
+        ss << "Unsigned negative number \"" << val << "\"";
+        error(ss.str());
+        op.valtype = nnasm::op::ASM_TYPE_INVALID;
+        return 0;
+    }
+    
+    if (op.deref && (op.valtype & nnasm::op::ASM_TYPE_FLOATING)) {
+        op.deref = nnasm::op::ASM_TYPE_INVALID;
+    }
+    
+    try {
+        u64 processed = 0;
+        if (op.valtype & nnasm::op::ASM_TYPE_FLOATING) {
+            if (op.valtype == nnasm::op::ASM_TYPE_FLOAT) {
+                converter.fl = std::stof(val, &processed);
+            } else {
+                converter.db = std::stod(val, &processed);
+            }
+            return converter.qword;
+        } else {
+            int base = 10;
+            u64 start = 0;
+            if (val[0] == '-') {
+                start = 1;
+            }
+            std::string prefix = val.substr(start, 2);
+            if (prefix == "0X"s) {
+                base = 16;
+                val = val.substr(0, start) + val.substr(start + 2);
+            } else if (prefix == "0B"s) {
+                base = 2;
+                val = val.substr(0, start) + val.substr(start + 2);
+            } else if (prefix == "0O"s) {
+                base = 8;
+                val = val.substr(0, start) + val.substr(start + 2);
+            }
+            {
+                using namespace nnasm::op;
+                if (op.valtype & nnasm::op::ASM_TYPE_SIGNED) {
+                    converter.sqword = std::stoll(val, &processed, base);
+                    switch (op.valtype) {
+                        case ASM_TYPE_SBYTE:
+                            if (converter.sqword != converter.sbyte) {
+                                std::stringstream ss{};
+                                ss << "Invalid signed byte \"" << val << "\"";
+                                error(ss.str());
+                                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                                return 0;
+                            }
+                            break;
+                        case ASM_TYPE_SWORD:
+                            if (converter.sqword != converter.sword) {
+                                std::stringstream ss{};
+                                ss << "Invalid signed word \"" << val << "\"";
+                                error(ss.str());
+                                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                                return 0;
+                            }
+                            break;
+                        case ASM_TYPE_SDWORD:
+                            if (converter.sqword != converter.sdword) {
+                                std::stringstream ss{};
+                                ss << "Invalid signed dword \"" << val << "\"";
+                                error(ss.str());
+                                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                                return 0;
+                            }
+                            break;
+                    }
+                } else {
+                    converter.qword = std::stoull(val, &processed, base);
+                    switch (op.valtype) {
+                        case ASM_TYPE_BYTE:
+                            if (converter.qword != converter.byte) {
+                                std::stringstream ss{};
+                                ss << "Invalid byte \"" << val << "\"";
+                                error(ss.str());
+                                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                                return 0;
+                            }
+                            break;
+                        case ASM_TYPE_WORD:
+                            if (converter.qword != converter.word) {
+                                std::stringstream ss{};
+                                ss << "Invalid word \"" << val << "\"";
+                                error(ss.str());
+                                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                                return 0;
+                            }
+                            break;
+                        case ASM_TYPE_DWORD:
+                            if (converter.qword != converter.dword) {
+                                std::stringstream ss{};
+                                ss << "Invalid dword \"" << val << "\"";
+                                error(ss.str());
+                                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                                return 0;
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+        if (processed != val.length()) {
+            std::stringstream ss{};
+            ss << "Invalid characters in value \"" << val << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            return 0;
+        }
+        return converter.qword;
+    } catch (...) {
+        std::stringstream ss{};
+        ss << "Invalid characters in value \"" << val << "\"";
+        error(ss.str());
+        op.valtype = nnasm::op::ASM_TYPE_INVALID;
+        return 0;
+    }
+}
+
+u64 asm_compiler::next_value(nnasm::instruction& ins, u8 index, std::string* strptr, bool allow_pending, bool allow_database) {
+    using namespace std::string_literals;
+    
+    vmregister converter{0};
+    
+    std::string buff{};
+    if (!strptr) {
+        strptr = &buff;
+    }
+    
+    std::string& val = *strptr;
+    while (!peek_separator() && !peek_eol()) {
+        val += next_char();
+    }
+    
+    nnasm::instruction_code::operand& op = ins.code.ops[index];
+    if (val.length() == 0) {
+        op.valtype = nnasm::op::ASM_TYPE_INVALID;
+        return 0;
+    }
+    
+    if (val[0] == '<') {
+        auto it = literals.find(val.substr(1));
+        if (it != literals.end()) {
+            val = it->second;
+        } else {
+            std::stringstream ss{};
+            ss << "Cannot find literal \"" << val.substr(1) << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            return 0;
+        }
+    }
+    
+    if (u64 atpos = val.find('@'); atpos != std::string::npos) { // Deref
+        std::string bef = val.substr(0, atpos);
+        val = val.substr(atpos + 1);
+        if (val.length() == 0) {
+            std::stringstream ss{};
+            ss << "Cannot dereference \"" << val << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            return 0;
+        }
+        op.deref = asm_type_from_string(bef);
+        if (op.deref == nnasm::op::ASM_TYPE_INVALID) {
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            return 0;
+        }
+    }
+    
+    if (val[0] == '<') {
+        auto it = literals.find(val.substr(1));
+        if (it != literals.end()) {
+            val = it->second;
+        } else {
+            std::stringstream ss{};
+            ss << "Cannot find literal \"" << val.substr(1) << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            return 0;
+        }
+    }
+    
+    if (val[0] == '$') {
+        std::transform(val.begin(), val.end(), val.begin(), ::toupper);
+        op.optype = nnasm::op::OP_REG;
+        if (val.length() < 3 || val.length() > 6) {
+            std::stringstream ss{};
+            ss << "Invalid register \"" << val << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            op.number = 12;
+            return 0;
+        }
+        std::string reg = val.substr(1, 2);
+        val = val.substr(3);
+        
+        if (reg[0] == 'R') {
+            if (reg[1] < 'A' || reg[1] > 'M') {
+                std::stringstream ss{};
+                ss << "Invalid register \"" << reg << "\"";
+                error(ss.str());
+                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                op.number = 12;
+                return 0;
+            }
+            op.number = reg[1] - 'A';
+        } else if (reg[1] == 'P') {
+            if (reg[1] != 'C') {
+                std::stringstream ss{};
+                ss << "Invalid register \"" << reg << "\"";
+                error(ss.str());
+                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                op.number = 12;
+                return 0;
+            } else {
+                op.number = 13;
+            }
+        } else if (reg[2] == 'S') {
+            if (reg[1] == 'F') {
+                op.number = 14;
+            } else if (reg[1] == 'P') {
+                op.number = 15;
+            } else {
+                std::stringstream ss{};
+                ss << "Invalid register \"" << reg << "\"";
+                error(ss.str());
+                op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                op.number = 12;
+                return 0;
+            }
+        } else {
+            std::stringstream ss{};
+            ss << "Invalid register \"" << reg << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            op.number = 12;
+            return 0;
+        }
+        
+        op.valtype = asm_type_from_string(val);
+        
+        return 0;
+    } else if (val[0] == '-' || (val[0] >= '0' && val[0] <= '9')){
+        std::transform(val.begin(), val.end(), val.begin(), ::toupper);
+        op.optype = nnasm::op::OP_VAL;
+        return value_from_string(val, op);
+    } else if (val[0] == '~') {
+        op.optype = nnasm::op::OP_VAL;
+        op.valtype = nnasm::op::ASM_TYPE_QWORD;
+        val = val.substr(1);
+        auto it = database.find(val);
+        if (it != database.end()) {
+            return it->second.size;
+        } else {
+            std::stringstream ss{};
+            ss << "Cannot find size of \"" << val << "\"";
+            error(ss.str());
+            op.valtype = nnasm::op::ASM_TYPE_INVALID;
+            return 0;
+        }
+    } else {
+        op.optype = nnasm::op::OP_VAL;
+        op.valtype = nnasm::op::ASM_TYPE_QWORD;
+        {
+            auto it = database.find(val);
+            if (it != database.end()) {
+                if (!allow_database) {
+                    std::stringstream ss{};
+                    ss << "Illegal reference \"" << val << "\"";
+                    error(ss.str());
+                    op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                }
+                if (allow_pending) {
+                    pending.push_back({shaddr, "&"s + val});
+                }
+            } else {
+                auto it = labels.find(val);
+                if (it != labels.end()) {
+                    return it->second;
+                } else {
+                    if (allow_pending) {
+                        pending.push_back({shaddr, val});
+                    } else {
+                        std::stringstream ss{};
+                        ss << "Cannot find \"" << val << "\"";
+                        error(ss.str());
+                        op.valtype = nnasm::op::ASM_TYPE_INVALID;
+                    }
+                }
+            }
+        }
+        return 0;
+    }
+}
+
+char asm_compiler::next_char() {
+    char c = file.get();
+    char r = c;
+    bool skip = false;
+    while (true) {
+        if (c == EOF) {
+            return EOF;
+        } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (c == '\n') {
+                ++line;
+                r = '\n';
+            } else {
+                r = ' ';
+            }
+            char p = file.peek();
+            while (p == ' ' || p == '\t' || p == '\n' || p == '\r') {
+                if (p == '\n') {
+                    ++line;
+                    r = '\n';
+                }
+                c = file.get();
+                p = file.peek();
+            }
+            if (p == EOF) {
+                return EOF;
+            } else if (skip && r == '\n') {
+                return r;
+            } else if (!skip && p != ';') {
+                return r;
+            }
+        } else if (c == ';') {
+            skip = true;
+        } else if (c == '\\') {
+            return file.get();
+        } else if (!skip) {
+            return r;
+        }
+        c = file.get();
+    }
+    return r; // Should never be reached anyway
+}
+
+bool asm_compiler::peek_separator() {
+    char c = file.peek();
+    
+    return c == ' ' || c == '\r'  || c == '\t';
+}
+
+bool asm_compiler::peek_eol() {
+    char c = file.peek();
+    
+    return c == '\n' || c == ';' || c == EOF;
+}
+
+void asm_compiler::error(const std::string& msg) {
+    using namespace std::string_literals;
+    
+    std::stringstream ss{};
+    ss << filename << ":" << line;
+    ss << " - "s << msg;
+    
+    errors.push_back(ss.str());
+}
+

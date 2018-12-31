@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+#include "common/asm.h"
 #include "common/convenience.h"
 
 class parser;
@@ -19,8 +21,35 @@ struct vmregister {
     };
 };
 
-class machine {
+struct vmflagsregister {
+    u64 zero : 1;
+    u64 check : 1;
+    u64 reserved : 62;
+};
+
+class virtualmachine {
 public:
+    virtualmachine(parser& p);
+    ~virtualmachine();
+    
+    virtualmachine(const virtualmachine&) = delete;
+    virtualmachine(virtualmachine&&) = delete;
+    virtualmachine& operator=(const virtualmachine&) = delete;
+    virtualmachine& operator=(virtualmachine&&) = delete;
+    
+    void run();
+    void step();
+    void load_instruction();
+    void execute_instruction();
+    void stop();
+    
+    void load(u8* program, u64 size);
+    void allocate(u64 amount);
+    void resize(u64 amount);
+    void clear();
+    
+    std::string print_info();
+    std::string print_register(u8 reg);
 private:
     vmregister registers[16]{};
     vmregister& ra = registers[0];
@@ -37,14 +66,27 @@ private:
     vmregister& rl = registers[11];
     vmregister& rm = registers[12];
     vmregister& pc = registers[13];
-    vmregister& sf = registers[14];
+    vmflagsregister& sf = *reinterpret_cast<vmflagsregister*>(&registers[14]);
     vmregister& sp = registers[15];
     
-    u8* memory{nullptr};
+    nnasm::instruction loaded{};
+    
+    u8* memory{nullptr}; // Owned
     u8* code{nullptr};
+    u8* data{nullptr};
     u8* heap{nullptr};
     u8* end{nullptr};
+    
     u64 allocated{0};
+    u64 read_only_end{0};
+    u64 stack_size{0};
+    
+    decltype(std::chrono::high_resolution_clock::now()) start_time{};
+    decltype(std::chrono::high_resolution_clock::now()) end_time{};
+    u64 steps{};
     
     parser& p;
+
+    bool running{false};
+    bool stopped{false};    
 };

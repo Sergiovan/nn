@@ -1,49 +1,47 @@
 Registers: 
-14 + program counter + stack pointer.
-Named RA-RM.
-Program counter named PC. PC is updated before instruction is run.
-Status flags register named SF.
-Flags:
- 0 : Zero flag. Previous operation resulted in zero.
+13 + program counter + status flags + stack pointer.
+Named ra-rm, pc, sf and sp respectively.
+Program counter is updated before instruction is run.
+Status flags:
+ 0 : Zero flag. Previous arithmetic operation resulted in zero.
  1 : Check flag. Previous comparison or check was true.
-Stack pointer named SP.
-Can hold 8 bytes each.
-Register names are suffixed with one of the following:
-- Nothing: 8 bytes.
-- s: 8 bytes. Signed.
-- 64: 8 bytes.
-- 64s: 8 bytes. Signed.
-- 8: First byte.
-- 8s: First byte. Signed.
-- 16: First 2 bytes.
-- 16s: First 2 bytes. Signed.
-- 32: First 4 bytes.
-- 32s: First 4 bytes. Signed.
-- f: Float, 4 bytes.
-- d: Double, 8 bytes.
+Registers can hold 8 bytes each.
+There are 10 type identifiers:
+- [64]: 8 bytes, unsigned.
+- [64]s: 8 bytes, signed.
+- 8: 1 byte.
+- 8s: 1 byte, signed.
+- 16: 2 bytes.
+- 16s: 2 bytes, signed.
+- 32: 4 bytes.
+- 32s: 4 bytes, signed.
+- f: 4 bytes, floating point.
+- d: 8 bytes, floating point.
+
+Register names are suffixed with one type identifier.
 
 Instructions:
 All instructions take at least 2 bytes. Operands may take more bytes. First 10 bits are instruction, then 6 bits for operand flags.
 <reg> = Any register. 1 byte. Preceeded by $.
-<val> = Any value. 8 bytes. Can be suffexed with _64, _64s, s, _8, _8s, _16, _16s, _32, _32s, _f or _d to indicate type and sign.
-<addr> = Any valid address or identifier. 8 bytes. Preceded by @.
+<val> = Any value. 8 bytes. Can be suffexed with an underscore followed by a type identifier to indicate type and sign. Numbers can be given in decimal, hexadecimal, octal or binary form.
+Registers and values can be preceeded by a type identifier and @ to take the value at that address with that size.
 <idn> = An identifier. No quotes.
 <x,y> = x or y.
 <any> = Anything.
 <:x> = Exactly x bytes.
 <:x+> = x or more bytes.
 <:x-> = x or less bytes.
-<>? = Optional.
 
 ~~ General ~~
 General instructions.
 NOP - No operation.
-MOV <any> <reg,addr> - Copy value of op1 to op2.
-MVI <any> <reg,addr> - Copy value of sp + signed op1 to op2.
-MVI <any> <any> <reg,addr> - Copy value of @(signed op1 + signed op2) to op3. 
+MOV <any> <reg> - Copy value of op1 to op2.
+MOV <any> <val> - Copy value of op1 to memory location op2.
+MVI <any> <reg> - Copy value of sp + signed op1 to op2.
+MVI <any> <any> <reg> - Copy value of @(signed op1 + signed op2) to op3. 
 CPY <any> <any> <any> - Copy op3 bytes from location op1 to op2.
-ZRO - <reg,addr> <any> - Zero op2 bytes at location op1.
-SET - <any:1> <reg,addr> <any> - Set op3 bytes at location op2 to value op1.
+ZRO - <any> <any> - Zero op2 bytes at location op1.
+SET - <any:1> <any> <any> - Set op3 bytes at location op2 to value op1.
 BRK - Break and jump to debugger.
 HLT - Stops the program.
 
@@ -53,10 +51,10 @@ CZRO <any> - Sets check flag if op1 is zero.
 CNZR <any> - Sets check flag if op1 is not zero.
 CEQ <any> <any> - Sets check flag if op1 equals op2.
 CNEQ <any> <any> - Sets check flag if op1 does not equal op2.
-CLT[S|F] <any> <any> - Sets check flag if op1 is less than op2.
-CLE[S|F] <any> <any> - Sets check flag if op1 is less or equal to op2.
-CGT[S|F] <any> <any> - Sets check flag if op1 is greater than op2.
-CGE[S|F] <any> <any> - Sets check flag if op1 is greater or equal to op2.
+CLT <any> <any> - Sets check flag if op1 is less than op2.
+CLE <any> <any> - Sets check flag if op1 is less or equal to op2.
+CGT <any> <any> - Sets check flag if op1 is greater than op2.
+CGE <any> <any> - Sets check flag if op1 is greater or equal to op2.
 CBS <any> <any:1> - Sets check flag if bit op2 is set in op1.
 CBNS <any> <any:1> - Sets check flag if bit op2 is not set in op1.
 
@@ -70,12 +68,12 @@ JNCH <any> - Jump to op1 if check flag is not set.
 ~~ Stack ~~
 PUSH <val> - Push op1 onto the stack, move the stack pointer up by size of op1.
 PUSH <reg> - Push op1 onto the stack, move the stack pointer up by size of op1.
-PUSH <addr> <any> - Push op2 bytes from op1 onto the stack, move the stack pointer up by op2.
-POP <val,addr> - Move the stack pointer down by op1 bytes.
-POP <addr> <any> - Pop op2 bytes from stack pointer to op1. Move stack pointer down op2 bytes.
+PUSH <any> <any> - Push op2 bytes from op1 onto the stack, move the stack pointer up by op2.
+POP <val> - Move the stack pointer down by op1 bytes.
+POP <any> <any> - Pop op2 bytes from stack pointer to op1. Move stack pointer down op2 bytes.
 POP <reg> - Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
-CALL <val> - Call built-in function. Pushes call pc onto stack.
-CALL <reg:8,addr> - Call function. Pushes call pc onto stack.
+BTIN <any> - Call builtin function op1. Pushes call pc onto stack.
+CALL <any> - Call function at location op1. Pushes call pc onto stack.
 RET - Return from function. Pops from the stack to pc.
 
 ~~ Pointers and arrays ~~
@@ -85,25 +83,25 @@ IDX <any> <reg> - Take value in memory at offset op2 + (op1 * ~op2) and store it
 IDX <any> <reg> <reg> - Take value in memory at offset op2 + (op1 * ~op2) and store it in op3.
 
 ~~ Arithmetic and bit manip ~~
-Instructions to perform arithmetic and bit manipulation. They all have a version with an extra parameter where the result is stored, instead of overwriting. S means the operation is signed. F means the operation is for floating points.
+Instructions to perform arithmetic and bit manipulation. They all have a version with an extra parameter where the result is stored, instead of overwriting.
 
-ADD[S|F] <any> <reg,addr> - Add op1 and op2. Store in op2.
-INC[S] <reg,addr> - Increment op1.
-SUB[S|F] <any> <reg,addr> - Subtract op1 from op2. Store in op2.
-DEC[S] <reg,addr> - Decrement op2.
-MUL[S|F] <any> <reg,addr> - Multiply op1 and op2. Store in op2.
-DIV[S|F] <any> <reg,addr> - Divide op2 by op1. Store in op2.
-MOD[S|F] <any> <reg,addr> - Divide op2 and op1. Store remainder in op2.
-ABS[S|F] <reg,addr> - Get absolute value of op1. Store in op1.
-NEG[S|F] <reg,addr> - Get negative of op1. Store in op1. Note that unsigned NEG does not have a single op version, only NEGS and NEGF do.
-SHR[S] <any:1> <reg,addr> - Shift op2 right by op1. Store in op2.
-SHL[S] <any:1> <reg,addr> - Shift op2 left by op1. Store in op2.
-RTR <any:1> <reg,addr> - Rotate op2 right by op1. Store in op2.
-RTL <any:1> <reg,addr> - Rotate op2 left by op1. Store in op2.
-AND <any> <reg,addr> - And op1 and op2. Store in op2.
-OR  <any> <reg,addr> - Or op1 and op2. Store in op2.
-XOR <any> <reg,addr> - Xor op1 and op2. Store in op2.
-NOT <reg,addr> - Not op1. Store in op1.
+ADD <any> <reg> - Add op1 and op2. Store in op2.
+INC <reg> - Increment op1.
+SUB <any> <reg> - Subtract op1 from op2. Store in op2.
+DEC <reg> - Decrement op2.
+MUL <any> <reg> - Multiply op1 and op2. Store in op2.
+DIV <any> <reg> - Divide op2 by op1. Store in op2.
+MOD <any> <reg> - Divide op2 and op1. Store remainder in op2.
+ABS <reg> - Get absolute value of op1. Store in op1.
+NEG <reg> - Get negative of op1. Store in op1. Note that unsigned NEG does not have a single op version, only NEGS and NEGF do.
+SHR <any:1> <reg> - Shift op2 right by op1. Store in op2.
+SHL <any:1> <reg> - Shift op2 left by op1. Store in op2.
+RTR <any:1> <reg> - Rotate op2 right by op1. Store in op2.
+RTL <any:1> <reg> - Rotate op2 left by op1. Store in op2.
+AND <any> <reg> - And op1 and op2. Store in op2.
+OR  <any> <reg> - Or op1 and op2. Store in op2.
+XOR <any> <reg> - Xor op1 and op2. Store in op2.
+NOT <reg> - Not op1. Store in op1.
 
 ~~ Pseudoinstructions ~~
 VAL <idn> <val> - Create internal value op2 with name op1. Can be used anywhere, preceded by <.

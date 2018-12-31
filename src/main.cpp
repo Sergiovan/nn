@@ -13,9 +13,11 @@
 #include "frontend/parser.h"
 
 #include "frontend/asm_compiler.h"
+#include "vm/machine.h"
 
 int main(int argc, char** argv) {
     
+    parser p{};
     auto start = std::chrono::high_resolution_clock::now();
     asm_compiler asmc{"examples/pithagoras.nna"};
     asmc.compile();
@@ -51,8 +53,6 @@ int main(int argc, char** argv) {
         logger::log() << logger::color::white << "] | " << t.value;
         logger::log() << "\n";
     } */
-    
-    logger::log() << logger::end;
     logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
     return 0;
 }
