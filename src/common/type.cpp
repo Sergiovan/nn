@@ -200,8 +200,6 @@ u64 type::get_size() {
             type_pointer& p = as_pointer();
             if (p.ptr_t == eptr_type::ARRAY && p.size) {
                 return 8 + p.size * p.t->get_size();
-            } else if (p.ptr_t == eptr_type::SHARED || p.ptr_t == eptr_type::WEAK) { 
-                return 16;
             } else {
                 return 8;
             }

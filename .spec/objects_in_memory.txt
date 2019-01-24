@@ -10,11 +10,11 @@ Enums: Variable, but known at compile time.
 
 Pointers: 8 bytes.
 Unique pointer: 8 bytes.
-Shared pointer: 16 bytes. First 8 bytes point to shared info (8 bytes Pointer count + 8 bytes Weak count) and last 8 bytes point to actual object.
-Weak pointer: 16 bytes. First 8 bytes point to shared info and last 8 bytes point to actual object.
+Shared pointer: 8 bytes. Shared data has a 16 byte header (8 bytes Pointer count + 8 bytes Weak count) followed by the object data.
+Weak pointer: 8 bytes. Also points to shared data.
+Array<k>[n]: Pointer. 8 bytes size, followed by n * k bytes of elements.
 
 Strings[n]: 8 bytes size, 8 bytes pointer to data. Data is n * 4 bytes characters. Effectively UTF-32.
-Array<k>[n]: Pointer. 8 bytes size, followed by n * k bytes of elements.
 
 Struct: All of its members, in order, aligned as needed. Size variable but known at compile time. 
 Union: Size of it's biggest member. Known at compile time.
