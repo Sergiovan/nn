@@ -88,7 +88,7 @@ Instructions to perform arithmetic and bit manipulation. They all have a version
 ADD <any> <reg> - Add op1 and op2. Store in op2.
 INC <reg> - Increment op1.
 SUB <any> <reg> - Subtract op1 from op2. Store in op2.
-DEC <reg> - Decrement op2.
+DEC <reg> - Decrement op1.
 MUL <any> <reg> - Multiply op1 and op2. Store in op2.
 DIV <any> <reg> - Divide op2 by op1. Store in op2.
 MOD <any> <reg> - Divide op2 and op1. Store remainder in op2.

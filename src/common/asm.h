@@ -129,16 +129,20 @@ namespace nnasm {
                     ret[code].push_back({code, OP_ANY | f, OP_ANY | f, OP_REG | f});
                 };
                 
+                constexpr opformat OP_VAL_INT  = OP_VAL | OP_FLAGS_INT;
+                constexpr opformat OP_VAL_UINT  = OP_VAL | OP_FLAGS_SINT;
+                constexpr opformat OP_VAL_SINT  = OP_VAL | OP_FLAGS_UINT;
+                constexpr opformat OP_ANY_INT  = OP_ANY | OP_FLAGS_INT;
                 constexpr opformat OP_ANY_SINT = OP_ANY | OP_FLAGS_SINT;
                 constexpr opformat OP_ANY_UINT = OP_ANY | OP_FLAGS_UINT;
                 
                 add(op::NOP); // NOP - No operation
                 add(op::MOV, OP_ANY, OP_REG); // MOV - Move
-                add(op::MOV, OP_ANY, OP_VAL | OP_FLAGS_INT);
-                add(op::MVI, OP_ANY_SINT, OP_REG); // MVI - Move indirect
-                add(op::MVI, OP_ANY_SINT, OP_ANY_SINT, OP_REG);
-                add(op::CPY, OP_REG, OP_REG, OP_ANY_UINT); // CPY - Copy
-                add(op::ZRO, OP_ANY_SINT, OP_ANY_UINT); // ZRO - Zero
+                add(op::MOV, OP_ANY, OP_VAL_INT);
+                add(op::MVI, OP_ANY_INT, OP_REG); // MVI - Move indirect
+                add(op::MVI, OP_ANY_INT, OP_ANY_INT, OP_REG);
+                add(op::CPY, OP_ANY_INT, OP_ANY_INT, OP_ANY_UINT); // CPY - Copy
+                add(op::ZRO, OP_ANY_INT, OP_ANY_UINT); // ZRO - Zero
                 add(op::SET, OP_ANY, OP_REG, OP_ANY_UINT); // SET - Set
                 add(op::BRK); // BRK - Break
                 add(op::HLT); // HLT - Halt 
@@ -154,15 +158,15 @@ namespace nnasm {
                 add(op::CBS, OP_ANY, OP_ANY_UINT); // CBS - Check bit set
                 add(op::CBNS, OP_ANY, OP_ANY_UINT); // CBNS - Check bit not set
                 
-                add(op::JMP, OP_ANY | OP_FLAGS_INT); // JMP - Jump
-                add(op::JMPR, OP_ANY | OP_FLAGS_INT); // JMPR - Jump relative
-                add(op::JCH, OP_ANY | OP_FLAGS_INT); // JCH - Jump if check
-                add(op::JNCH, OP_ANY | OP_FLAGS_INT); // JNCH - Jump if not check
+                add(op::JMP, OP_ANY_INT); // JMP - Jump
+                add(op::JMPR, OP_ANY_INT); // JMPR - Jump relative
+                add(op::JCH, OP_ANY_INT); // JCH - Jump if check
+                add(op::JNCH, OP_ANY_INT); // JNCH - Jump if not check
                 
                 add(op::PUSH, OP_VAL); // PUSH - Push
                 add(op::PUSH, OP_REG);
                 add(op::PUSH, OP_ANY, OP_ANY_UINT); 
-                add(op::POP, OP_VAL | OP_FLAGS_UINT); // POP - Pop
+                add(op::POP, OP_VAL_UINT); // POP - Pop
                 add(op::POP, OP_ANY, OP_ANY_UINT);
                 add(op::POP, OP_REG);
                 add(op::BTIN, OP_ANY_UINT); // BTIN - Built-in

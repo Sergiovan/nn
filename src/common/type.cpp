@@ -199,7 +199,9 @@ u64 type::get_size() {
         case ettype::POINTER: {
             type_pointer& p = as_pointer();
             if (p.ptr_t == eptr_type::ARRAY && p.size) {
-                return p.size * p.t->get_size();
+                return 8 + p.size * p.t->get_size();
+            } else if (p.ptr_t == eptr_type::SHARED || p.ptr_t == eptr_type::WEAK) { 
+                return 16;
             } else {
                 return 8;
             }
@@ -224,7 +226,12 @@ u64 type::get_size() {
                             ps.size++;
                             bfsum = 0;
                         }
-                        ps.size += f.t->get_size();
+                        u64 tsize = f.t->get_size();
+                        u8 align = std::min(tsize, 8ul);
+                        if (u8 remainder = tsize % align; remainder) {
+                            ps.size += (align - remainder);
+                        }
+                        ps.size += tsize;
                     }
                 }
                 return ps.size;

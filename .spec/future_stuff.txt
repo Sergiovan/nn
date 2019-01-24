@@ -22,3 +22,5 @@ Combination type casting:
 
 Multicasting:
 "<a -> b>" casts to a, then to b. Chainable
+
+C++-like "move" semantics. Currently everything is copied.

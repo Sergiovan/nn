@@ -1,0 +1,24 @@
+All objects preceeded by a u64 (8 bytes) with its type. This means everything has at least 8 bytes of size. Pointers point _after_ this, which means this info is always "behind" data. IDEA: Make this less somehow? Unlikely to use 2^64 types.
+
+Everything is aligned to min(size, 8).
+
+Numbers: X bytes aligned.
+Booleans: 1 byte. Only first bit is used.
+Sig: 8 bytes.
+Chars: 4 bytes.
+Enums: Variable, but known at compile time.
+
+Pointers: 8 bytes.
+Unique pointer: 8 bytes.
+Shared pointer: 16 bytes. First 8 bytes point to shared info (8 bytes Pointer count + 8 bytes Weak count) and last 8 bytes point to actual object.
+Weak pointer: 16 bytes. First 8 bytes point to shared info and last 8 bytes point to actual object.
+
+Strings[n]: 8 bytes size, 8 bytes pointer to data. Data is n * 4 bytes characters. Effectively UTF-32.
+Array<k>[n]: Pointer. 8 bytes size, followed by n * k bytes of elements.
+
+Struct: All of its members, in order, aligned as needed. Size variable but known at compile time. 
+Union: Size of it's biggest member. Known at compile time.
+
+Closure: 8 bytes premade stack (n), n bytes premade stack, 8 bytes remaining stack, 8 bytes function location.
+Function ptr: 8 bytes. Points to empty closure.
+Closure ptr: 8 bytes.

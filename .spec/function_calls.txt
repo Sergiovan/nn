@@ -1,0 +1,12 @@
+Everything done by caller, basically.
+
+0. rk:rm should not contain anything that can't be replaced.
+1. Load parameters right-to-left, first parameter is at the bottom.
+2. Load stack, usually empty. In case of closures or coroutines, things may be added here. When calling a function normally, this is known at compile time. If not, closure objects have the required information.
+3. Call function. This also automatically puts the return address at the very top of the stack.
+4. Function happens, who knows what magical things are achieved.
+5. Return pops the return address from the stack.
+6. Stack is cleared. Once again, this is automatically done for normal functions, but requires some help with closures.
+7. Parameters are cleared.
+
+Returns always in rk:rm. If data is bigger than 24 bytes, rk is a pointer to the data (stored in struct format according to return types) that needs to be deleted after use.

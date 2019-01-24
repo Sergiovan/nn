@@ -19,9 +19,15 @@ int main(int argc, char** argv) {
     
     parser p{};
     auto start = std::chrono::high_resolution_clock::now();
-    asm_compiler asmc{"examples/pithagoras.nna"};
+    asm_compiler asmc{"examples/fib.nna"};
     asmc.compile();
     auto end = std::chrono::high_resolution_clock::now();
+    
+    virtualmachine vm{p};
+    vm.load(asmc.get(), asmc.size());
+    
+    vm.run();
+    logger::info() << vm.print_info() << logger::nend;
     
     /*
     parser p{};
