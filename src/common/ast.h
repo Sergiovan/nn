@@ -234,6 +234,7 @@ struct ast {
     bool is_block();
     bool is_function();
     bool is_nntype();
+    bool is_value();
     
     type* get_type();
     bool is_assignable();

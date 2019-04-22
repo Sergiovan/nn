@@ -16,7 +16,7 @@
 #include "vm/machine.h"
 
 int main(int argc, char** argv) {
-    
+    /*
     parser p{};
     auto start = std::chrono::high_resolution_clock::now();
     asm_compiler asmc{"examples/fib.nna"};
@@ -28,12 +28,12 @@ int main(int argc, char** argv) {
     
     vm.run();
     logger::info() << vm.print_info() << logger::nend;
+    */
     
-    /*
     parser p{};
     
     auto start = std::chrono::high_resolution_clock::now();
-    ast* res = p.parse(argc > 1 ? argv[1] : "examples/mastermind2.nn", true);
+    parse_info res = p.parse(argc > 1 ? argv[1] : "examples/simple.nn", true);
     
     auto end = std::chrono::high_resolution_clock::now();
     
@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
     } else {
         p.print_info();
     }
-    */
+    
     /*
     reader* r = reader::from_file("examples/mastermind2.nn");
     lexer  l{r};

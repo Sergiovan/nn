@@ -46,20 +46,21 @@ parser::~parser() {
     }
 }
 
-ast* parser::parse(lexer* l) {
+parse_info parser::parse(lexer* l) {
     contexts.push({root_st, nullptr, nullptr, nullptr, nullptr, nullptr});
     parser::l = l;
     c = l->next();
-    return _parse();
+    ast* res = _parse();
+    return {res, root_st, &types, modules};
 }
 
-ast* parser::parse(const std::string& str, bool is_file) {
+parse_info parser::parse(const std::string& str, bool is_file) {
     reader* r = (is_file ? reader::from_file : reader::from_string)(str);
     if (is_file) {
         file_path /= str;
     }
     lexer* l = new lexer{r};
-    ast* ret = parse(l);
+    parse_info ret = parse(l);
     delete l; // Deletes r
     return ret;
 }
@@ -850,6 +851,9 @@ ast* parser::ifstmt() {
     
     eexpression_type last{eexpression_type::INVALID};
     do {
+        if (is(Symbol::SEMICOLON)) {
+            next(); // ;
+        }
         stmts.push_back(fexpression(&last));
     } while (is(Symbol::SEMICOLON));
     
@@ -1063,6 +1067,9 @@ ast* parser::whilestmt() {
     
     eexpression_type last{eexpression_type::INVALID};
     do {
+        if (is(Symbol::SEMICOLON)) {
+            next(); // ;
+        }
         stmts.push_back(fexpression(&last));
     } while (is(Symbol::SEMICOLON));
     
@@ -1101,6 +1108,9 @@ ast* parser::switchstmt() {
     
     eexpression_type last{eexpression_type::INVALID};
     do {
+        if (is(Symbol::SEMICOLON)) {
+            next(); // ;
+        }
         stmts.push_back(fexpression(&last));
     } while (is(Symbol::SEMICOLON));
     
@@ -1178,7 +1188,10 @@ ast* parser::casestmt() {
     }
     
     if (is(Keyword::CONTINUE)) {
+        next(); // continue
         bin.right = ast::unary(Symbol::KWCONTINUE);
+        require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
+        next(); // ;
     } else if (is(Symbol::BRACE_LEFT)) {
         bin.right = ast::unary(Symbol::KWCASE, scope());
     } else if (is(Keyword::DO)) {
@@ -1205,6 +1218,8 @@ ast* parser::trystmt() {
     do {
         stmts.push_back(statement());
     } while (!is(Keyword::CATCH) && !is(TokenType::END_OF_FILE));
+    
+    next(); // catch
     
     ast* consequence = ast::unary();
     auto& un = consequence->as_unary();
@@ -1372,6 +1387,7 @@ ast* parser::raisestmt() {
                 val = sigval->as_field().field;
             }
             ret = ast::unary(Symbol::KWRAISE, ast::qword(val, types.t_sig));
+            next(); // sig name
         } else { // Assume it's an expression
             ast* exp = expression();
             if (!exp->get_type()->can_weak_cast(types.t_sig)) {
@@ -1573,7 +1589,7 @@ ast* parser::importstmt() {
     
     if (auto stored_module = modules.find(module_name); stored_module == modules.end()) {
         parser pars = fork();
-        ast* module = pars.parse(module_name, true);
+        ast* module = pars.parse(module_name, true).result;
         if (pars.has_errors()) {
             errors.insert(errors.end(), pars.errors.begin(), pars.errors.end());
         }
@@ -2343,6 +2359,7 @@ ast* parser::structvardecliden(ast* t1) {
             }
             f.bits = (u8) val;
             f.bitfield = true;
+            next(); // value
         }
     }
     
@@ -2525,7 +2542,7 @@ ast* parser::simplevardecl(ast* t1) {
         }
     }
     
-    st_entry* entry = st()->add_field(name, fields.size(), ctx()._struct);
+    st_entry* entry = st()->add_field(name, fields.size() - 1, ctx()._struct);
     ast* ret = ast::symbol(entry);
     
     return ast::binary(Symbol::SYMDECL, ret, exp ? exp : ast::none(), expected);
@@ -2990,6 +3007,7 @@ ast* parser::unionscope() {
     }
     
     require(Symbol::BRACE_RIGHT);
+    next(); // }
     
     return block;
 }
@@ -3277,8 +3295,8 @@ ast* parser::deletestmt() {
         if (!exp->is_assignable()) {
             error("Cannot delete result of expression");
             continue;
-        } else if (!exp->get_type()->is_pointer()) {
-            error("Cannot delete non-pointer");
+        } else if (!exp->get_type()->is_pointer(eptr_type::NAKED)) {
+            error("Cannot delete non-naked pointer");
             continue;
         }
         

@@ -879,6 +879,29 @@ bool ast::is_nntype() {
     return t == east_type::TYPE;
 }
 
+bool ast::is_value() {
+    switch (t) {
+        case east_type::NONE: [[fallthrough]];
+        case east_type::BYTE: [[fallthrough]];
+        case east_type::WORD: [[fallthrough]];
+        case east_type::DWORD: [[fallthrough]];
+        case east_type::QWORD: [[fallthrough]];
+        case east_type::STRING: [[fallthrough]];
+        case east_type::ARRAY: [[fallthrough]];
+        case east_type::CLOSURE: [[fallthrough]];   
+        case east_type::STRUCT: return true;
+        case east_type::PRE_UNARY: [[fallthrough]];
+        case east_type::POST_UNARY: [[fallthrough]];
+        case east_type::BINARY: [[fallthrough]];
+        case east_type::SYMBOL: [[fallthrough]];
+        case east_type::BLOCK: [[fallthrough]];   
+        case east_type::TYPE: [[fallthrough]];
+        case east_type::FUNCTION: [[fallthrough]];
+        default:
+            return false;
+    }
+}
+
 type* ast::get_type() {
     switch (t) {
         case east_type::SYMBOL: return as_symbol().symbol->get_type(); 
@@ -975,7 +998,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
                 sep += "\xbf\xc4"s;
                 ss << un.node->print(depth + 1, sep);
             } else {
-                ss << "NULLPTR\n";
+                ss << sep << "  NULLPTR\n";
             }
             return ss.str();
         }
@@ -996,13 +1019,13 @@ std::string ast::print(u64 depth, const std::string& prev) {
             if (bin.left) {
                 ss << bin.left->print(depth + 1, sep);
             } else {
-                ss << "NULLPTR\n";
+                ss << sep << "  NULLPTR\n";
             }
             *(sep.end() - 2) = '\xbf';
             if (bin.right) {
                 ss << bin.right->print(depth + 1, sep);
             } else {
-                ss << "NULLPTR\n";
+                ss << sep << "  NULLPTR\n";
             }
             return ss.str();
         }
@@ -1042,7 +1065,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
             if (fun.block) {
                 ss << fun.block->print(depth + 1, sep);
             } else {
-                ss << "NULLPTR\n";
+                ss << sep << "  NULLPTR\n";
             }
             return ss.str();
         }
@@ -1118,7 +1141,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
                 if (arr.elems[i]) {
                     ss << arr.elems[i]->print(depth + 1, sep);
                 } else {
-                    ss << "NULLPTR\n";
+                    ss << sep << "  NULLPTR\n";
                 }
             }
             return ss.str();
@@ -1135,7 +1158,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
                 if (stc.elems[i]) {
                     ss << stc.elems[i]->print(depth + 1, sep);
                 } else {
-                    ss << "NULLPTR\n";
+                    ss << sep << "  NULLPTR\n";
                 }
             }
             return ss.str();
@@ -1151,13 +1174,13 @@ std::string ast::print(u64 depth, const std::string& prev) {
                 if (size) {
                     ss << size->print(depth + 1, prev);
                 } else {
-                    ss << "NULLPTR\n";
+                    ss << sep << "  NULLPTR\n";
                 }
             }
             return ss.str();
         }
         default:
-            ss << "ILLEGAL SHENANIGANS\n";
+            ss << sep << "ILLEGAL SHENANIGANS\n";
             return ss.str();
     }
     

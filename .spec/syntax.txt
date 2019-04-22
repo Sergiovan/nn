@@ -323,7 +323,7 @@ freedeclstmt = freevardecl, semicolon | funcdecl | structdecl | uniondecl | enum
 
 structdeclstmt = structvardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl
 
-uniondeclstmt = simplevardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl;
+uniondeclstmt = simplevardecl, semicolon | funcdecl | structdecl | uniondecl | enumdecl
 
 vardeclass  = opassign, aexpression, {comma, aexpression}
 

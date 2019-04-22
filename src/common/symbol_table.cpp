@@ -198,15 +198,15 @@ st_variable& st_variable::operator=(st_variable&& o) {
     return *this;
 }
 
-st_function::st_function(const std::vector<overload> overloads, symbol_table* st) : overloads(overloads), st(st) {
-
+st_function::st_function(const std::vector<overload> overloads, symbol_table* st) : overloads(overloads), st(st ? st : new symbol_table{etable_owner::FUNCTION, nullptr}) {
+    
 }
 
 overload* st_function::get_overload(const std::vector<type*>& args) {
     std::vector<overload*> ret{};
     for (auto& ov : overloads) {
         auto& oparams = ov.t->as_function().params;
-        bool spread = (oparams.back().flags & eparam_flags::SPREAD) != 0;
+        bool spread = oparams.size() ? (oparams.back().flags & eparam_flags::SPREAD) != 0 : false;
         if (args.size() > oparams.size() && !spread) {
             goto next_overload;
         }
@@ -780,7 +780,7 @@ std::string symbol_table::print(u64 depth) {
     ss << sep << "Parent: " << (u64) parent << "\n";
     ss << sep << "Entries: \n";
     if (entries.empty()) {
-        ss << "None\n";
+        ss << sep << "  None\n";
     } else {
         for (auto& entry : entries) {
             ss << entry.second->print(depth + 1);
@@ -788,7 +788,7 @@ std::string symbol_table::print(u64 depth) {
     }
     ss << sep << "Borrowed entries: \n";
     if (borrowed_entries.empty()) {
-        ss << "None\n";
+        ss << sep << "  None\n";
     } else {
         for (auto& entry : borrowed_entries) {
             ss << sep << "  " << entry.first << "\n";

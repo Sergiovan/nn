@@ -48,6 +48,12 @@ struct ctx_guard {
 class parser_exception : public std::exception {
 };
 
+struct parse_info {
+    ast* result;
+    symbol_table* root_st;
+    type_table* types;
+    dict<symbol_table*> modules;
+};
 
 class parser{
 public:
@@ -60,8 +66,8 @@ public:
     parser& operator=(const parser&) = delete;
     parser& operator=(parser&&) = delete;
     
-    ast* parse(lexer* l);
-    ast* parse(const std::string& str, bool is_file = false);
+    parse_info parse(lexer* l);
+    parse_info parse(const std::string& str, bool is_file = false);
     
     symbol_table* get_as_module();
     parser fork();

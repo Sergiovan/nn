@@ -712,7 +712,7 @@ std::string type::print(bool simple) {
                     }
                     ss << "\n";
                 }
-                ss << "}";
+                ss << "    }";
             }
             break;
         }
@@ -729,7 +729,7 @@ std::string type::print(bool simple) {
                     ss << "\t" << field.t->print(true);
                     ss << " " << field.name << "\n";
                 }
-                ss << "}";
+                ss << "    }";
             }
             break;
         }
