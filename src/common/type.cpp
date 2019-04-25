@@ -65,6 +65,10 @@ field& field::operator=(field&& o) {
     return *this;
 }
 
+type* parameter::in_param() {
+    return flags & eparam_flags::SPREAD ? t->as_pointer().t : t;
+}
+
 type_union::type_union(const std::vector<ufield> fields, st_entry* ste, u64 def_type, ast* def_value, u64 size) 
     : fields(fields), ste(ste), def_type(def_type), def_value(def_value), size(size) {
     
@@ -746,12 +750,14 @@ std::string type::print(bool simple) {
             }
             ss << "(";
             for (auto& param : fun.params) {
-                ss << param.t->print(true);
+                if (param.flags & eparam_flags::SPREAD) {
+                    ss << param.t->as_pointer().t->print(true);
+                    ss << "...";
+                } else {
+                    ss << param.t->print(true);
+                }
                 if (param.name.length()) {
                     ss << " " << param.name;
-                }
-                if (param.flags & eparam_flags::SPREAD) {
-                    ss << "...";
                 }
                 if (param.flags & eparam_flags::DEFAULTABLE) {
                     ss << "=";

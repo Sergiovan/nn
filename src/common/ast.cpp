@@ -1031,7 +1031,12 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::SYMBOL: {
             ast_symbol& sym = as_symbol();
-            ss << "SYMBOL " << sym.get_name() << " (" << sym.symbol->get_type()->print(true) << ") ";
+            ss << "SYMBOL " << sym.get_name();
+            if (sym.overload_defined) {
+                ss << " (" << sym.symbol->get_type(sym.overload)->print(true) << ") ";
+            } else {
+                ss << " (" << sym.symbol->get_type()->print(true) << ") ";
+            }
             switch (sym.symbol->t) {
                 case est_entry_type::FIELD: 
                     ss << "FIELD\n"; 

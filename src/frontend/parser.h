@@ -8,6 +8,7 @@
 #include "frontend/token.h"
 #include "common/grammar.h"
 #include "common/type_table.h"
+#include "common/symbol_table.h"
 
 struct ast;
 class reader;
@@ -143,7 +144,7 @@ private:
     ast* program();
     ast* statement();
     ast* scopestatement();
-    ast* scope();
+    ast* scope(etable_owner from = etable_owner::COPY);
     
     ast* ifstmt();
     ast* ifscope();

@@ -132,6 +132,8 @@ struct parameter {
     std::string name{""};
     ast* value{nullptr};
     // std::string type_same_as{""}
+    
+    type* in_param();
 };
 
 struct type_primitive {

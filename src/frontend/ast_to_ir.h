@@ -14,7 +14,7 @@ public:
     void build(ast* ast = nullptr, symbol_table* sym = nullptr);
     void optimize();
 private:    
-    void add_proper(ir_triple& triple, ast* ast, symbol_table* sym);
+    void add_proper(ir_op::code code, symbol_table* sym, ast* param1, ast* param2 = nullptr);
     ir* new_ir();
     
     parse_info& p;
@@ -22,4 +22,5 @@ private:
     ir* current{nullptr};
     std::vector<ir*> irs{};
     std::stack<block> blocks{};
+    std::map<st_entry*, ir*> labeled{};
 };

@@ -7,8 +7,8 @@
 #include "common/type_table.h"
 #include "common/utils.h"
 
-overload::overload(type* t, ast* value, bool defined, symbol_table* st) 
- : t(t), value(value), defined(defined), st(st) {
+overload::overload(type* t, ast* value, bool defined, symbol_table* st, u64 oid) 
+ : t(t), value(value), defined(defined), st(st), oid(oid) {
     
 }
 
@@ -42,6 +42,7 @@ overload::overload(const overload& o) {
     } else {
         st = nullptr;
     }
+    oid = o.oid;
 }
 
 overload::overload(overload&& o) {
@@ -49,6 +50,7 @@ overload::overload(overload&& o) {
     std::swap(value, o.value);
     defined = o.defined;
     std::swap(st, o.st);
+    oid = o.oid;
 }
 
 overload& overload::operator=(const overload& o) {
@@ -72,6 +74,7 @@ overload& overload::operator=(const overload& o) {
         } else {
             st = nullptr;
         }
+        oid = o.oid;
     }
     return *this;
 }
@@ -82,6 +85,7 @@ overload& overload::operator=(overload&& o) {
         std::swap(value, o.value);
         defined = o.defined;
         std::swap(st, o.st);
+        oid = o.oid;
     }
     return *this;
 }
@@ -212,11 +216,11 @@ overload* st_function::get_overload(const std::vector<type*>& args) {
         }
         for (u64 i = 0; i < args.size(); ++i) {
             if (i < oparams.size()) {
-                if (!args[i]->can_weak_cast(oparams[i].t)) {
+                if (!args[i]->can_weak_cast(oparams[i].in_param())) {
                     goto next_overload;
                 }
             } else if (oparams.back().flags & eparam_flags::SPREAD){
-                if (!args[i]->can_weak_cast(oparams.back().t)) {
+                if (!args[i]->can_weak_cast(oparams.back().in_param())) {
                     goto next_overload;
                 }
             } else {
@@ -243,7 +247,7 @@ overload* st_function::get_overload(const std::vector<type*>& args) {
             auto& oparams = ov->t->as_function().params;
             bool spread = (oparams.back().flags & eparam_flags::SPREAD) != 0;
             for (int i = 0; i < oparams.size() - (spread ? 1 : 0); ++i) {
-                if (oparams[i].t != args[i]) {
+                if (oparams[i].in_param() != args[i]) {
                     goto final_next_overload;
                 }
             }
@@ -484,7 +488,39 @@ type* st_entry::get_type() {
             }
         }
         case est_entry_type::FUNCTION:
-            return as_function().overloads.size() != 1 ? type_table::t_fun : as_function().overloads[0].t;
+            return as_function().overloads.size() != 1 ? type_table::t_fun : as_function().overloads.back().t;
+        case est_entry_type::TYPE:
+            return as_type().t;
+        case est_entry_type::VARIABLE:
+            return as_variable().t;
+        case est_entry_type::MODULE: [[fallthrough]];
+        case est_entry_type::NAMESPACE: [[fallthrough]];
+        case est_entry_type::LABEL: 
+            return type_table::t_void;
+    }
+    return nullptr; // What
+}
+
+type* st_entry::get_type(u64 oid) {
+    switch (t) {
+        case est_entry_type::FIELD: 
+        {
+            type* ftype = as_field().ptype;
+            switch (ftype->tt) {
+                case ettype::FUNCTION:
+                    return type_table::t_sig;
+                case ettype::ENUM:
+                    return ftype;
+                case ettype::STRUCT:
+                    return ftype->as_struct().fields[as_field().field].t;
+                case ettype::UNION:
+                    return ftype->as_union().fields[as_field().field].t;
+                default:
+                    return nullptr; // Error, bad
+            }
+        }
+        case est_entry_type::FUNCTION:
+            return as_function().overloads[oid].t;
         case est_entry_type::TYPE:
             return as_type().t;
         case est_entry_type::VARIABLE:
@@ -664,7 +700,7 @@ std::pair<st_entry*, overload*> symbol_table::add_function(const std::string& na
         entries.insert({name, f});
     }
     
-    overload o{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}};
+    overload o{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}, f->as_function().overloads.size()};
     f->as_function().overloads.emplace_back(std::move(o));
     return {f, &f->as_function().overloads.back()};
 }
@@ -737,6 +773,10 @@ void symbol_table::set_owner(etable_owner owner) {
     symbol_table::owner = owner;
 }
 
+bool symbol_table::owned_by(etable_owner owner) {
+    return symbol_table::owner == etable_owner::COPY ? parent->owned_by(owner) : symbol_table::owner == owner;
+}
+
 symbol_table* symbol_table::make_child(etable_owner new_owner) {
     symbol_table* self = this;
     return new symbol_table{new_owner == etable_owner::COPY ? owner : new_owner, self};
@@ -756,6 +796,9 @@ std::string symbol_table::print(u64 depth) {
             break;
         case etable_owner::FREE:
             ss << "Top level ";
+            break;
+        case etable_owner::LOOP:
+            ss << "Loop ";
             break;
         case etable_owner::FUNCTION:
             ss << "Function ";

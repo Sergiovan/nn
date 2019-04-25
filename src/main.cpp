@@ -11,6 +11,7 @@
 
 #include "common/ast.h"
 #include "frontend/parser.h"
+#include "frontend/ast_to_ir.h"
 
 #include "frontend/asm_compiler.h"
 #include "vm/machine.h"
@@ -40,7 +41,12 @@ int main(int argc, char** argv) {
     if (p.has_errors()) {
         p.print_errors();
     } else {
-        p.print_info();
+        // p.print_info();
+        logger::log() << res.result->print() << logger::nend;
+        
+        ir_builder b{res};
+        b.build();
+    
     }
     
     /*

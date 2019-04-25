@@ -769,7 +769,7 @@ ast* parser::statement() {
     } else if (is_decl_start()) {
         ret = freedeclstmt();
     } else if (is(Symbol::BRACE_LEFT)) {
-        ret = scope();
+        ret = scope(etable_owner::BLOCK);
     } else {
         ret = mexpression();
         require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
@@ -817,13 +817,13 @@ ast* parser::scopestatement() {
     return ret;
 }
 
-ast* parser::scope() {
+ast* parser::scope(etable_owner from) {
     compiler_assert(Symbol::BRACE_LEFT);
     
     next(); // {
     
     push_context();
-    ctx().st = st()->make_child();
+    ctx().st = st()->make_child(from);
     auto cg = guard();
     
     ast* block = ast::block(st());
@@ -897,7 +897,7 @@ ast* parser::forstmt() {
     next(); // for
     
     push_context();
-    ctx().st = st()->make_child();
+    ctx().st = st()->make_child(etable_owner::LOOP);
     auto cg = guard();
     
     ast* condition = forcond();
@@ -1059,7 +1059,7 @@ ast* parser::whilestmt() {
     next(); // while
     
     push_context();
-    ctx().st = st()->make_child();
+    ctx().st = st()->make_child(etable_owner::LOOP);
     auto cg = guard();
     
     ast* conditions = ast::block(st());
@@ -1100,7 +1100,7 @@ ast* parser::switchstmt() {
     next(); // switch
     
     push_context();
-    ctx().st = st()->make_child();
+    ctx().st = st()->make_child(etable_owner::LOOP);
     auto cg = guard();
     
     ast* conditions = ast::block(st());
@@ -1490,6 +1490,23 @@ ast* parser::breakstmt() {
     compiler_assert(Keyword::BREAK);
     next(); // break
     
+    symbol_table* st = ctx().st;
+    bool in_loop{false};
+    while (st) {
+        if (st->owned_by(etable_owner::LOOP)) {
+            in_loop = true;
+            break;
+        } else if (st->owned_by(etable_owner::FUNCTION)) {
+            in_loop = false;
+            break;
+        }
+        st = st->parent;
+    }
+    
+    if (!in_loop) {
+        error("Cannot use break outside of loop");
+    }
+    
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
     return ast::unary(Symbol::KWBREAK);
@@ -1499,6 +1516,23 @@ ast* parser::continuestmt() {
     compiler_assert(Keyword::CONTINUE);
     next(); // continue
     
+    symbol_table* st = ctx().st;
+    bool in_loop{false};
+    while (st) {
+        if (st->owned_by(etable_owner::LOOP)) {
+            in_loop = true;
+            break;
+        } else if (st->owned_by(etable_owner::FUNCTION)) {
+            in_loop = false;
+            break;
+        }
+        st = st->parent;
+    }
+    
+    if (!in_loop) {
+        error("Cannot use continue outside of loop");
+    }
+    
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
     return ast::unary(Symbol::KWCONTINUE);
@@ -1507,6 +1541,10 @@ ast* parser::continuestmt() {
 ast* parser::leavestmt() {
     compiler_assert(Keyword::LEAVE);
     next(); // leave
+    
+    if (st()->owned_by(etable_owner::FUNCTION)) {
+        error("Cannot leave function, use 'return' instead");
+    }
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
@@ -2165,6 +2203,64 @@ ast* parser::vardeclass() {
     
     if (e->is_combination()) {
         auto& types = e->as_combination().types;
+        std::vector<type*> rhtypes{};
+        
+        u64 i{0};
+        
+        push_context();
+        auto cg = guard();
+        
+        while (true) {
+            if (i >= types.size()) {
+                error("Too many expressions for assignment", epanic_mode::SEMICOLON);
+                break;
+            }
+            ctx().expected = types[i];
+            ast* exp = aexpression();
+            type* exptype = exp->get_type();
+            if (exptype->is_combination()) {
+                auto& ctypes = exptype->as_combination().types;
+                rhtypes.insert(rhtypes.end(), ctypes.begin(), ctypes.end());
+                i += ctypes.size();
+            } else {
+                rhtypes.push_back(exptype);
+                ++i;
+            }
+            stmts.push_back(exp);
+            
+            if (is(Symbol::SEMICOLON)) {
+                break;
+            } else {
+                if (!require(Symbol::COMMA, epanic_mode::SEMICOLON)) {
+                    break;
+                }
+            }
+        }
+        
+        for (u64 i = 0; i < types.size(); ++i) {
+            if (i >= rhtypes.size()) {
+                break;
+            }
+            if (!rhtypes[i]->can_weak_cast(types[i])) {
+                error("Cannot cast assignment expression to correct type");
+            }
+        }
+        
+    } else {
+        ast* exp = aexpression();
+        type* exptype = exp->get_type();
+        type* t = exptype->is_combination() ? exptype->as_combination().types[0] : exptype;
+        if (!t->can_weak_cast(e)) {
+            error("Cannot cast assignment expression to correct type");
+        }
+        stmts.push_back(exp);
+        if (is(Symbol::COMMA)) {
+            error("Too many expressions for assignment", epanic_mode::SEMICOLON);
+        }
+    }
+    
+    /* if (e->is_combination()) {
+        auto& types = e->as_combination().types;
         
         push_context();
         auto cg = guard();
@@ -2173,7 +2269,7 @@ ast* parser::vardeclass() {
             ctx().expected = typ;
             ast* exp = aexpression();
             if (!exp->get_type()->can_weak_cast(typ)) {
-                error("Cannot cast expression to correct type");
+                error("Cannot cast assignment expression to correct type");
             }
             stmts.push_back(exp);
             
@@ -2195,11 +2291,11 @@ ast* parser::vardeclass() {
             }
             ast* exp = aexpression();
             if (!exp->get_type()->can_weak_cast(e)) {
-                error("Cannot cast expression to correct type");
+                error("Cannot cast assignment expression to correct type");
             }
             stmts.push_back(exp);
         } while (is(Symbol::COMMA));
-    }
+    } */
     
     return vals;
 }
@@ -2525,7 +2621,7 @@ ast* parser::simplevardecl(ast* t1) {
             exptype = exptype->as_combination().types[0];
         }
         if (!exptype->can_weak_cast(expected)) {
-            error("Cannot cast expression to correct type");
+            error("Cannot cast assignment expression to correct type");
         }
         if (fields.back().t == types.t_let) {
             fields.back().t = exptype;
@@ -2672,7 +2768,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
         auto cg = guard();
         
         ol->defined = true;
-        ol->value = scope();
+        ol->value = scope(etable_owner::FUNCTION);
         delete ol->st;
         ol->st = st();
         
@@ -2810,7 +2906,7 @@ ast* parser::funcval() {
         ctx().function = ftype;
         auto cg = guard();
         
-        scp = scope();
+        scp = scope(etable_owner::FUNCTION);
     } else {
         error("Function values must be defined", epanic_mode::SEMICOLON);
     }
@@ -2833,6 +2929,7 @@ parameter parser::nnparameter() {
     if (is(Symbol::SPREAD)) {
         next(); // ...
         flags |= eparam_flags::SPREAD;
+        ret.t = pointer_to(ret.t, eptr_type::ARRAY);
     }
     
     if (is(TokenType::IDENTIFIER)) {
@@ -3251,20 +3348,30 @@ ast* parser::newinit() {
             ctx().expected = nntyp.t;
             auto cg = guard();
             
+            next(); // {
+            
             value = aexpression();
             if (!value->get_type()->can_weak_cast(nntyp.t)) {
                 error("Cannot cast new value to type");
+            }
+            
+            if(require(Symbol::BRACE_RIGHT, epanic_mode::ESCAPE_BRACE)) {
+                next(); // }
             }
         } else {
             value = ast::byte(0, nntyp.t);
         } 
         valstmts.push_back(value);
         
-        type ret{ettype::POINTER};
-        auto& ptr = ret.as_pointer();
-        ptr.ptr_t = array ? eptr_type::ARRAY : eptr_type::NAKED;
-        ptr.t = nntyp.t;
-        rettypes.push_back(types.get_or_add(ret));
+        if (!array) {
+            type ret{ettype::POINTER};
+            auto& ptr = ret.as_pointer();
+            ptr.ptr_t = eptr_type::NAKED;
+            ptr.t = nntyp.t;
+            rettypes.push_back(types.get_or_add(ret));
+        } else {
+            rettypes.push_back(nntyp.t);
+        }
         
     } while (is(Symbol::COMMA));
 
@@ -3295,8 +3402,9 @@ ast* parser::deletestmt() {
         if (!exp->is_assignable()) {
             error("Cannot delete result of expression");
             continue;
-        } else if (!exp->get_type()->is_pointer(eptr_type::NAKED)) {
-            error("Cannot delete non-naked pointer");
+        } else if (!exp->get_type()->is_pointer(eptr_type::NAKED) && 
+                   !exp->get_type()->is_pointer(eptr_type::ARRAY)) {
+            error("Cannot delete smart pointer");
             continue;
         }
         
@@ -3872,6 +3980,8 @@ ast* parser::e1() {
                         continue;
                     } else {
                         rtype = ol->t->as_function().rets;
+                        exp->as_symbol().overload = ol->oid;
+                        exp->as_symbol().overload_defined = true;
                     }
                 } else {
                     error("Cannot call non-function", epanic_mode::ESCAPE_PAREN);

@@ -10,6 +10,7 @@ struct ast;
 namespace ir_op {
     enum code {
         ADD, SUBTRACT, MULTIPLY, DIVIDE,
+        INCREMENT, DECREMENT, 
         NEGATE, SHIFT_LEFT, SHIFT_RIGHT,
         ROTATE_LEFT, ROTATE_RIGHT,
         AND, OR, XOR, NOT,
@@ -18,9 +19,11 @@ namespace ir_op {
         IF_LESS_THAN_ZERO, IF_GREATER_THAN_ZERO,
         IF_BIT_SET, IF_BIT_NOT_SET,
         
-        CALL, PARAM, 
+        CALL, PARAM, RETURN, RETVAL, 
         
-        COPY, INDEX, OFFSET, ADDRESS, DEREFERENCE
+        COPY, INDEX, OFFSET, ADDRESS, DEREFERENCE, LENGTH,
+        
+        NOOP
     };
 }
 

@@ -21,6 +21,8 @@ struct ast_none{};
 
 struct ast_symbol {
     st_entry* symbol;
+    u64 overload{0}; // For overloaded functions
+    bool overload_defined{false};
     std::string get_name();
 };
 

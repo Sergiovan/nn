@@ -10,7 +10,7 @@ struct ast;
 struct type;
 
 enum class etable_owner {
-    FREE, BLOCK, NAMESPACE, 
+    FREE, BLOCK, NAMESPACE, LOOP, 
     FUNCTION, STRUCT, MODULE,
     UNION, ENUM,
     COPY
@@ -26,8 +26,9 @@ struct overload {
     ast* value{nullptr}; // Owned
     bool defined{false};
     symbol_table* st{nullptr}; // Owned
+    u64 oid{0};
     
-    overload(type* t, ast* value = nullptr, bool defined = false, symbol_table* st = nullptr);
+    overload(type* t, ast* value = nullptr, bool defined = false, symbol_table* st = nullptr, u64 oid = 0);
     ~overload();
     overload(const overload& o);
     overload(overload&& o);
@@ -122,6 +123,7 @@ struct st_entry {
     bool is_label();
     
     type* get_type();
+    type* get_type(u64 oid);
     
     std::string print(u64 depth = 0);
 };
@@ -159,11 +161,12 @@ public:
     u64 get_size(bool borrowed = true);
     
     void set_owner(etable_owner owner);
+    bool owned_by(etable_owner owner);
     
     symbol_table* make_child(etable_owner new_owner = etable_owner::COPY);
     
     std::string print(u64 depth = 0);
-private:
+
     symbol_table* parent;
     etable_owner owner;
     dict<st_entry*> entries{}; // Owned

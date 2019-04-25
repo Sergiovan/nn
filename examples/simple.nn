@@ -2,16 +2,28 @@ int foo();
 int foo() {
 	return 1;
 }
+int foo(int a) {
+	return a;
+}
+int:sig foo(int a, int... b) {
+	if a > ~b {
+		raise NO_WAY;
+	}
+	return b[~b - a];
+}
 
 struct name {
 	float a;
 	double b;
 	int c : 8;
 	string d;
+	int foo() {
+		return 0;
+	}
 }
 
 union uname {
-	int a;
+	int a = 3;
 	float b;
 }
 
@@ -47,7 +59,7 @@ int main(string[] arg) {
 		else do break;
 	} 
 	
-	int sol = 0;
+	int sol = <int> -~arr;
 	for int i : arr {
 		sol += i;
 	}
@@ -60,13 +72,51 @@ int main(string[] arg) {
 		sol *= i;
 	}
 	
+	{
+		int* a = new int;
+		int[] b = new int[10];
+		delete a;
+		delete b;
+		leave;
+		int* c = new int{10};
+	}
+	
+	# leave;
+	
+	int gone = 0;
+	label whoops;
+	gone++;
+	if gone < 2 {
+		goto whoops;
+	} else {
+		goto better;
+	}
+	
+	label better;
+	
 	int one, float two = 1, <float> 2;
 	
 	while int itwo = <int> two; one > 0 {
 		one -= itwo;
 	}
 	
+	name sname = {<float> 1, <float> 2, 5, "Hello!"};
+	float two = sname.a;
+	
+	uname un;
+	un.a = 4;
+	two = un.b;
+	
 	int nothing = ---;
+	int namefoo = sname.foo();
+	namefoo.foo();
+	
+	int laster, sig err = foo(2, 1, 2, 3, 4, 5);
+	
+	if err || err == foo.NO_WAY {
+		return -69;
+	}
+	
 	char some_char = 'b';
 	string some_string = "Do me this favor";
 	
