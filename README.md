@@ -4,6 +4,10 @@ Interpreter/Compiler for a madeup language.
 
 Check .spec for a raw overview of how the language looks like.
 
+Check other for syntax highlighting for N++ and VS Code.
+
+Check examples for .nn and .nna examples.
+
 ## Progress
 * Spec: Ongoing.
   * Syntax: Mostly done.
@@ -15,9 +19,9 @@ Check .spec for a raw overview of how the language looks like.
   * Other (TODOs, pitfalls, previous attempts): Ongoing forever.
 * Lexer: Mostly done.
 * Parser: Mostly done.
-* AST Optimizer: Not started.
-* IR Generator: Not started.
-* IR Optimizer: Not started.
+* AST Optimizer: Stub.
+* IR Generator: Started.
+* IR Optimizer: Stub.
 * IR-to-ASM compiler: Not started.
 * Assembler: Mostly done.
 * VM: Working, but awful.
