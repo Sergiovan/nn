@@ -189,7 +189,7 @@ private:
     ast* structdeclstmt();
     ast* uniondeclstmt();
     
-    ast* vardeclass(); // Requires expected values
+    ast* vardeclass(bool allow_overflow = false); // Requires expected values
     
     ast* freevardecliden(ast* t1 = nullptr);
     ast* freevardecl(ast* t1 = nullptr);

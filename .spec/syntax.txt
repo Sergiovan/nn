@@ -301,7 +301,7 @@ raisestmt = craise, (expression | iden), semicolon
 gotostmt = cgoto, iden, semicolon
 labelstmt = clabel, iden, semicolon
 
-deferstmt = cdefer, statement, semicolon
+deferstmt = cdefer, scopestatement, semicolon
 
 breakstmt = cbreak, semicolon
 continuestmt = ccontinue, semicolon

@@ -108,11 +108,16 @@ void parser::print_types() {
 }
 
 ast* parser::_parse() {
-    ast* ret = program();
-    if (unfinished.size()) {
-        finish();
+    try {
+        ast* ret = program();
+        if (unfinished.size()) {
+            finish();
+        }
+        return ret;
+    } catch (...) {
+        logger::error() << "Unfixable error occurred. Leaving..." << logger::nend;
+        return nullptr;
     }
-    return ret;
 }
 
 void parser::finish() {
@@ -298,7 +303,9 @@ bool parser::require(Grammar::Keyword kw, epanic_mode mode, const std::string& e
 void parser::compiler_assert(TokenType tt) {
     if constexpr(__debug) { // TODO Replace with DEBUG/
         if (!is(tt)) {
-            throw parser_exception{};
+            std::stringstream ss{};
+            ss << "Assertion failed! " << Grammar::tokentype_names.at(tt) << " != " << Grammar::tokentype_names.at(c.type);
+            error(ss.str(), epanic_mode::ULTRA_PANIC);
         }
     }
 }
@@ -306,7 +313,13 @@ void parser::compiler_assert(TokenType tt) {
 void parser::compiler_assert(Symbol sym) {
     if constexpr(__debug) { // TODO Replace with DEBUG/
         if (!is(sym)) {
-            throw parser_exception{};
+            std::stringstream ss{};
+            if (c.type == Grammar::TokenType::SYMBOL) {
+                ss << "Assertion failed! " << Grammar::symbol_names.at(sym) << " != " << Grammar::symbol_names.at(c.as_symbol());
+            } else {
+                ss << "Assertion failed! SYMBOL != " << Grammar::tokentype_names.at(c.type);
+            }
+            error(ss.str(), epanic_mode::ULTRA_PANIC);
         }
     }
 }
@@ -314,7 +327,13 @@ void parser::compiler_assert(Symbol sym) {
 void parser::compiler_assert(Keyword kw) {
     if constexpr(__debug) { // TODO Replace with DEBUG/
         if (!is(kw)) {
-            throw parser_exception{};
+            std::stringstream ss{};
+            if (c.type == Grammar::TokenType::KEYWORD) {
+                ss << "Assertion failed! " << Grammar::keyword_names.at(kw) << " != " << Grammar::keyword_names.at(c.as_keyword());
+            } else {
+                ss << "Assertion failed! KEYWORD != " << Grammar::tokentype_names.at(c.type);
+            }
+            error(ss.str(), epanic_mode::ULTRA_PANIC);
         }
     }
 }
@@ -397,7 +416,7 @@ u64 parser::peek_until(Symbol sym, bool skip_groups) {
 
 u64 parser::peek_until(const std::vector<Grammar::Symbol>& syms, bool skip_groups) {
     if (syms.empty()) {
-        throw parser_exception{};
+        error("No tokens to peek from!", epanic_mode::ULTRA_PANIC);
     }
     u64 amount = 0;
     
@@ -553,7 +572,7 @@ ast* parser::array() {
     type* t = ctx().expected; // Needs to be set as the type of the array
     
     if (!t->is_pointer(eptr_type::ARRAY)) {
-        throw parser_exception{};
+        error("Expected type is not array!", epanic_mode::ULTRA_PANIC);
     }
     
     t = t->as_pointer().t;
@@ -592,7 +611,7 @@ ast* parser::struct_lit() {
     type* t = ctx().expected; // Needs to be set as the type of the struct
     
     if (!t->is_struct(false)) {
-        throw parser_exception{};
+        error("Expected type is not a struct!", epanic_mode::ULTRA_PANIC);
     }
     
     auto& s = t->as_struct();
@@ -936,7 +955,7 @@ ast* parser::forcond() {
             ctx().expected = new_iden->get_type();
             auto cg = guard();
             
-            ast* idenass = vardeclass();
+            ast* idenass = vardeclass(true);
             if (is(Symbol::BRACE_LEFT) || is(Keyword::DO)) {
                 ftype = fortype::LUA;
             } else {
@@ -1283,13 +1302,15 @@ ast* parser::returnstmt() {
         auto& stmts = rets->as_block().stmts;
         type rtype = type{ettype::COMBINATION};
         
+        bool first = true;
         do {
-            if (is(Symbol::SEMICOLON)) {
-                break;
+            if (!first) {
+                next(); // ,
             }
             ast* exp = aexpression();
             rtype.as_combination().types.push_back(exp->get_type());
             stmts.push_back(exp);
+            first = false;
         } while (is(Symbol::COMMA));
         require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
         next(); // ;
@@ -1482,7 +1503,7 @@ ast* parser::deferstmt() {
     compiler_assert(Keyword::DEFER);
     next(); // defer
     
-    ast* stmt = statement(); // Semicolon handled by statement();
+    ast* stmt = scopestatement(); // Semicolon handled by scopestatement();
     return ast::unary(Symbol::KWDEFER, stmt);
 }
 
@@ -1661,6 +1682,9 @@ ast* parser::usingstmt() {
     std::string as{};
     bool true_as{false};
     bool asterisk = false;
+    type* primitive = nullptr;
+    
+    bool first = true;
     
     do {
         if (asterisk) {
@@ -1669,13 +1693,22 @@ ast* parser::usingstmt() {
         }
         
         next(); // using, .
-        if(!is(TokenType::IDENTIFIER)) {
-            require(Symbol::ASTERISK);
+        if(is(Symbol::ASTERISK)) {
             asterisk = true;
-        } else {
+        } else if (is(TokenType::IDENTIFIER)){
             path.push_back(c.value);
+        } else if (is(TokenType::KEYWORD) && is_type() && first) {
+            primitive = nntype()->get_type();
+            require(Keyword::AS);
+            break;
+        } else {
+            error("Invalid using target", epanic_mode::SEMICOLON);
+            path.push_back(":");
+            break;
         }
         next(); //iden *
+        
+        first = false;
         
     } while(is(Symbol::DOT));
     
@@ -1689,52 +1722,57 @@ ast* parser::usingstmt() {
             as = c.value;
             next();
         }
-    } else {
+    } else if (!primitive) {
         as = path.back();
     }
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
     
-    symbol_table* cur{st()};
-    bool first = true;
-    bool last = false;
-    st_entry* entry{nullptr};
-    
-    for (auto& str : path) {
-        if (last) {
-            return error("Path ends prematurely");
+    if (!primitive) {
+        symbol_table* cur{st()};
+        bool first = true;
+        bool last = false;
+        st_entry* entry{nullptr};
+        
+        for (auto& str : path) {
+            if (last) {
+                return error("Path ends prematurely");
+            }
+            
+            entry = cur->get(str, first);
+            first = false;
+            if (!entry) {
+                return error("Given identifier does not exist");
+            } else if (entry->is_type()) {
+                if (!entry->as_type().st) {
+                    last = true;
+                } else {
+                    cur = entry->as_type().st;
+                }
+            } else if (entry->is_function()) {
+                cur = entry->as_function().st;
+            } else if (entry->is_namespace() || entry->is_module()) {
+                cur = entry->as_namespace().st;
+            } else {
+                return error("Cannot use element found");
+            }
         }
         
-        entry = cur->get(str, first);
-        first = false;
-        if (!entry) {
-            return error("Given identifier does not exist");
-        } else if (entry->is_type()) {
-            if (!entry->as_type().st) {
-                last = true;
-            } else {
-                cur = entry->as_type().st;
-            }
-        } else if (entry->is_function()) {
-            cur = entry->as_function().st;
-        } else if (entry->is_namespace() || entry->is_module()) {
-            cur = entry->as_namespace().st;
+        if (asterisk) {
+            st()->merge_st(cur);
         } else {
-            return error("Cannot use element found");
+            if (as.empty()) {
+                as = entry->name;
+            }
+            st()->borrow(as, entry);
         }
-    }
-    
-    if (asterisk) {
-        st()->merge_st(cur);
+        return ast::unary(Symbol::KWUSING, ast::symbol(entry));
     } else {
-        if (as.empty()) {
-            as = entry->name;
-        }
-        st()->borrow(as, entry);
+        st_entry* entry = st()->add_type(as, primitive);
+        return ast::unary(Symbol::KWUSING, ast::symbol(entry));
     }
     
-    return ast::unary(Symbol::KWUSING, ast::symbol(entry));
 }
 
 ast* parser::namespacestmt() {
@@ -2192,7 +2230,7 @@ ast* parser::uniondeclstmt() {
     }
 }
 
-ast* parser::vardeclass() {
+ast* parser::vardeclass(bool allow_overflow) {
     compiler_assert(Symbol::ASSIGN);
     next(); // =
     
@@ -2233,6 +2271,8 @@ ast* parser::vardeclass() {
             } else {
                 if (!require(Symbol::COMMA, epanic_mode::SEMICOLON)) {
                     break;
+                } else {
+                    next(); // ,
                 }
             }
         }
@@ -2247,16 +2287,23 @@ ast* parser::vardeclass() {
         }
         
     } else {
-        ast* exp = aexpression();
-        type* exptype = exp->get_type();
-        type* t = exptype->is_combination() ? exptype->as_combination().types[0] : exptype;
-        if (!t->can_weak_cast(e)) {
-            error("Cannot cast assignment expression to correct type");
-        }
-        stmts.push_back(exp);
-        if (is(Symbol::COMMA)) {
-            error("Too many expressions for assignment", epanic_mode::SEMICOLON);
-        }
+        bool first = true;
+        do {
+            if (!first) {
+                next(); // ,
+            }
+            ast* exp = aexpression();
+            type* exptype = exp->get_type();
+            type* t = exptype->is_combination() ? exptype->as_combination().types[0] : exptype;
+            if (!t->can_weak_cast(e)) {
+                error("Cannot cast assignment expression to correct type");
+            }
+            stmts.push_back(exp);
+            if (is(Symbol::COMMA) && !allow_overflow) {
+                error("Too many expressions for assignment", epanic_mode::SEMICOLON);
+            }
+            first = false;
+        } while (is(Symbol::COMMA));
     }
     
     /* if (e->is_combination()) {
@@ -2966,8 +3013,6 @@ ast* parser::structdecl() {
     std::string name = c.value;
     next(); // iden
     
-    require(Symbol::BRACE_LEFT);
-    
     bool declared{false};
     
     type* stype{nullptr};
@@ -3288,9 +3333,9 @@ ast* parser::assignment() {
         if (t->is_combination()) {
             auto& comb = t->as_combination().types;
             for (type* ct : comb) {
-                type* restype = get_result_type(ass, lhtypes[i++], t);
+                type* restype = get_result_type(ass, lhtypes[i++], ct);
                 if (!restype) {
-                    operator_error(ass, lhtypes[i - 1], t);
+                    operator_error(ass, lhtypes[i - 1], ct);
                     continue;
                 }
                 

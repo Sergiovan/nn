@@ -12,6 +12,10 @@ int:sig foo(int a, int... b) {
 	return b[~b - a];
 }
 
+int fooo(int a) {
+	return a;
+}
+
 struct name;
 
 struct name {
@@ -36,10 +40,34 @@ enum cutlery {FORK, SPOON, SPORK, TINY_ONE_POINT_FORK}
 int main(string[] arg) { 
 	int[] arr = [1, 2, 3, 4, 5, 6];
 	
+	defer if ~arg > 2 {
+		arr[2] = 7;
+	} else {
+		arr[2] = 36;
+	}
+
 	enum not_cutlery {WHAT, IS, THIS}
 	
 	cutlery c = cutlery.SPOON;
 	
+	using cutlery as _c;
+
+	c = _c.SPORK;
+
+	using int as i32;
+	using int*[] as api32;
+	using fun<int(int)> as fun_foo;
+
+	i32 huh = 1;
+	int okay = 2;
+	api32 nyeom = [null, null, null];
+	fun_foo a = fooo;
+
+	okay = huh;
+
+	using _c.*;
+	c = TINY_ONE_POINT_FORK;
+
 	int bar() {
 		raise X_2;
 	}
@@ -117,6 +145,7 @@ int main(string[] arg) {
 	bool boolean = false;
 
 	int laster, sig err = foo(2, 1, 2, 3, 4, 5);
+	laster, err = foo(2, (let wee(){return 1, 2, 3, 4, 5;})());
 	
 	if err || err == foo.NO_WAY {
 		return -69;
