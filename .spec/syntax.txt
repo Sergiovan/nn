@@ -308,7 +308,7 @@ continuestmt = ccontinue, semicolon
 leavestmt = cleave, semicolon
 
 importstmt = kwimport, (iden, {opaccess, (iden | asterisk)} | string), [kwas, iden], semicolon
-usingstmt = kwusing, iden, {opaccess, (iden | asterisk)}, [kwas, iden], semicolon
+usingstmt = kwusing, ((iden, {opaccess, (iden | asterisk)}, [kwas, iden]) | (type, kwas, iden)), semicolon
 
 namespacestmt = kwnamespace, iden, {opaccess, iden}, namespacescope
 namespacescope = obrace, {usingstmt | namespacestmt | freedeclstmt}, cbrace
