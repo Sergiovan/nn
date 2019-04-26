@@ -12,6 +12,8 @@ int:sig foo(int a, int... b) {
 	return b[~b - a];
 }
 
+struct name;
+
 struct name {
 	float a;
 	double b;
@@ -30,7 +32,8 @@ union uname {
 enum cutlery {FORK, SPOON, SPORK, TINY_ONE_POINT_FORK}
 
 # $main
-int main(string[] arg) {
+#> #> Yay, comments! <# <#
+int main(string[] arg) { 
 	int[] arr = [1, 2, 3, 4, 5, 6];
 	
 	enum not_cutlery {WHAT, IS, THIS}
@@ -106,11 +109,13 @@ int main(string[] arg) {
 	uname un;
 	un.a = 4;
 	two = un.b;
-	
+
 	int nothing = ---;
 	int namefoo = sname.foo();
 	namefoo.foo();
 	
+	bool boolean = false;
+
 	int laster, sig err = foo(2, 1, 2, 3, 4, 5);
 	
 	if err || err == foo.NO_WAY {

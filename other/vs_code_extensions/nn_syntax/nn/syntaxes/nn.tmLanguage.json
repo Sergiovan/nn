@@ -1,0 +1,334 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "nn",
+	"patterns": [
+		{
+			"include": "#block_comments"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#invalid"
+		},
+		{
+			"include": "#constant"
+		},
+		{
+			"include": "#meta"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#operators"
+		},
+		{
+			"include": "#punctuation"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#entity"
+		}
+	],
+	"repository": {
+		"escaped_character": {
+			"patterns": [{
+				"name": "constant.character.escape.nn",
+				"match": "\\\\."
+			}]
+		},
+		"block_comments": {
+			"patterns": [{
+				"name": "comment.block.nn",
+				"begin": "#>",
+				"beginCaptures": {
+					"0": {
+						"name": "punctuation.definition.comment.begin.nn"
+					}
+				},
+				"end": "<#",
+				"endCaptures": {
+					"0": {
+						"name": "punctuation.definition.comment.end.nn"
+					}
+				},
+				"patterns": [{
+						"include": "#block_comments"
+				}]
+			}]
+		},
+		"comments": {
+			"patterns": [{
+				"name": "comment.line.number-sign.nn",
+				"begin": "#",
+				"beginCaptures": {
+					"0": {
+						"name": "punctuation.definition.comment.nn"
+					}
+				},
+				"end": "\n"
+			}]
+		},
+		"invalid": {
+			"patterns": [{
+				"name": "invalid.illegal",
+				"match": "\\b(and|or|typeof|sizeof|yield|any)\\b"
+			}, {
+				"name": "invalid.illegal",
+				"match": "<-|->"
+			}]
+		},
+		"constant": {
+			"patterns": [{
+				"name": "constant.language.nn",
+				"match": "\\b(null|true|false)\\b"
+			},
+			{
+				"name": "constant.numeric.nn",
+				"match": "\\b((0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+))|[0-9][lL][0-9a-zA-Z]+|[0-9]+(\\.[0-9]+)?(e[+-]?[0-9]+)?)"
+			},
+			{
+				"name": "constant.character.nn",
+				"begin": "'",
+				"beginCaptures": {
+					"0": {
+						"name": "punctuation.definition.character.begin.nn"
+					}
+				},
+				"end": "'",
+				"endCaptures": {
+					"0": {
+						"name": "punctuation.definition.character.end.nn"
+					}
+				},
+				"patterns": [
+					{
+						"include": "#escaped_character"
+					}
+				]
+			}]
+		},
+		"meta": {
+			"patterns": [{
+				"begin": "\\b(enum)(?: +([A-Za-z_][A-Za-z_0-9]*))(?: *({))?",
+				"beginCaptures": {
+					"1": {
+						"name": "storage.type.enum.nn"
+					},
+					"2": {
+						"name": "entity.name.type.enum.nn"
+					},
+					"3": {
+						"name": "punctuation.starter.block.nn"
+					}
+				},
+				"name": "meta.enum.nn",
+				"patterns": [{
+					"name": "entity.name.type.enum.element.nn",
+					"match": "[a-zA-Z_][a-zA-Z_0-9]*"
+				}],
+				"end": "(})|(;)",
+				"endCaptures": {
+					"1": {
+						"name": "punctuation.terminator.block.nn"
+					},
+					"2": {
+						"name": "punctuation.terminator.statement.nn"
+					}
+				}
+			}, 
+			{
+				"name": "meta.struct.decl.nn",
+				"match": "\\b(struct)(?: +([A-Za-z_][A-Za-z_0-9]*))(?: *(?:({)|(;)))",
+				"captures": {
+					"1": {
+						"name": "storage.type.struct.nn"
+					},
+					"2": {
+						"name": "entity.name.type.struct.nn"
+					},
+					"3": {
+						"name": "punctuation.starter.block.nn"
+					},
+					"4": {
+						"name": "punctuation.terminator.statement.nn"
+					}
+				}
+			},
+			{
+				"name": "meta.union.decl.nn",
+				"match": "\\b(union)(?: +([A-Za-z_][A-Za-z_0-9]*))(?: *(?:({)|(;)))",
+				"captures": {
+					"1": {
+						"name": "storage.type.union.nn"
+					},
+					"2": {
+						"name": "entity.name.type.union.nn"
+					},
+					"3": {
+						"name": "punctuation.starter.block.nn"
+					},
+					"4": {
+						"name": "punctuation.terminator.statement.nn"
+					}
+				}
+			}]
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.$0.nn",
+				"match": "\\b(if|else|for|while|do|switch|return|raise|break|continue|leave|goto|try|catch)\\b"
+			},
+			{
+				"name": "keyword.other.$0.nn",
+				"match": "\\b(label|defer|import|using|namespace|case|as)\\b"
+			},
+			{
+				"name": "storage.type.$0.nn",
+				"match": "\\b(void|byte|short|int|long|sig|float|double|bool|struct|union|enum|char|string|fun|let)\\b"
+			}, 
+			{
+				"name": "variable.language.this.nn",
+				"match": "\\bthis\\b"
+			},
+			{
+				"name": "storage.modifier.$0.nn",
+				"match": "\\b(const|volatile|signed|unsigned)\\b"
+			},
+			{
+				"name": "storage.modifier.nothing.nn",
+				"match": "---"
+			},
+			{
+				"name": "keyword.other.compiler.nn",
+				"match": "(\\$[a-zA-Z0-9_]+)"
+			}]
+		},
+		"operators": {
+			"patterns": [{
+				"name": "keyword.operator.new.nn keyword.other",
+				"match": "\\bnew\\b"
+			},
+			{
+				"name": "keyword.operator.delete.nn keyword.other",
+				"match": "\\bdelete\\b"
+			},
+			{
+				"name": "keyword.operator.decrement.nn",
+				"match": "--"
+			},
+			{
+				"name": "keyword.operator.increment.nn",
+				"match": "\\+\\+"
+			},
+			{
+				"name": "keyword.operator.assignment.compound.nn",
+				"match": "(\\+|-|\\*|\\*\\*|/|&|\\||\\^|<<|>>|<<<|>>>|\\.\\.|@\\||@&|@\\^)="
+			},
+			{
+				"name": "keyword.operator.bitwise.nn",
+				"match": "@\\||@&|@\\?|@\\^"
+			},
+			{
+				"name": "keyword.operator.pointer.nn",
+				"match": "(\\*|\\@)\\b"
+			},
+			{
+				"name": "keyword.operator.arithmetic.nn",
+				"match": "\\+|-|\\*|\\*\\*|/|%"
+			}, 
+			{
+				"name": "keyword.operator.bitwise.rotate.nn",
+				"match": "<<<|>>>"
+			},
+			{
+				"name": "keyword.operator.bitwise.shift.nn",
+				"match": "<<|>>"
+			},
+			{
+				"name": "keyword.operator.logical.comparison.nn",
+				"match": "==|!=|>=|>|<=|<"
+			},
+			{
+				"name": "keyword.operator.assignment.nn",
+				"match": "="
+			},
+			{
+				"name": "keyword.operator.logical.nn",
+				"match": "!!|&&|\\|\\||\\^\\^"
+			},
+			{
+				"name": "keyword.operator.bitwise.nn",
+				"match": "!|&|\\||\\^"
+			},
+			{
+				"name": "keyword.operator.spread.nn",
+				"match": "\\.\\.\\."
+			},
+			{
+				"name": "keyword.operator.concatenate.nn",
+				"match": "\\.\\."
+			},
+			{
+				"name": "keyword.operator.access.nn",
+				"match": "\\."
+			}, 
+			{
+				"begin": "\\?",
+				"beginCaptures": {
+					"0": {
+						"name": "keyword.operator.ternary.begin.nn"
+					}
+				},
+				"end": "\\:",
+				"endCaptures": {
+					"0": {
+						"name": "keyword.operator.ternary.end.nn"
+					}
+				}
+			}]
+		},
+		"punctuation": {
+			"patterns": [{
+				"name": "punctuation.terminator.statement.nn",
+				"match": ";"
+			},
+			{
+				"name": "punctuation.separator.delimiter.nn",
+				"match": "[,:]"
+			}]
+		},
+		"strings": {
+			"patterns": [{
+				"name": "string.quoted.double.nn",
+				"begin": "\"",
+				"beginCaptures": {
+					"0": {
+						"name": "punctuation.definition.string.begin.nn"
+					}
+				},
+				"end": "\"",
+				"endCaptures": {
+					"0": {
+						"name": "punctuation.definition.string.end.nn"
+					}
+				},
+				"patterns": [
+					{
+						"include": "#escaped_character"
+					}
+				]
+			}]
+		},
+		"entity": {
+			"patterns": [{
+				"name": "entity.name.function.nn",
+				"match": "[a-zA-Z_]\\w*(?= *\\()"
+			}]
+		}
+	},
+	"scopeName": "source.nn"
+}

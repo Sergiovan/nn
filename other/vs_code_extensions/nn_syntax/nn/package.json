@@ -1,0 +1,33 @@
+{
+    "name": "nn-lang",
+    "displayName": "nn",
+    "description": "",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.33.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "nn-lang",
+                "aliases": [
+                    "nn"
+                ],
+                "extensions": [
+                    "nn"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "nn-lang",
+                "scopeName": "source.nn",
+                "path": "./syntaxes/nn.tmLanguage.json"
+            }
+        ]
+    }
+}
