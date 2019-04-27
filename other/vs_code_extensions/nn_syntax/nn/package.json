@@ -3,6 +3,7 @@
     "displayName": "nn",
     "description": "",
     "version": "0.0.1",
+    "publisher": "Sergiovan",
     "engines": {
         "vscode": "^1.33.0"
     },
