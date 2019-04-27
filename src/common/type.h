@@ -3,6 +3,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <iostream>
 
 #include "common/convenience.h"
 
@@ -271,3 +272,6 @@ struct type {
     
     std::string print(bool simple = false);
 };
+
+std::ostream& operator<<(std::ostream& os, type t);
+std::ostream& operator<<(std::ostream& os, type* t);

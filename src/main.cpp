@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
     } else {
         // p.print_info();
         logger::log() << res.result->print() << logger::nend;
+        logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
         
         ir_builder b{res};
         b.build();
@@ -65,6 +66,5 @@ int main(int argc, char** argv) {
         logger::log() << logger::color::white << "] | " << t.value;
         logger::log() << "\n";
     } */
-    logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
     return 0;
 }

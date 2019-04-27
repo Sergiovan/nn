@@ -30,6 +30,32 @@ void ctx_guard::deactivate() {
     }
 }
 
+error_message_manager::error_message_manager(parser& p) : p(p) { }
+
+error_message_manager::~error_message_manager() {
+    if (!done) {
+        p.error(ss.str(), mode, t);
+    }
+}
+
+error_message_manager& error_message_manager::operator<<(epanic_mode p) {
+    mode = p;
+    return *this;
+}
+
+error_message_manager& error_message_manager::operator<<(token* t) {
+    error_message_manager::t = t;
+    return *this;
+}
+
+ast* error_message_manager::operator<<(end_error) {
+    if (!done) {
+        return p.error(ss.str(), mode, t);
+    } else {
+        return p.error("Tried to end error more than once", epanic_mode::ULTRA_PANIC);
+    }
+}
+
 parser::parser() : types(*(new type_table{})) {
     root_st = new symbol_table(etable_owner::FREE);
 }
@@ -130,7 +156,7 @@ void parser::finish() {
                 delete unn.node;
                 unn.node = label->second;
             } else {
-                error("Unable to finish GOTO element");
+                error() << "Unable to finish GOTO element: " << labelname; // TODO Store token in ast?
             }
         } else {
             error("Unable to finish element");
@@ -161,6 +187,10 @@ ctx_guard parser::guard() {
     return {*this};
 }
 
+error_message_manager parser::error() {
+    return error_message_manager{*this};
+}
+
 ast* parser::error(const std::string& msg, epanic_mode mode, token* t) {
     errors.emplace_back(t ? *t : c, msg);
     if (mode != epanic_mode::NO_PANIC) {
@@ -170,21 +200,14 @@ ast* parser::error(const std::string& msg, epanic_mode mode, token* t) {
 }
 
 ast* parser::operator_error(Symbol op, type* t, bool post) {
-    std::stringstream ss{};
-    ss << "Cannot use operator '" << symbol_names.at(op) << "' on type \"" << t->print(true) << "\"";
-    return error(ss.str());
+    return error() << "Cannot use operator '" << op << "' on type \"" << t << "\"" << end_error{};
 }
 
 ast* parser::operator_error(Symbol op, type* l, type* r) {
     if (op != Symbol::ASSIGN) {
-        std::stringstream ss{};
-        ss << "Cannot use operator '" << symbol_names.at(op) << "' on types \"" << l->print(true) << 
-            "\" and \"" << r->print(true) << "\"";
-        return error(ss.str());
+        return error() << "Cannot use operator '" << op << "' on types \"" << l << "\" and \"" << r << "\"" << end_error{};
     } else {
-        std::stringstream ss{};
-        ss << "Cannot cast \"" << r->print(true) << "\" to \"" << l->print(true) << "\" implicitly";
-        return error(ss.str());
+        return error() << "Cannot cast \"" << r << "\" to \"" << l << "\" implicitly" << end_error{};
     }
 }
 
@@ -261,9 +284,7 @@ bool parser::peek(Grammar::Keyword kw, u64 lookahead) {
 bool parser::require(Grammar::TokenType tt, epanic_mode mode, const std::string& err) {
     if (!is(tt)) {
         if (err.empty()) {
-            std::stringstream ss{};
-            ss << "Expected \"" << Grammar::tokentype_names.at(tt) << " but got \"" << c.value << "\" instead,";
-            error(ss.str(), mode);
+            error() << "Expected \"" << tt << " but got \"" << c.value << "\" instead" << mode;
         } else {
             error(err, mode);
         }
@@ -275,9 +296,7 @@ bool parser::require(Grammar::TokenType tt, epanic_mode mode, const std::string&
 bool parser::require(Grammar::Symbol sym, epanic_mode mode, const std::string& err) {
     if (!is(sym)) {
         if (err.empty()) {
-            std::stringstream ss{};
-            ss << "Expected symbol \"" << Grammar::symbol_names.at(sym) << "\" but got \"" << c.value << "\" instead";
-            error(ss.str(), mode);
+            error() << "Expected symbol \"" << sym << "\" but got \"" << c.value << "\" instead" << mode;
         } else {
             error(err, mode);
         }
@@ -289,9 +308,7 @@ bool parser::require(Grammar::Symbol sym, epanic_mode mode, const std::string& e
 bool parser::require(Grammar::Keyword kw, epanic_mode mode, const std::string& err) {
     if (!is(kw)) {
         if (err.empty()) {
-            std::stringstream ss{};
-            ss << "Expected keyword \"" << Grammar::keyword_names.at(kw) << " but got \"" << c.value << "\" instead";
-            error(ss.str(), mode);
+            error() << "Expected keyword \"" << kw << "\" but got \"" << c.value << "\" instead" << mode;
         } else {
             error(err, mode);
         }
@@ -303,9 +320,7 @@ bool parser::require(Grammar::Keyword kw, epanic_mode mode, const std::string& e
 void parser::compiler_assert(TokenType tt) {
     if constexpr(__debug) { // TODO Replace with DEBUG/
         if (!is(tt)) {
-            std::stringstream ss{};
-            ss << "Assertion failed! " << Grammar::tokentype_names.at(tt) << " != " << Grammar::tokentype_names.at(c.type);
-            error(ss.str(), epanic_mode::ULTRA_PANIC);
+            error() << "Assertion failed! Token type " << tt << " != " << c.type << epanic_mode::ULTRA_PANIC;
         }
     }
 }
@@ -313,13 +328,11 @@ void parser::compiler_assert(TokenType tt) {
 void parser::compiler_assert(Symbol sym) {
     if constexpr(__debug) { // TODO Replace with DEBUG/
         if (!is(sym)) {
-            std::stringstream ss{};
             if (c.type == Grammar::TokenType::SYMBOL) {
-                ss << "Assertion failed! " << Grammar::symbol_names.at(sym) << " != " << Grammar::symbol_names.at(c.as_symbol());
+                error() << "Assertion failed! Symbol " << sym << " != " << c.as_symbol() << epanic_mode::ULTRA_PANIC;
             } else {
-                ss << "Assertion failed! SYMBOL != " << Grammar::tokentype_names.at(c.type);
+                error() << "Assertion failed! Token type Symbol != " << c.type << epanic_mode::ULTRA_PANIC;
             }
-            error(ss.str(), epanic_mode::ULTRA_PANIC);
         }
     }
 }
@@ -327,13 +340,11 @@ void parser::compiler_assert(Symbol sym) {
 void parser::compiler_assert(Keyword kw) {
     if constexpr(__debug) { // TODO Replace with DEBUG/
         if (!is(kw)) {
-            std::stringstream ss{};
             if (c.type == Grammar::TokenType::KEYWORD) {
-                ss << "Assertion failed! " << Grammar::keyword_names.at(kw) << " != " << Grammar::keyword_names.at(c.as_keyword());
+                error() << "Assertion failed! Keyword " << kw << " != " << c.as_keyword() << epanic_mode::ULTRA_PANIC;
             } else {
-                ss << "Assertion failed! KEYWORD != " << Grammar::tokentype_names.at(c.type);
+                error() << "Assertion failed! Token type Keyword != " << c.type << epanic_mode::ULTRA_PANIC;
             }
-            error(ss.str(), epanic_mode::ULTRA_PANIC);
         }
     }
 }
@@ -498,7 +509,7 @@ ast* parser::iden(bool withthis, type** thistype) {
                     if (peek(Symbol::PAREN_LEFT)) {
                         ctx().first_param = ast::symbol(self);
                     } else {
-                        error("Method access on values or variables must be used as function calls");
+                        error() << "Method access \"" << sym->name << "\" must be used as function call";
                     }
                 } else if (sym->is_field()) {
                     return ast::binary(Symbol::ACCESS, ast::symbol(self), ast::symbol(sym));
@@ -510,10 +521,7 @@ ast* parser::iden(bool withthis, type** thistype) {
     }
     
     if (!sym) {
-        std::stringstream ss{};
-        ss << '"' << tok.value << '"' << "does not exist";
-        error(ss.str(), epanic_mode::NO_PANIC, &tok);
-        return ast::none();
+        return error() << '"' << tok.value << '"' << "does not exist" << &tok << end_error{};
     }
     return ast::symbol(sym);
 }
@@ -572,7 +580,7 @@ ast* parser::array() {
     type* t = ctx().expected; // Needs to be set as the type of the array
     
     if (!t->is_pointer(eptr_type::ARRAY)) {
-        error("Expected type is not array!", epanic_mode::ULTRA_PANIC);
+        error() << "Expected type is not array, but " << t << epanic_mode::ULTRA_PANIC;
     }
     
     t = t->as_pointer().t;
@@ -588,7 +596,7 @@ ast* parser::array() {
         } else {
             ast* exp = aexpression();
             if (!exp->get_type()->can_weak_cast(t)) { // Eventually ANY arrays will be a thing, not for now
-                exp = error("Cannot cast to array type", epanic_mode::IN_ARRAY);
+                exp = error() << "Cannot cast " << exp->get_type() << " to array type" << epanic_mode::IN_ARRAY << end_error{};
             } else if (t == types.t_let) {
                 t = exp->get_type();
             }
@@ -611,7 +619,7 @@ ast* parser::struct_lit() {
     type* t = ctx().expected; // Needs to be set as the type of the struct
     
     if (!t->is_struct(false)) {
-        error("Expected type is not a struct!", epanic_mode::ULTRA_PANIC);
+        error() << "Expected type is " << t << " instead of a struct" << epanic_mode::ULTRA_PANIC;
     }
     
     auto& s = t->as_struct();
@@ -643,7 +651,7 @@ ast* parser::struct_lit() {
             
             st_entry* fld = st->get(name, false);
             if (!fld || !fld->is_field()) {
-                error("Not a field", epanic_mode::COMMA);
+                error() << name << " is not a field of " << t << epanic_mode::COMMA;
                 continue;
             }
             field = fld->as_field().field;
@@ -654,7 +662,7 @@ ast* parser::struct_lit() {
             
             ast* exp = aexpression();
             if (!exp->get_type()->can_weak_cast(s.fields[field].t)) {
-                exp = error("Cannot cast to correct type", epanic_mode::IN_STRUCT_LIT);
+                exp = error() << "Cannot cast " << exp << " to " << s.fields[field].t << epanic_mode::IN_STRUCT_LIT << end_error{};
             }
             elems[field] = exp;
             
@@ -665,7 +673,7 @@ ast* parser::struct_lit() {
             
             ast* exp = aexpression();
             if (!exp->get_type()->can_weak_cast(s.fields[field].t)) {
-                exp = error("Cannot cast to correct type", epanic_mode::IN_STRUCT_LIT);
+                exp = error() << "Cannot cast " << exp << " to " << s.fields[field].t << epanic_mode::IN_STRUCT_LIT << end_error{};
             }
             elems[field] = exp;
             ++field;
@@ -698,8 +706,8 @@ ast* parser::safe_literal() {
         next(); // false
         return ast::byte(0, types.t_bool);
     } else {
+        error() << "Invalid literal '" << c.value << "'";
         next(); // ?????
-        error("Invalid literal");
         return ast::none();
     }
 }
@@ -707,19 +715,20 @@ ast* parser::safe_literal() {
 ast* parser::compound_literal() {
     if (is(Symbol::BRACE_LEFT)) { // struct
         if (!ctx().expected->is_struct(false)) {
-            return error("Expected type was not a struct", epanic_mode::ESCAPE_BRACE);
+            return error() << "Expected type was " << ctx().expected << " instead of a struct" << epanic_mode::ESCAPE_BRACE << end_error{};
         } else {
             return struct_lit();
         }
     } else if (is(Symbol::BRACKET_LEFT)) { // array
         if (!ctx().expected->is_pointer(eptr_type::ARRAY)) {
-            return error("Expected type was not an array", epanic_mode::ESCAPE_BRACKET);
+            return error() << "Expected type was " << ctx().expected << " instead of an array" << epanic_mode::ESCAPE_BRACKET << end_error{};
         } else {
             return array();
         }
     } else {
+        error() << "Invalid compound literal start: " << c.value << epanic_mode::ULTRA_PANIC;
         next(); // ????
-        return error("Invalid compound literal");
+        return ast::none();
     }
 }
 
@@ -739,7 +748,8 @@ ast* parser::program() {
         } else if (is(TokenType::END_OF_FILE)) {
             break;
         } else {
-            stmts.push_back(error("Invalid token", epanic_mode::SEMICOLON));
+            stmts.push_back(error() << "Invalid token '" << c.value << "'" << epanic_mode::SEMICOLON << end_error{}); // SEMICOLON panic makes everything alright
+            next(); // ;
         }
     }
     
@@ -877,11 +887,11 @@ ast* parser::ifstmt() {
     } while (is(Symbol::SEMICOLON));
     
     if (last != eexpression_type::EXPRESSION) {
-        error("Last part of if conditions must be an expression"); // TODO better message
+        error("Last part of if conditions must not be a declaration or assignment");
     }
     
     if (!stmts.back()->get_type()->can_boolean()) {
-        error("Last condition on an if must convert to boolean");
+        error() << "Last condition on an if must convert to boolean, " << stmts.back()->get_type() << " does not convert to boolean";
     }
     
     ast* results{nullptr};
@@ -892,7 +902,7 @@ ast* parser::ifstmt() {
         next(); // do
         results = scopestatement();
     } else {
-        results = error("Expected do or brace after if conditions", epanic_mode::SEMICOLON);
+        results = error() << "Expected do or brace after if conditions, found " << c.value << " instead" << epanic_mode::SEMICOLON << end_error{};
     }
     
     return ast::binary(Symbol::KWIF, conditions, results);
@@ -929,7 +939,7 @@ ast* parser::forstmt() {
         next(); // do
         loop = scopestatement();
     } else {
-        loop = error("Expected do or brace after for conditions", epanic_mode::SEMICOLON);
+        loop = error() << "Expected do or brace after for conditions, found " << c.value << " instead" << epanic_mode::SEMICOLON << end_error{};
     }
     
     return ast::binary(Symbol::KWFOR, condition, loop);
@@ -1004,7 +1014,7 @@ ast* parser::forcond() {
             }
             
             if (!condition->get_type()->can_boolean()) {
-                condition = error("For condition must convert to boolean");
+                condition = error() << "For condition must convert to boolean, " << condition->get_type() << " does not convert to boolean" << end_error{};
             }
             
             stmts.push_back(condition);
@@ -1030,17 +1040,11 @@ ast* parser::forcond() {
             type* ct = colon->get_type();
             
             if (!ct->is_pointer(eptr_type::ARRAY) && !ct->is_primitive(etype_ids::STRING)) {
-                std::stringstream ss{};
-                ss << "Cannot use for-each on \"" << ct->print(true) << "\"";
-                colon = error(ss.str());
+                colon = error() << "Cannot use for-each on \"" << ct << "\"" << end_error{};
             } else if (ct->is_pointer(eptr_type::ARRAY) && !ct->as_pointer().t->can_weak_cast(start->get_type())) {
-                std::stringstream ss{};
-                ss << "Cannot cast \"" << ct->as_pointer().t->print(true) << "\" to \"" << start->get_type()->print(true) << "\" in foreach";
-                colon = error(ss.str());
+                colon = error() << "Cannot cast \"" << ct->as_pointer().t << "\" to \"" << start->get_type() << "\" in foreach" << end_error{};
             } else if (ct->is_primitive(etype_ids::STRING) && !types.t_char->can_weak_cast(start->get_type())) {
-                std::stringstream ss{};
-                ss << "Cannot cast \"" << ct->print(true) << "\" to \"" << start->get_type()->print(true) << "\" in foreach";
-                colon = error(ss.str());
+                colon = error() << "Cannot cast \"" << ct << "\" to \"" << start->get_type() << "\" in foreach" << end_error{};
             }
             
             if (start->is_binary() && start->as_binary().op == Symbol::SYMDECL) {
@@ -1060,14 +1064,14 @@ ast* parser::forcond() {
             auto& commas   = luablock.right->as_block();
             auto len = commas.stmts.size();
             if (len < 2 || len > 3) {
-                error("Lua for had an illegal number of values");
+                error() << "Lua for had " << len << " values, when it can only be 2 or 3";
             }
             ret = ast::unary(Symbol::KWFORLUA, start);
             break;
         }
         case fortype::INVALID: [[fallthrough]];
         default:
-            return error("Invalid for type", epanic_mode::ULTRA_PANIC);
+            return error("Invalid 'for' type", epanic_mode::ULTRA_PANIC);
     }
     
     return ret;
@@ -1093,11 +1097,11 @@ ast* parser::whilestmt() {
     } while (is(Symbol::SEMICOLON));
     
     if (last != eexpression_type::EXPRESSION) {
-        error("Last part of while conditions must be an expression"); // TODO better message
+        error("Last part of while conditions must not be a declaration or assignment");
     }
     
     if (!stmts.back()->get_type()->can_boolean()) {
-        error("Last condition on an while must convert to boolean");
+        error() << "Last condition on a while must convert to boolean, " << stmts.back()->get_type() << " does not convert to boolean";
     }
     
     ast* results{nullptr};
@@ -1108,7 +1112,7 @@ ast* parser::whilestmt() {
         next(); // do
         results = scopestatement();
     } else {
-        results = error("Expected do or brace after while conditions", epanic_mode::SEMICOLON);
+        results = error() << "Expected do or brace after while conditions, found " << c.value << " instead"  << epanic_mode::SEMICOLON << end_error{};
     }
     
     return ast::binary(Symbol::KWWHILE, conditions, results);
@@ -1134,19 +1138,19 @@ ast* parser::switchstmt() {
     } while (is(Symbol::SEMICOLON));
     
     if (last != eexpression_type::EXPRESSION) {
-        error("Last part of switch conditions must be an expression"); // TODO better message
+        error("Last part of switch conditions must not be a declaration or assignment");
     }
     
     type* switcht = stmts.back()->get_type();
     if (switcht->is_combination()) {
-        error("Cannot switch on a combination type"); // TODO Panic, please
+        error() << "Cannot switch on " << switcht; // TODO Escape brace?
     }
     ctx().aux = switcht;
     
     ast* cases{nullptr};
     
     if (!is(Symbol::BRACE_LEFT)) {
-        cases = error("Expected brace to start cases", epanic_mode::ESCAPE_BRACE);
+        cases = error() << "Expected brace to start switch cases, found " << c.value << "instead" << epanic_mode::ESCAPE_BRACE << end_error{};
     } else {
         cases = switchscope();
     }
@@ -1189,7 +1193,7 @@ ast* parser::casestmt() {
         do {
             ast* exp = expression();
             if (!exp->get_type()->can_weak_cast(ctx().aux)) {
-                exp = error("Cannot cast case value to switch value");
+                exp = error() << "Cannot cast " << exp << " case value to " << ctx().aux << " switch value" << end_error{};
             }
             stmts.push_back(exp);
             if (!is(Symbol::COMMA)) {
@@ -1203,7 +1207,7 @@ ast* parser::casestmt() {
         bin.left = case_vals;
         
     } else {
-        return error("Expected either case or else", epanic_mode::ESCAPE_BRACE);
+        return error() << "Expected either case or else, found " << c.value << " instead" << epanic_mode::ESCAPE_BRACE << end_error{};
     }
     
     if (is(Keyword::CONTINUE)) {
@@ -1217,7 +1221,7 @@ ast* parser::casestmt() {
         next(); // do
         bin.right = ast::unary(Symbol::KWCASE, scopestatement());
     } else {
-        bin.right = error("Expected continue, do or a scope", epanic_mode::ESCAPE_BRACE);
+        bin.right = error() << "Expected continue, do or a scope, found " << c.value << " instead" << epanic_mode::ESCAPE_BRACE << end_error{};
     }
     
     return caseast;
@@ -1274,7 +1278,7 @@ ast* parser::trystmt() {
         next(); // ;
     } else {
         un.op = Symbol::SYMBOL_INVALID;
-        un.node = error("Expected parenthesis or raise after catch");
+        un.node = error() << "Expected parenthesis or raise after catch, found " << c.value << " instead" << end_error{};
     }
     
     return ast::binary(Symbol::KWTRY, tryblock, consequence);
@@ -1349,14 +1353,14 @@ ast* parser::returnstmt() {
                 
                 while (i < rcomb.types.size()) {
                     if (rcomb.types[i] != types.t_sig) {
-                        un.node = error("Incomplete return");
-                        break;
+                        un.node = error() << "Not enough return values: missing " << rcomb.types[i] << end_error{};
+                        // break;
                     }
                     ++i;
                 }
                 
-                if (i != rcomb.types.size() || j != uncomb.types.size()) {
-                    un.node = error("Incomplete return"); // TODO Better message
+                if (j != uncomb.types.size()) {
+                    un.node = error() << "Too many return parameters given: Expected " << rcomb.types.size() << " but found " << j << end_error{}; 
                 }
                 
             } else {
@@ -1365,23 +1369,21 @@ ast* parser::returnstmt() {
                     ++i;
                 }
                 if (i >= rcomb.types.size()) {
-                    un.node = error("Return type not found");
+                    un.node = error() << "Return type " << un.t << " not found" << end_error{};
                 } else if (!un.t->can_weak_cast(rcomb.types[i])) {
-                    un.node = operator_error(Symbol::ASSIGN, rcomb.types[i], un.t);
+                    un.node = error() << "Cannot cast return value #" << i << " of type " << un.t << " to function return type " << rcomb.types[i] << end_error{};
                 }
                 ++i;
                 while (i < rcomb.types.size() && rcomb.types[i] == types.t_sig) {
                     ++i;
                 }
                 if (i != rcomb.types.size()) {
-                    std::stringstream ss{};
-                    ss << "Only " << i << " return type(s) given when " << rcomb.types.size() << " were needed";
-                    un.node = error(ss.str());
+                    un.node = error() << "Only " << i << " return type(s) given when " << rcomb.types.size() << " were needed" << end_error{};
                 }
             }
         } else {
             if (!un.t->can_weak_cast(ret_type)) {
-                un.node = operator_error(Symbol::ASSIGN, ret_type, un.t);
+                un.node = error() << "Cannot cast return value of type " << un.t << " to function return type " << ret_type << end_error{};
             }
         }
     }
@@ -1412,14 +1414,14 @@ ast* parser::raisestmt() {
         } else { // Assume it's an expression
             ast* exp = expression();
             if (!exp->get_type()->can_weak_cast(types.t_sig)) {
-                exp = error("Expression is not of sig type");
+                exp = error() << "Expression cannot be cast to sig type: " << exp->get_type() << end_error{};
             }
             ret = ast::unary(Symbol::KWRAISE, exp);
         }
     } else { // Assume it's an expression
         ast* exp = expression();
         if (!exp->get_type()->can_weak_cast(types.t_sig)) {
-            exp = error("Expression is not of sig type");
+            exp = error() << "Expression cannot be cast to sig type: " << exp->get_type() << end_error{};
         }
         ret = ast::unary(Symbol::KWRAISE, exp);
     }

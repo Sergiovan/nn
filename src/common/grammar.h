@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <iostream>
 
 #include "common/convenience.h"
 
@@ -275,3 +276,7 @@ static const dict<Symbol>  string_to_symbol {
 static const std::map<Symbol, std::string> symbol_names{swap_key(string_to_symbol)};
 
 }
+
+std::ostream& operator<<(std::ostream& os, Grammar::TokenType tt);
+std::ostream& operator<<(std::ostream& os, Grammar::Symbol sym);
+std::ostream& operator<<(std::ostream& os, Grammar::Keyword kw);

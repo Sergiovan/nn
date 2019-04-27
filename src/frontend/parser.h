@@ -3,8 +3,9 @@
 #include <filesystem>
 #include <stack>
 #include <utility>
-
 #include <exception>
+#include <utility>
+
 #include "frontend/token.h"
 #include "common/grammar.h"
 #include "common/type_table.h"
@@ -46,14 +47,38 @@ struct ctx_guard {
     bool active{true};
 };
 
-class parser_exception : public std::exception {
-};
+class parser_exception : public std::exception {};
 
 struct parse_info {
     ast* result;
     symbol_table* root_st;
     type_table* types;
     dict<symbol_table*> modules;
+};
+
+struct end_error {};
+
+class error_message_manager {
+public:
+    error_message_manager(parser& p);
+    ~error_message_manager();
+    
+    error_message_manager& operator<<(epanic_mode p);
+    error_message_manager& operator<<(token* t);
+    ast* operator<<(end_error t);
+    
+    template <typename T>
+    error_message_manager& operator<<(T&& t) {
+        ss << std::forward<T>(t);
+        return *this;
+    }
+    
+private:
+    parser& p;
+    std::stringstream ss{};
+    epanic_mode mode{epanic_mode::NO_PANIC};
+    bool done{false};
+    token* t{nullptr};
 };
 
 class parser{
@@ -90,6 +115,7 @@ private:
     context pop_context();
     ctx_guard guard();
     
+    error_message_manager error();
     ast* error(const std::string& msg, epanic_mode mode = epanic_mode::NO_PANIC, token* t = nullptr);
     ast* operator_error(Grammar::Symbol op, type* t, bool post = true);
     ast* operator_error(Grammar::Symbol op, type* l, type* r);
@@ -275,5 +301,6 @@ private:
     std::filesystem::path file_path{std::filesystem::current_path()};
     
     friend struct ctx_guard;
+    friend struct error_message_manager;
 };
 

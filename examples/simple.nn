@@ -2,6 +2,7 @@ int foo();
 int foo() {
 	return 1;
 }
+
 int foo(int a) {
 	return a;
 }

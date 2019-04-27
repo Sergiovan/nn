@@ -815,3 +815,11 @@ std::string type::print(bool simple) {
     
     return ss.str();
 }
+
+std::ostream& operator<<(std::ostream& os, type t) {
+    return os << t.print(true);
+}
+
+std::ostream& operator<<(std::ostream& os, type* t) {
+    return os << t->print(true);
+}
