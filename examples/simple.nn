@@ -13,6 +13,10 @@ int:sig foo(int a, int... b) {
 	return b[~b - a];
 }
 
+void baz(int a, int... b) {
+	return void;
+}
+
 int fooo(int a) {
 	return a;
 }
@@ -147,7 +151,8 @@ int main(string[] arg) {
 
 	int laster, sig err = foo(2, 1, 2, 3, 4, 5);
 	laster, err = foo(2, (let wee(){return 1, 2, 3, 4, 5;})());
-	
+	baz(a = 2, b = [1, 2, 3, 4, 5]);
+
 	if err || err == foo.NO_WAY {
 		return -69;
 	}

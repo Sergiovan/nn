@@ -50,6 +50,7 @@ error_message_manager& error_message_manager::operator<<(token* t) {
 
 ast* error_message_manager::operator<<(end_error) {
     if (!done) {
+        done = true;
         return p.error(ss.str(), mode, t);
     } else {
         return p.error("Tried to end error more than once", epanic_mode::ULTRA_PANIC);
@@ -159,7 +160,7 @@ void parser::finish() {
                 error() << "Unable to finish GOTO element: " << labelname; // TODO Store token in ast?
             }
         } else {
-            error("Unable to finish element");
+            error() << "Unable to finish element: " << val->print();
         }
     }
 }
@@ -286,7 +287,7 @@ bool parser::require(Grammar::TokenType tt, epanic_mode mode, const std::string&
         if (err.empty()) {
             error() << "Expected \"" << tt << " but got \"" << c.value << "\" instead" << mode;
         } else {
-            error(err, mode);
+            error() << err << mode;
         }
         return false;
     }
@@ -298,7 +299,7 @@ bool parser::require(Grammar::Symbol sym, epanic_mode mode, const std::string& e
         if (err.empty()) {
             error() << "Expected symbol \"" << sym << "\" but got \"" << c.value << "\" instead" << mode;
         } else {
-            error(err, mode);
+            error() << err << mode;
         }
         return false;
     }
@@ -310,7 +311,7 @@ bool parser::require(Grammar::Keyword kw, epanic_mode mode, const std::string& e
         if (err.empty()) {
             error() << "Expected keyword \"" << kw << "\" but got \"" << c.value << "\" instead" << mode;
         } else {
-            error(err, mode);
+            error() << err << mode;
         }
         return false;
     }
@@ -427,7 +428,7 @@ u64 parser::peek_until(Symbol sym, bool skip_groups) {
 
 u64 parser::peek_until(const std::vector<Grammar::Symbol>& syms, bool skip_groups) {
     if (syms.empty()) {
-        error("No tokens to peek from!", epanic_mode::ULTRA_PANIC);
+        error() << "No tokens to peek from!" << epanic_mode::ULTRA_PANIC;
     }
     u64 amount = 0;
     
@@ -887,7 +888,7 @@ ast* parser::ifstmt() {
     } while (is(Symbol::SEMICOLON));
     
     if (last != eexpression_type::EXPRESSION) {
-        error("Last part of if conditions must not be a declaration or assignment");
+        error() << "Last part of if conditions must not be a declaration or assignment";
     }
     
     if (!stmts.back()->get_type()->can_boolean()) {
@@ -1071,7 +1072,7 @@ ast* parser::forcond() {
         }
         case fortype::INVALID: [[fallthrough]];
         default:
-            return error("Invalid 'for' type", epanic_mode::ULTRA_PANIC);
+            return error() << "Invalid 'for' type" << epanic_mode::ULTRA_PANIC << end_error{};
     }
     
     return ret;
@@ -1097,7 +1098,7 @@ ast* parser::whilestmt() {
     } while (is(Symbol::SEMICOLON));
     
     if (last != eexpression_type::EXPRESSION) {
-        error("Last part of while conditions must not be a declaration or assignment");
+        error() << "Last part of while conditions must not be a declaration or assignment";
     }
     
     if (!stmts.back()->get_type()->can_boolean()) {
@@ -1138,7 +1139,7 @@ ast* parser::switchstmt() {
     } while (is(Symbol::SEMICOLON));
     
     if (last != eexpression_type::EXPRESSION) {
-        error("Last part of switch conditions must not be a declaration or assignment");
+        error() << "Last part of switch conditions must not be a declaration or assignment";
     }
     
     type* switcht = stmts.back()->get_type();
@@ -1434,7 +1435,7 @@ ast* parser::raisestmt() {
     if (ret_type == types.t_void) {
         ret_type = types.t_sig;
     } else if (ret_type == types.t_let) { // TODO Allow this
-        error("Cannot raise in incompletely typed non-inferred function return");
+        error() << "Cannot raise in incompletely typed inferred function return";
     } else if (!ret_type->is_combination() && ret_type != types.t_sig) {
         type nret = type(ettype::COMBINATION);
         nret.as_combination().types.push_back(ret_type);
@@ -1482,12 +1483,12 @@ ast* parser::labelstmt() {
     ast* ret{nullptr};
     
     if (labels.find(c.value) != labels.end()) {
-        ret = error("Label already exists");
+        ret = error() << "Label " << c.value << " already exists" << end_error{};
     } else {
         st_entry* label = st()->add_label(c.value);
         ast* labelast{nullptr};
         if (!label) {
-            labelast = error("Object with that name already exists ");
+            labelast = error() << "Object with name " << c.value << " already exists " << end_error{};
         } else {
             labelast = ast::symbol(label);
         }
@@ -1527,7 +1528,7 @@ ast* parser::breakstmt() {
     }
     
     if (!in_loop) {
-        error("Cannot use break outside of loop");
+        error() << "Cannot use break outside of loop";
     }
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
@@ -1553,7 +1554,7 @@ ast* parser::continuestmt() {
     }
     
     if (!in_loop) {
-        error("Cannot use continue outside of loop");
+        error() << "Cannot use continue outside of loop";
     }
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
@@ -1566,7 +1567,7 @@ ast* parser::leavestmt() {
     next(); // leave
     
     if (st()->owned_by(etable_owner::FUNCTION)) {
-        error("Cannot leave function, use 'return' instead");
+        error() << "Cannot leave function, use 'return' or 'raise' instead";
     }
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
@@ -1594,7 +1595,7 @@ ast* parser::importstmt() {
             p = fs::canonical(p);
             what = ast::string(p.string());
         } else {
-            what = error("Path does not exist or is not a file");
+            what = error() << "Path '" << p << "' does not exist or is not a file" << end_error{};
         }
     } else {
         std::stringstream path{};
@@ -1603,13 +1604,13 @@ ast* parser::importstmt() {
         next(); // iden
         while (is(Symbol::DOT)) {
             if (asterisk) {
-                error("Cannot have more names after asterisk", epanic_mode::SEMICOLON);
+                error() << "Cannot have names after asterisk" << epanic_mode::SEMICOLON;
                 break;
             }
             
             p /= as;
             if (!fs::exists(p) || !fs::is_directory(p)) {
-                error("Path does not exist");
+                error() << "Path '" << p << "' does not exist";
             }
             path << c.value;
             next(); // .
@@ -1628,14 +1629,14 @@ ast* parser::importstmt() {
             p = fs::canonical(p);
             what = ast::string(p.string());
         } else {
-            what = error("Path does not exist or is not a file"); 
+            what = error() << "Path '" << p << "'does not exist or is not a file" << end_error{}; 
         }
     }
     
     if (is(Keyword::AS)) {
         next(); // as
         if (st()->get(c.value)) {
-            error("Identifier already exists");
+            error() << "Identifier '" << c.value << "' already exists";
         } else {
             as = c.value;
         }
@@ -1690,7 +1691,7 @@ ast* parser::usingstmt() {
     
     do {
         if (asterisk) {
-            error("Cannot have more names after asterisk", epanic_mode::SEMICOLON);
+            error() << "Cannot have names after asterisk" << epanic_mode::SEMICOLON;
             break;
         }
         
@@ -1704,7 +1705,7 @@ ast* parser::usingstmt() {
             require(Keyword::AS);
             break;
         } else {
-            error("Invalid using target", epanic_mode::SEMICOLON);
+            error() << "Invalid using target: " << c.value << epanic_mode::SEMICOLON;
             path.push_back(":");
             break;
         }
@@ -1716,7 +1717,7 @@ ast* parser::usingstmt() {
     
     if (is(Keyword::AS)) {
         if (asterisk) {
-            error("Cannot give name to asterisk expression", epanic_mode::SEMICOLON);
+            error() << "Cannot give name to asterisk expression" << epanic_mode::SEMICOLON;
         } else {
             true_as = true;
             next(); // as
@@ -1739,13 +1740,13 @@ ast* parser::usingstmt() {
         
         for (auto& str : path) {
             if (last) {
-                return error("Path ends prematurely");
+                return error() << "Path ends prematurely" << end_error{};
             }
             
             entry = cur->get(str, first);
             first = false;
             if (!entry) {
-                return error("Given identifier does not exist");
+                return error() << "Identifier '" << str << "'does not exist" << end_error{};
             } else if (entry->is_type()) {
                 if (!entry->as_type().st) {
                     last = true;
@@ -1757,7 +1758,7 @@ ast* parser::usingstmt() {
             } else if (entry->is_namespace() || entry->is_module()) {
                 cur = entry->as_namespace().st;
             } else {
-                return error("Cannot use element found");
+                return error() << "Cannot use element found" << end_error{};
             }
         }
         
@@ -1800,14 +1801,14 @@ ast* parser::namespacestmt() {
     
     for (auto& str : path) {
         if (create) {
-            return error("Cannot create nested namespaces", epanic_mode::ESCAPE_BRACE);
+            return error() << "Cannot create nested namespaces" << epanic_mode::ESCAPE_BRACE << end_error{};
         }
         entry = cur->get(str, first);
         first = false;
         if (!entry) {
             create = true;
         } else if (!entry->is_namespace()) {
-            return error("Namespaces can only be nested inside other namespaces", epanic_mode::ESCAPE_BRACE);
+            return error() << "Namespaces can only be nested inside other namespaces" << epanic_mode::ESCAPE_BRACE << end_error{};
         } else {
             cur = entry->as_namespace().st;
         }
@@ -1828,7 +1829,7 @@ ast* parser::namespacestmt() {
     if(is(Symbol::BRACE_LEFT)) {
          nsscope = namespacescope();
     } else {
-        nsscope = error("Require { to start namespace", epanic_mode::ESCAPE_BRACE);
+        nsscope = error() << "'{' required to start namespace, found " << c.value << " instead" << epanic_mode::ESCAPE_BRACE << end_error{};
     }
     
     return ast::unary(Symbol::KWNAMESPACE, nsscope);
@@ -1851,7 +1852,7 @@ ast* parser::namespacescope() {
         } else if (is(TokenType::END_OF_FILE)) {
             break;
         } else {
-            stmts.push_back(error("Invalid token", epanic_mode::SEMICOLON));
+            stmts.push_back(error() << "Invalid token: " << c.value << epanic_mode::SEMICOLON << end_error{});
         }
     }
     
@@ -1966,14 +1967,14 @@ ast* parser::nntype(bool* endswitharray) {
             }
             default:
                 nnt.t = types.t_void;
-                error("Invalid type", epanic_mode::SEMICOLON);
+                error() << "Invalid type: " << c.value << epanic_mode::SEMICOLON;
                 return ret;
         }
     } else if(is(TokenType::IDENTIFIER)) {
         st_entry* type_entry = st()->get(c.value); // TODO Dot operator?
         if (!type_entry || !type_entry->is_type()) {
             nnt.t = types.t_void;
-            error("Invalid type", epanic_mode::SEMICOLON);
+            error() << "Invalid type: " << c.value << epanic_mode::SEMICOLON;
             return ret;
         } else {
             t = type_entry->as_type().t;
@@ -1981,7 +1982,7 @@ ast* parser::nntype(bool* endswitharray) {
         next();
     } else {
         nnt.t = types.t_void;
-        error("Invalid type", epanic_mode::SEMICOLON);
+        error() << "Invalid type: " << c.value << epanic_mode::SEMICOLON;
         return ret;
     }
     
@@ -2004,7 +2005,7 @@ ast* parser::nntype(bool* endswitharray) {
             constructed.as_pointer().ptr_t = eptr_type::ARRAY;
             ast* size = arraysize();
             if (!size->get_type()->can_weak_cast(types.t_long) && size->get_type() != types.t_void) {
-                size = error("Array size must be a long type");
+                size = error() << "Array size must be a long type, but was " << size->get_type() << " instead" << end_error{};
             } 
             // TODO Const expression?
             nnt.array_sizes.push_back(size);
@@ -2026,7 +2027,7 @@ ast* parser::nntype(bool* endswitharray) {
                     constructed.as_pointer().ptr_t = eptr_type::WEAK;
                     break;
                 default:
-                    error("What the fuck just happened", epanic_mode::ULTRA_PANIC);
+                    error() << "Pointer was of illegal type: " << c.value << epanic_mode::ULTRA_PANIC;
             }
             next(); // * *+ *! *?
             if (endswitharray) {
@@ -2064,7 +2065,7 @@ ast* parser::functype() {
         while (!is(Symbol::PAREN_LEFT) && !is(TokenType::END_OF_FILE)) {
             ast* t = nntype();
             if (t->as_nntype().array_sizes.size()) {
-                error("Function type arrays cannot have expression sizes");
+                error() << "Function type arrays cannot have expression sizes: " << t->as_nntype().t;
             }
             frtype.as_combination().types.push_back(t->as_nntype().t);
             
@@ -2092,7 +2093,7 @@ ast* parser::functype() {
     while (!is(Symbol::PAREN_RIGHT) && !is(TokenType::END_OF_FILE)) {
         ast* t = nntype();
         if (t->as_nntype().array_sizes.size()) {
-            error("Function type arrays cannot have expression sizes");
+            error() << "Function type arrays cannot have expression sizes: " << t->as_nntype().t;
         }
         type* pt = t->as_nntype().t;
         param_flags pf{0};
@@ -2136,8 +2137,8 @@ ast* parser::infer() {
             break;
         default:
             t = types.t_void;
+            error() << "Expected inference keyword, but found '" << c.value << "' instead";
             next();
-            error("No inference keyword found");
             break;
     }
     
@@ -2252,7 +2253,7 @@ ast* parser::vardeclass(bool allow_overflow) {
         
         while (true) {
             if (i >= types.size()) {
-                error("Too many expressions for assignment", epanic_mode::SEMICOLON);
+                error() << "Too many expressions for assignment: Expected " << types.size() << epanic_mode::SEMICOLON;
                 break;
             }
             ctx().expected = types[i];
@@ -2284,7 +2285,7 @@ ast* parser::vardeclass(bool allow_overflow) {
                 break;
             }
             if (!rhtypes[i]->can_weak_cast(types[i])) {
-                error("Cannot cast assignment expression to correct type");
+                error() << "Cannot cast assignment expression of type " << rhtypes[i] << " to correct type " << types[i];
             }
         }
         
@@ -2298,53 +2299,15 @@ ast* parser::vardeclass(bool allow_overflow) {
             type* exptype = exp->get_type();
             type* t = exptype->is_combination() ? exptype->as_combination().types[0] : exptype;
             if (!t->can_weak_cast(e)) {
-                error("Cannot cast assignment expression to correct type");
+                error() << "Cannot cast assignment expression of type " << t << " to correct type " << e;
             }
             stmts.push_back(exp);
             if (is(Symbol::COMMA) && !allow_overflow) {
-                error("Too many expressions for assignment", epanic_mode::SEMICOLON);
+                error() << "Too many expressions for assignment: Expected 1" << epanic_mode::SEMICOLON;
             }
             first = false;
         } while (is(Symbol::COMMA));
     }
-    
-    /* if (e->is_combination()) {
-        auto& types = e->as_combination().types;
-        
-        push_context();
-        auto cg = guard();
-        
-        for (type* typ : types) {
-            ctx().expected = typ;
-            ast* exp = aexpression();
-            if (!exp->get_type()->can_weak_cast(typ)) {
-                error("Cannot cast assignment expression to correct type");
-            }
-            stmts.push_back(exp);
-            
-            if (is(Symbol::SEMICOLON)) {
-                break;
-            } else {
-                require(Symbol::COMMA, epanic_mode::COMMA);
-                next(); // ,
-            }
-        }
-        
-    } else {
-        bool first = true;
-        do {
-            if (first) {
-                first = false;
-            } else {
-                next(); // ,
-            }
-            ast* exp = aexpression();
-            if (!exp->get_type()->can_weak_cast(e)) {
-                error("Cannot cast assignment expression to correct type");
-            }
-            stmts.push_back(exp);
-        } while (is(Symbol::COMMA));
-    } */
     
     return vals;
 }
@@ -2446,7 +2409,7 @@ ast* parser::freevardecl(ast* t1) {
                 var.defined = true;
             } else {
                 if (stmts[i]->as_symbol().symbol->as_variable().t == types.t_let) {
-                    error("Variable has uninferrable type");
+                    error() << "Variable '" << stmts[i]->as_symbol().get_name() << "' has uninferrable type";
                 }
             }
         }
@@ -2456,7 +2419,7 @@ ast* parser::freevardecl(ast* t1) {
             auto& sym = stmt->as_symbol();
             st()->add(sym.get_name(), sym.symbol);
             if (sym.symbol->as_variable().t == types.t_let) {
-                error("Variable has uninferrable type");
+                error() << "Variable '" << sym.get_name() << "' has uninferrable type";
             }
         }
         iden->as_binary().right = ast::none();
@@ -2496,11 +2459,11 @@ ast* parser::structvardecliden(ast* t1) {
         
         require(TokenType::NUMBER);
         if (c.as_real() != c.as_integer()) {
-            error("Bitfield values must be integers", epanic_mode::SEMICOLON);
+            error() << "Expected integer bitfield value, got '" << c.as_real() << "' instead" << epanic_mode::SEMICOLON;
         } else {
             u64 val = c.as_integer();
             if (val > 64 || val == 0) {
-                error("Bitfield values must be between 0 and 64");
+                error() << "Expected bitfield value between 0 and 64, got '" << val << "' instead";
             }
             f.bits = (u8) val;
             f.bitfield = true;
@@ -2544,11 +2507,11 @@ ast* parser::structvardecliden(ast* t1) {
                 
                 require(TokenType::NUMBER);
                 if (c.as_real() != c.as_integer()) {
-                    error("Bitfield values must be integers", epanic_mode::SEMICOLON);
+                    error() << "Expected integer bitfield value, got '" << c.as_real() << "' instead" << epanic_mode::SEMICOLON;
                 } else {
                     u64 val = c.as_integer();
                     if (val > 64 || val == 0) {
-                        error("Bitfield values must be between 0 and 64");
+                        error() << "Expected bitfield value between 0 and 64, got '" << val << "' instead";
                     }
                     f.bits = (u8) val;
                     f.bitfield = true;
@@ -2610,7 +2573,7 @@ ast* parser::structvardecl(ast* t1) {
             } else {
                 auto& var = stmts[i]->as_symbol().symbol->as_field();
                 if (fields[var.field].t == types.t_let) {
-                    error("Variable has uninferrable type");
+                    error() << "Variable '" << stmts[i]->as_symbol().get_name() << "' has uninferrable type";
                 }
             }
         }
@@ -2621,7 +2584,7 @@ ast* parser::structvardecl(ast* t1) {
             auto& sym = stmt->as_symbol();
             st()->add(sym.get_name(), sym.symbol);
             if (fields[sym.symbol->as_field().field].t == types.t_let) {
-                error("Variable has uninferrable type");
+                error() << "Variable '" << sym.get_name() << "' has uninferrable type";
             }
         }
         iden->as_binary().right = ast::none();
@@ -2670,20 +2633,20 @@ ast* parser::simplevardecl(ast* t1) {
             exptype = exptype->as_combination().types[0];
         }
         if (!exptype->can_weak_cast(expected)) {
-            error("Cannot cast assignment expression to correct type");
+            error() << "Cannot cast assignment expression of type " << exptype << " to type " << expected;
         }
         if (fields.back().t == types.t_let) {
             fields.back().t = exptype;
         }
         if (_union.def_value) {
-            error("Unions can only have one default value");
+            error() << "Unions can only have one default value";
         } else {
             _union.def_value = exp;
             _union.def_type = fields.size() - 1;
         }
     } else {
         if (expected == types.t_let) {
-            error("Variable has uninferrable type");
+            error() << "Field '" << name << "' has uninferrable type";
         }
     }
     
@@ -2763,7 +2726,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
     
     while (!is(Symbol::PAREN_RIGHT) && !is(TokenType::END_OF_FILE)) {
         if (last) {
-            error("Spread parameter must be last");
+            error() << "Spread parameter must be last";
         }
         
         auto p = nnparameter();
@@ -2775,7 +2738,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
         }
         
         if (defaulted && !(p.flags & eparam_flags::DEFAULTABLE)) {
-            error("Already declared default parameter");
+            error() << "Non-default parameter '" << p.name << "' behind default parameter";
         }
         
         if (p.flags & eparam_flags::SPREAD) {
@@ -2800,7 +2763,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
     bool declared = ol != nullptr;
     
     if (ol && ol->defined) {
-        ast* ret = error("Function already defined");
+        ast* ret = error() << "Function '" << ol->t << "' already defined" << end_error{};
         if (is(Symbol::BRACE_LEFT)) {
             panic(epanic_mode::ESCAPE_BRACE);
         }
@@ -2825,7 +2788,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
         if (ol && !ol->defined && declared) {
             require(Symbol::SEMICOLON);
             next(); // ;
-            return error("Function already declared");
+            return error() << "Function '" << ol->t << "' already declared" << end_error{};
         }
         require(Symbol::SEMICOLON);
         next(); // ;
@@ -2868,7 +2831,7 @@ ast* parser::funcval() {
     
     while (!is(Symbol::PAREN_RIGHT) && !is(TokenType::END_OF_FILE)) {
         if (last) {
-            error("Spread parameter must be last");
+            error() << "Spread parameter must be last";
         }
         
         auto p = nnparameter();
@@ -2880,7 +2843,7 @@ ast* parser::funcval() {
         }
         
         if (defaulted && !(p.flags & eparam_flags::DEFAULTABLE)) {
-            error("Already declared default parameter");
+            error() << "Non-default parameter '" << p.name << "' behind default parameter";
         }
         
         if (p.flags & eparam_flags::SPREAD) {
@@ -2913,7 +2876,7 @@ ast* parser::funcval() {
             ast* identifier = iden(false);
             auto& idn = identifier->as_symbol();
             if (!idn.symbol->is_variable()) {
-                error("Can only capture variables", epanic_mode::IN_ARRAY);
+                error() << "'" << idn.get_name() << "' cannot be captured" << epanic_mode::IN_ARRAY;
                 if (is(Symbol::COMMA)) {
                     next(); // ,
                 }
@@ -2957,7 +2920,7 @@ ast* parser::funcval() {
         
         scp = scope(etable_owner::FUNCTION);
     } else {
-        error("Function values must be defined", epanic_mode::SEMICOLON);
+        error() << "Function values must be defined" << epanic_mode::SEMICOLON;
     }
     
     cg.deactivate();
@@ -2996,7 +2959,7 @@ parameter parser::nnparameter() {
         
         ast* exp = aexpression();
         if(!exp->get_type()->can_weak_cast(ret.t)) {
-            error("Cannot cast expression to parameter type");
+            error() << "Cannot cast expression of type " << exp->get_type() << " to parameter type " << ret.t;
         }
         ret.value = exp;
     }
@@ -3022,7 +2985,7 @@ ast* parser::structdecl() {
     st_entry* entry = st()->get(name, false);
     if (entry) {
         if (!entry->is_type() || entry->as_type().defined || !entry->as_type().t->is_struct()) {
-            error("Struct already exists", epanic_mode::ESCAPE_BRACE);
+            error() << "Struct '" << name << "' already exists" << epanic_mode::ESCAPE_BRACE;
             next(); // }
             return nullptr;
         }
@@ -3050,7 +3013,7 @@ ast* parser::structdecl() {
         if (declared) {
             require(Symbol::SEMICOLON);
             next(); // ;
-            return error("Struct already declared");
+            return error() << "Struct '" << name << "' already declared" << end_error{};
         }
         require(Symbol::SEMICOLON);
         next(); // ;
@@ -3100,9 +3063,9 @@ ast* parser::uniondecl() {
     st_entry* entry = st()->get(name, false);
     if (entry) {
         if (!entry->is_type() || entry->as_type().defined || !entry->as_type().t->is_union()) {
-            error("Union already exists", epanic_mode::ESCAPE_BRACE);
+            error() << "Union '" << name << "' already exists" << epanic_mode::ESCAPE_BRACE;
             next(); // }
-            return nullptr;
+            return ast::none();
         }
         declared = true;
         utype = entry->as_type().t;
@@ -3128,7 +3091,7 @@ ast* parser::uniondecl() {
         if (declared) {
             require(Symbol::SEMICOLON);
             next(); // ;
-            return error("Union already declared");
+            return error() << "Union '" << name << "' already declared" << end_error{};
         }
         require(Symbol::SEMICOLON);
         next(); // ;
@@ -3174,9 +3137,9 @@ ast* parser::enumdecl() {
     st_entry* entry = st()->get(name, false);
     if (entry) {
         if (!entry->is_type() || entry->as_type().defined || !entry->as_type().t->is_enum()) {
-            error("Enum already exists", epanic_mode::ESCAPE_BRACE);
+            error() << "Enum '" << name << "' already exists" << epanic_mode::ESCAPE_BRACE;
             next(); // }
-            return nullptr;
+            return ast::none();
         }
         declared = true;
         etype = entry->as_type().t;
@@ -3201,7 +3164,7 @@ ast* parser::enumdecl() {
         if (declared) {
             require(Symbol::SEMICOLON);
             next(); // ;
-            return error("Union already declared");
+            return error() << "Enum '" << name << "' already declared" << end_error{};
         }
         require(Symbol::SEMICOLON);
         next(); // ;
@@ -3229,7 +3192,7 @@ ast* parser::enumscope() {
         st_entry* added{nullptr};
         
         if (values.find(name) != values.end()) {
-            error("Name already exists");
+            error() << "Name '" << name << "' already exists in " << ctx()._struct;
         } else {
             values.insert(name);
             added = st()->add_field(name, st()->get_size(), ctx()._struct);
@@ -3277,7 +3240,7 @@ ast* parser::assignment() {
         
         ast* exp = expression();
         if (!exp->is_assignable()) {
-            error("Cannot assign to expression");
+            error() << "Cannot assign to expression";
             continue;
         } else {
             lstmts.push_back(exp);
@@ -3315,7 +3278,7 @@ ast* parser::assignment() {
         
         push_context();
         if (i >= lhtypes.size()) {
-            // error("Too many assignments", epanic_mode::SEMICOLON);
+            // error() << "Too many assignments" << epanic_mode::SEMICOLON;
             done = true;
             ctx().expected = types.t_let;
         } else {
@@ -3399,7 +3362,7 @@ ast* parser::newinit() {
             
             value = aexpression();
             if (!value->get_type()->can_weak_cast(nntyp.t)) {
-                error("Cannot cast new value to type");
+                error() << "Cannot cast new value of type " << value->get_type() << " to type " << nntyp.t;
             }
             
             if(require(Symbol::BRACE_RIGHT, epanic_mode::ESCAPE_BRACE)) {
@@ -3447,11 +3410,11 @@ ast* parser::deletestmt() {
         next(); // delete ,
         ast* exp = expression();
         if (!exp->is_assignable()) {
-            error("Cannot delete result of expression");
+            error() << "Cannot delete result of expression";
             continue;
         } else if (!exp->get_type()->is_pointer(eptr_type::NAKED) && 
                    !exp->get_type()->is_pointer(eptr_type::ARRAY)) {
-            error("Cannot delete smart pointer");
+            error() << "Cannot delete value of type " << exp->get_type();
             continue;
         }
         
@@ -3486,13 +3449,9 @@ ast* parser::e17() {
         next(); // :
         ast* no = e17();
         if (!exp->get_type()->can_boolean()) {
-            std::stringstream ss{};
-            ss << "Ternary condition of type \"" << exp->get_type()->print(true) << "\" cannot be converted to boolean";
-            error(ss.str());
+            error() << "Ternary condition of type " << exp->get_type() << " cannot be converted to boolean";
         } else if (!yes->get_type()->is_weak_equalish(no->get_type())) {
-            std::stringstream ss{};
-            ss << "Types \"" << yes->get_type()->print(true) << "\" and \"" << no->get_type()->print(true) << "\" of ternary condition results are not compatible";
-            error(ss.str());
+            error() << "Types " << yes->get_type() << " and " << no->get_type() << " of ternary condition results are not compatible";
         }
         ast* block = ast::block(st());
         block->as_block().stmts.push_back(yes);
@@ -3751,7 +3710,7 @@ ast* parser::e3() {
             case Symbol::ADDRESS: // Cannot go wrong?
                 break;
             default:
-                error("How did we get here", epanic_mode::ULTRA_PANIC);
+                error() << "e3() called on Symbol " << sym << epanic_mode::ULTRA_PANIC;
                 break;
         }
         return ast::unary(sym, exp, etype, assignable, false);
@@ -3769,9 +3728,7 @@ ast* parser::e3() {
         
         type* etype = get_result_type(Symbol::CAST, typ->get_type(), from->get_type());
         if (!etype) {
-            std::stringstream ss{};
-            ss << "Cannot cast \"" << from->get_type()->print(true) << "\" to \"" << typ->get_type()->print(true) << "\"";
-            error(ss.str());
+            error() << "Cannot cast " << from->get_type() << " to " << typ->get_type();
             etype = typ->get_type();
         }
         
@@ -3822,7 +3779,7 @@ ast* parser::e1() {
                     u64 i{0};
                     while (ctx().first_param != nullptr || (!is(Symbol::PAREN_RIGHT) && !is(TokenType::END_OF_FILE))) {
                         if (i >= params.size()) {
-                            error("Too many arguments", epanic_mode::ESCAPE_PAREN);
+                            error() << "Too many arguments: Expected " << params.size() << epanic_mode::ESCAPE_PAREN;
                             continue;
                         }
                         
@@ -3840,11 +3797,11 @@ ast* parser::e1() {
                         if (argtype->is_combination()) {
                             for (type* t : argtype->as_combination().types) {
                                 if (i >= params.size()) {
-                                    error("Too many arguments", epanic_mode::ESCAPE_PAREN);
+                                    error() << "Too many arguments: Expected " << params.size() << epanic_mode::ESCAPE_PAREN;
                                     continue;
                                 }
                                 if (!t->can_weak_cast(params[i].t)) {
-                                    error("Cannot cast argument to parameter type");
+                                    error() << "Cannot cast argument #" << i << " of type " << t << " to parameter type " << params[i].t;
                                 }
                                 if ((params[i].flags & eparam_flags::SPREAD) == 0) {
                                     ++i;
@@ -3852,7 +3809,7 @@ ast* parser::e1() {
                             }
                         } else {
                             if (!argtype->can_weak_cast(params[i].t)) {
-                                error("Cannot cast argument to parameter type");
+                                error() << "Cannot cast argument #" << i << " of type " << argtype << " to parameter type " << params[i].t;
                             }
                             if ((params[i].flags & eparam_flags::SPREAD) == 0) {
                                 ++i;
@@ -3872,7 +3829,7 @@ ast* parser::e1() {
                     }
                     
                     if (i < params.size() && !(params[i].flags & eparam_flags::DEFAULTABLE) && !(params[i].flags & eparam_flags::SPREAD)) {
-                        error("Not enough arguments");
+                        error() << "Not enough arguments: Expected " << params.size() << " but got " << i << " instead";
                     } 
                     
                 } else if (exp->get_type()->is_function(false)) {
@@ -3884,7 +3841,7 @@ ast* parser::e1() {
                     bool named{false};
                     while (ctx().first_param != nullptr || (!is(Symbol::PAREN_RIGHT) && !is(TokenType::END_OF_FILE))) {
                         if (i >= params.size()) {
-                            error("Too many arguments", epanic_mode::ESCAPE_PAREN);
+                            error() << "Too many arguments: Expected " << params.size() << epanic_mode::ESCAPE_PAREN;
                             continue;
                         }
                         
@@ -3903,11 +3860,11 @@ ast* parser::e1() {
                             if (argtype->is_combination()) {
                                 for (type* t : argtype->as_combination().types) {
                                     if (i >= params.size()) {
-                                        error("Too many arguments", epanic_mode::ESCAPE_PAREN);
+                                        error() << "Too many arguments: Expected " << params.size() << epanic_mode::ESCAPE_PAREN;
                                         continue;
                                     }
                                     if (!t->can_weak_cast(params[i].t)) {
-                                        error("Cannot cast argument to parameter type");
+                                        error() << "Cannot cast argument #" << i << " of type " << t << " to parameter type " << params[i].t; // TODO Better?
                                     }
                                     passed[i] = true;
                                     if ((params[i].flags & eparam_flags::SPREAD) == 0) {
@@ -3916,7 +3873,7 @@ ast* parser::e1() {
                                 }
                             } else {
                                 if (!argtype->can_weak_cast(params[i].t)) {
-                                    error("Cannot cast argument to parameter type");
+                                    error() << "Cannot cast argument #" << i << " of type " << argtype << " to parameter type " << params[i].t;
                                 }
                                 passed[i] = true;
                                 if ((params[i].flags & eparam_flags::SPREAD) == 0) {
@@ -3926,7 +3883,7 @@ ast* parser::e1() {
                             maxi = i;
                         } else {
                             if (name.empty()) {
-                                error("Cannot have non-named parameters after named parameters");
+                                error() << "Cannot have non-named parameters after named parameters";
                                 continue;
                             }
                             
@@ -3937,24 +3894,18 @@ ast* parser::e1() {
                             } 
                             si = i;
                             if (i >= params.size()) {
-                                error("No parameter with such name");
+                                error() << "No parameter with name " << name;
                                 continue;
                             }
                             if (argtype->is_combination()) {
-                                error("Cannot pass combination type to a single parameter");
+                                error() << "Cannot pass combination type " << argtype << " to paramater '" << name << "' of type " << params[i].t;
                             } else {
                                 if (passed[i]) {
-                                    error("Parameter already filled in");
+                                    error() << "Parameter '" << name << "' already passed in";
                                     continue;
                                 }
-                                if (params[i].flags & eparam_flags::SPREAD) {
-                                    if (!argtype->is_pointer(eptr_type::ARRAY) || !argtype->as_pointer().t->can_weak_cast(params[i].t)) {
-                                        error("Cannot cast argument to parameter type");
-                                    }
-                                } else {
-                                    if (!argtype->can_weak_cast(params[i].t)) {
-                                        error("Cannot cast argument to parameter type");
-                                    }
+                                if (!argtype->can_weak_cast(params[i].t)) {
+                                    error() << "Cannot cast argument #" << i << " of type " << argtype << " to parameter '" << name << "' of type " << params[i].t;
                                 }
                                 passed[i] = true;
                             }
@@ -3986,7 +3937,7 @@ ast* parser::e1() {
                     }
                     
                     if (last_passed < params.size() && !(params[last_passed].flags & eparam_flags::DEFAULTABLE) && !(params[last_passed].flags & eparam_flags::SPREAD)) {
-                        error("Not enough arguments");
+                        error() << "Not enough arguments: Expected " << params.size();
                     } 
                 } else if (exp->is_symbol() && exp->get_type() == types.t_fun) {
                     stmts = std::vector<ast*>{};
@@ -4021,7 +3972,7 @@ ast* parser::e1() {
                     }
                     overload* ol = exp->as_symbol().symbol->as_function().get_overload(argtypes);
                     if (!ol) {
-                        error("Cannot find overload taking those parameters");
+                        error() << "Cannot find overload taking those parameters"; // TODO
                         next(); // )
                         rtype = types.t_void;
                         continue;
@@ -4031,7 +3982,7 @@ ast* parser::e1() {
                         exp->as_symbol().overload_defined = true;
                     }
                 } else {
-                    error("Cannot call non-function", epanic_mode::ESCAPE_PAREN);
+                    error() << "Cannot call non-function of type " << exp->get_type() <<  epanic_mode::ESCAPE_PAREN;
                     next(); // )
                     rtype = types.t_void;
                     continue;
@@ -4070,7 +4021,7 @@ ast* parser::e1() {
                             if (t.t->is_struct() || t.t->is_union()) {
                                 st_entry* meth = t.st->get(name, est_entry_type::FUNCTION, false);
                                 if (!meth) {
-                                    error("No method with that name");
+                                    error() << "No method '" << name << "' in type " << symbol->get_type();
                                 } else {
                                     if (is(Symbol::PAREN_LEFT)) {
                                         ctx().first_param = exp;
@@ -4083,14 +4034,14 @@ ast* parser::e1() {
                             } else if (t.t->is_enum()) {
                                 st_entry* en = t.st->get(name, est_entry_type::FIELD, false);
                                 if (!en) {
-                                    error("No enumeration value with that name");
+                                    error() << "No enumeration value '" << name << "' in type " << symbol->get_type();
                                 } else {
                                     delete exp;
                                     exp = ast::qword(en->as_field().field, t.t);
                                     continue;
                                 }
                             } else {
-                                return error("Impossible! The ancient scripts must be mistaken!", epanic_mode::ULTRA_PANIC);
+                                return error() << "Impossible! The ancient scripts must be mistaken!" << epanic_mode::ULTRA_PANIC << end_error{};
                             }
                             break;
                         }
@@ -4117,7 +4068,7 @@ ast* parser::e1() {
                                 exp = ast::symbol(e);
                                 continue;
                             } else {
-                                error("No such name in namespace");
+                                error() << "No name '" << name << "' in namespace '" << symbol->name << "'";
                             }
                             break;
                         }
@@ -4126,14 +4077,14 @@ ast* parser::e1() {
                             if (!not_first) {
                                 st_entry* zhis = st()->get("this");
                                 if (zhis->get_type()->as_pointer().t != symbol->as_field().ptype) {
-                                    error("this does not have any such fields");
+                                    error() << "'this' of type " << zhis->get_type() << " does not have field '" << symbol->name << "'";
                                 } else {
                                     exp = ast::binary(Symbol::ACCESS, ast::symbol(zhis), on, t, true);
                                 }
                             }
                             break;
                         case est_entry_type::LABEL:
-                            error("I thought colons could not be part of names...", epanic_mode::ULTRA_PANIC);
+                            error() << "I thought colons could not be part of names... " << symbol->name << epanic_mode::ULTRA_PANIC;
                             break;
                     }
                 } else {
@@ -4155,7 +4106,7 @@ ast* parser::e1() {
                                         exp = ast::symbol(e);
                                         goto access_type_fine;
                                     } else {
-                                        error("Method access on values or variables must be used as function calls");
+                                        error() << "Method access on values or variables must be used as function calls"; // TODO Make into lambda automatically? 
                                     }
                                 }
                             }
@@ -4167,7 +4118,7 @@ ast* parser::e1() {
                                 exp = ast::symbol(ff);
                                 goto access_type_fine;
                             } else {
-                                error("Function access on values or variables must be used as function calls");
+                                error() << "Method access on values or variables must be used as function calls"; // TODO Make into lambda automatically? 
                             }
                         }
                         if (t && t->is_pointer()) {
@@ -4176,15 +4127,15 @@ ast* parser::e1() {
                             break;
                         }
                     }
-                    error("Could not find any names");
+                    error() << "Could not find '" << name << "'";
                     access_type_fine:;
                 } else {
-                    error("Should have already returned, fool!", epanic_mode::ULTRA_PANIC);
+                    error() << "Should have already returned, fool!" << epanic_mode::ULTRA_PANIC;
                 }
                 break;
             }
             default:
-                error("Oh no", epanic_mode::ULTRA_PANIC);
+                error() << "Oh no" << epanic_mode::ULTRA_PANIC;
                 break;
         }
     }
