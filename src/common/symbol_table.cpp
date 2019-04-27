@@ -202,14 +202,14 @@ st_variable& st_variable::operator=(st_variable&& o) {
     return *this;
 }
 
-st_function::st_function(const std::vector<overload> overloads, symbol_table* st) : overloads(overloads), st(st ? st : new symbol_table{etable_owner::FUNCTION, nullptr}) {
+st_function::st_function(const std::vector<overload*> overloads, symbol_table* st) : overloads(overloads), st(st ? st : new symbol_table{etable_owner::FUNCTION, nullptr}) {
     
 }
 
 overload* st_function::get_overload(const std::vector<type*>& args) {
     std::vector<overload*> ret{};
     for (auto& ov : overloads) {
-        auto& oparams = ov.t->as_function().params;
+        auto& oparams = ov->t->as_function().params;
         bool spread = oparams.size() ? (oparams.back().flags & eparam_flags::SPREAD) != 0 : false;
         if (args.size() > oparams.size() && !spread) {
             goto next_overload;
@@ -234,7 +234,7 @@ overload* st_function::get_overload(const std::vector<type*>& args) {
                 }
             }
         }
-        ret.push_back(&ov);
+        ret.push_back(ov);
         next_overload:;
     }
     if (ret.size() == 1) {
@@ -266,6 +266,11 @@ st_function::~st_function() {
     if (st) {
         delete st;
     }
+    for (auto& ov : overloads) {
+        if (ov) {
+            delete ov;
+        }
+    }
 }
 
 st_function::st_function(const st_function& o) {
@@ -273,7 +278,15 @@ st_function::st_function(const st_function& o) {
         delete st;
     }
     
-    overloads = o.overloads;
+    overloads.resize(o.overloads.size());
+    for (u64 i = 0; i < o.overloads.size(); ++i) {
+        if (o.overloads[i]) {
+            overloads[i] = new overload{*o.overloads[i]};
+        } else {
+            overloads[i] = nullptr;
+        }
+    }
+    
     if (o.st) {
         st = new symbol_table{*o.st};
     } else {
@@ -292,7 +305,15 @@ st_function& st_function::operator=(const st_function& o) {
             delete st;
         }
         
-        overloads = o.overloads;
+        overloads.resize(o.overloads.size());
+        for (u64 i = 0; i < o.overloads.size(); ++i) {
+            if (o.overloads[i]) {
+                overloads[i] = new overload{*o.overloads[i]};
+            } else {
+                overloads[i] = nullptr;
+            }
+        }
+        
         if (o.st) {
             st = new symbol_table{*o.st};
         } else {
@@ -488,7 +509,7 @@ type* st_entry::get_type() {
             }
         }
         case est_entry_type::FUNCTION:
-            return as_function().overloads.size() != 1 ? type_table::t_fun : as_function().overloads.back().t;
+            return as_function().overloads.size() != 1 ? type_table::t_fun : as_function().overloads.back()->t;
         case est_entry_type::TYPE:
             return as_type().t;
         case est_entry_type::VARIABLE:
@@ -520,7 +541,7 @@ type* st_entry::get_type(u64 oid) {
             }
         }
         case est_entry_type::FUNCTION:
-            return as_function().overloads[oid].t;
+            return as_function().overloads[oid]->t;
         case est_entry_type::TYPE:
             return as_type().t;
         case est_entry_type::VARIABLE:
@@ -564,12 +585,12 @@ std::string st_entry::print(u64 depth) {
         case est_entry_type::FUNCTION:
             ss << "FUNCTION " << name << "[" << as_function().overloads.size() << "]\n";
             for (auto& ol : as_function().overloads) {
-                ss << sep << "  " << ol.t->print(true) << "\n";
-                if (ol.defined) {
+                ss << sep << "  " << ol->t->print(true) << "\n";
+                if (ol->defined) {
                     ss << sep << "  " << "Value: \n";
-                    ss << (ol.value ? ol.value->print(depth + 2) : "NULLPTR") << "\n";
+                    ss << (ol->value ? ol->value->print(depth + 2) : "NULLPTR") << "\n";
                     ss << sep << "  " << "Symbol table: \n";
-                    ss << (ol.st ? ol.st->print(depth + 2) : "NULLPTR") << "\n";
+                    ss << (ol->st ? ol->st->print(depth + 2) : "NULLPTR") << "\n";
                 }
             }
             break;
@@ -700,9 +721,8 @@ std::pair<st_entry*, overload*> symbol_table::add_function(const std::string& na
         entries.insert({name, f});
     }
     
-    overload o{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}, f->as_function().overloads.size()};
-    f->as_function().overloads.emplace_back(std::move(o));
-    return {f, &f->as_function().overloads.back()};
+    f->as_function().overloads.push_back(new overload{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}, f->as_function().overloads.size()});
+    return {f, f->as_function().overloads.back()};
 }
 
 st_entry* symbol_table::add_namespace(const std::string& name, symbol_table* st) {

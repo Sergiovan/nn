@@ -63,13 +63,13 @@ struct st_variable {
 };
 
 struct st_function {
-    std::vector<overload> overloads{};
+    std::vector<overload*> overloads{}; // Owned
     // TODO Borrowed overloads, for inner functions with the same name as outer functions
     symbol_table* st{nullptr}; // Owned, for sigs
     
     overload* get_overload(const std::vector<type*>& args);
     
-    st_function(const std::vector<overload> overloads = {}, symbol_table* st = nullptr);
+    st_function(const std::vector<overload*> overloads = {}, symbol_table* st = nullptr);
     ~st_function();
     st_function(const st_function& o);
     st_function(st_function&& o);
