@@ -2,6 +2,7 @@
 
 #include <variant>
 #include <vector>
+#include <iostream>
 
 #include "common/grammar.h"
 
@@ -21,8 +22,6 @@ struct ast_none{};
 
 struct ast_symbol {
     st_entry* symbol;
-    u64 overload{0}; // For overloaded functions
-    bool overload_defined{false};
     std::string get_name();
 };
 
@@ -57,6 +56,8 @@ struct ast_string {
     ast_string(ast_string&& o);
     ast_string& operator=(const ast_string& o);
     ast_string& operator=(ast_string&& o);
+    
+    std::string preview();
 };
 
 struct ast_array {
@@ -242,4 +243,7 @@ struct ast {
     bool is_assignable();
     
     std::string print(u64 depth = 0, const std::string& prev = "");
+    std::string print_value();
 };
+
+std::ostream& operator<<(std::ostream& os, const east_type& ast_type);

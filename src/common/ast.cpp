@@ -60,6 +60,51 @@ ast_string& ast_string::operator=(ast_string&& o) {
     return *this;
 }
 
+std::string ast_string::preview() {
+    char nchars[21];
+    nchars[20] = '\0';
+    for (u8 i = 0; i < 21; ++i) {
+        if (i > length) {
+            nchars[i] = '\0';
+            continue;
+        }
+        char c = chars[i];
+        switch (c) {
+            case '\n':
+                if (i < 18) {
+                    nchars[i] = '\\';
+                    nchars[++i] = 'n';
+                } else {
+                    nchars[i] = '.';
+                }
+                break;
+            case '\t':
+                if (i < 18) {
+                    nchars[i] = '\\';
+                    nchars[++i] = 't';
+                } else {
+                    nchars[i] = '.';
+                }
+                break;
+            case '\r':
+                if (i < 18) {
+                    nchars[i] = '\\';
+                    nchars[++i] = 'r';
+                } else {
+                    nchars[i] = '.';
+                }
+                break;
+            default:
+                nchars[i] = c;
+                break;
+        }
+    }
+    if (length >= 20) {
+        nchars[19] = nchars[18] = nchars[17] = '.';
+    }
+    return std::string{&nchars[0], 21};
+}
+
 ast_array::~ast_array() {
     if (elems) {
         for (u64 i = 0; i < length; ++i) {
@@ -1032,19 +1077,14 @@ std::string ast::print(u64 depth, const std::string& prev) {
         case east_type::SYMBOL: {
             ast_symbol& sym = as_symbol();
             ss << "SYMBOL " << sym.get_name();
-            if (sym.overload_defined) {
-                ss << " (" << sym.symbol->get_type(sym.overload)->print(true) << ") ";
-            } else {
-                ss << " (" << sym.symbol->get_type()->print(true) << ") ";
-            }
+            ss << " (" << sym.symbol->get_type() << ") ";
             switch (sym.symbol->t) {
                 case est_entry_type::FIELD: 
                     ss << "FIELD\n"; 
                     break;
-                case est_entry_type::FUNCTION: {
+                case est_entry_type::FUNCTION:
                     ss << "FUNCTION\n";
                     break;
-                }
                 case est_entry_type::TYPE: 
                     ss << "TYPE\n"; 
                     break;
@@ -1056,6 +1096,9 @@ std::string ast::print(u64 depth, const std::string& prev) {
                     break;
                 case est_entry_type::NAMESPACE: 
                     ss << "NAMESPACE\n"; 
+                    break;
+                case est_entry_type::OVERLOAD:
+                    ss << "OVERLOAD\n";
                     break;
                 case est_entry_type::LABEL:
                     ss << "LABEL\n";
@@ -1132,7 +1175,7 @@ std::string ast::print(u64 depth, const std::string& prev) {
         }
         case east_type::STRING: {
             ast_string& str = as_string();
-            ss << "STRING [" << str.length << "]\n";
+            ss << "STRING [" << str.preview() << "]\n";
             return ss.str();
         }
         case east_type::ARRAY: {
@@ -1189,4 +1232,86 @@ std::string ast::print(u64 depth, const std::string& prev) {
             return ss.str();
     }
     
+}
+
+std::string ast::print_value() {
+    using namespace std::string_literals;
+    std::stringstream ss{};
+    switch (t) {
+        case east_type::NONE: 
+            ss << "NONE";
+            return ss.str();
+        case east_type::BYTE: 
+            ss << "BYTE (" << get_type() << ") " << (u64) as_byte().data;
+            return ss.str();
+        case east_type::WORD: 
+            ss << "WORD (" << get_type() << ") " << as_word().data;
+            return ss.str();
+        case east_type::DWORD: 
+            ss << "DWORD (" << get_type() << ") " << as_dword().data;
+            return ss.str();
+        case east_type::QWORD: 
+            ss << "QWORD (" << get_type() << ") " << as_qword().data;
+            return ss.str();
+        case east_type::STRING: 
+            ss << "STRING \"" << as_string().preview() << "\"";
+            return ss.str();
+        case east_type::ARRAY:
+            ss << "ARRAY " << as_array().t;
+            return ss.str();
+        case east_type::STRUCT:
+            ss << "STRUCT " << as_struct().t;
+            return ss.str();
+        case east_type::CLOSURE: 
+            ss << "CLOSURE " << as_closure().function->get_type();
+            return ss.str();
+        case east_type::PRE_UNARY: [[fallthrough]];
+        case east_type::POST_UNARY: [[fallthrough]];
+        case east_type::BINARY: [[fallthrough]];
+        case east_type::SYMBOL: [[fallthrough]];
+        case east_type::FUNCTION: [[fallthrough]];
+        case east_type::BLOCK: [[fallthrough]];   
+        case east_type::TYPE: [[fallthrough]];
+        default:
+            return "NOT A VALUE"s;
+    }
+}
+
+std::ostream& operator<<(std::ostream& os, const east_type& ast_type) {
+    switch (ast_type) {
+        case east_type::NONE:
+            return os << "NONE";
+        case east_type::SYMBOL:
+            return os << "SYMBOL";
+        case east_type::BYTE:
+            return os << "BYTE";
+        case east_type::WORD:
+            return os << "WORD";
+        case east_type::DWORD:
+            return os << "DWORD";
+        case east_type::QWORD:
+            return os << "QWORD";
+        case east_type::STRING:
+            return os << "STRING";
+        case east_type::ARRAY:
+            return os << "ARRAY";
+        case east_type::STRUCT:
+            return os << "STRUCT";
+        case east_type::PRE_UNARY:
+            return os << "PRE_UNARY";
+        case east_type::POST_UNARY:
+            return os << "POST_UNARY";
+        case east_type::BINARY:
+            return os << "BINARY";
+        case east_type::BLOCK:
+            return os << "BLOCK";
+        case east_type::FUNCTION:
+            return os << "FUNCTION";
+        case east_type::CLOSURE:
+            return os << "CLOSURE";
+        case east_type::TYPE:
+            return os << "TYPE";
+        default:
+            return os << "INVALID";
+    }
 }

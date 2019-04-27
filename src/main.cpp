@@ -11,6 +11,7 @@
 
 #include "common/ast.h"
 #include "frontend/parser.h"
+#include "common/ir.h"
 #include "frontend/ast_to_ir.h"
 
 #include "frontend/asm_compiler.h"
@@ -45,9 +46,13 @@ int main(int argc, char** argv) {
         logger::log() << res.result->print() << logger::nend;
         logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
         
+        start = std::chrono::high_resolution_clock::now();
         ir_builder b{res};
         b.build();
-    
+        end = std::chrono::high_resolution_clock::now();
+        
+        logger::log() << '\n' << print_sequence(b.get()) << logger::nend;
+        logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
     }
     
     /*

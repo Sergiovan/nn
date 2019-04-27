@@ -18,7 +18,7 @@ enum class etable_owner {
 
 enum class est_entry_type {
     TYPE, VARIABLE, FUNCTION, NAMESPACE,
-    FIELD, MODULE, LABEL
+    FIELD, OVERLOAD, MODULE, LABEL
 };
 
 struct overload {
@@ -34,6 +34,8 @@ struct overload {
     overload(overload&& o);
     overload& operator=(const overload& o);
     overload& operator=(overload&& o);
+    
+    std::string unique_name();
 };
 
 struct st_type {
@@ -65,7 +67,7 @@ struct st_variable {
 struct st_function {
     std::vector<overload*> overloads{}; // Owned
     // TODO Borrowed overloads, for inner functions with the same name as outer functions
-    symbol_table* st{nullptr}; // Owned, for sigs
+    symbol_table* st{nullptr}; // Owned, for sigs and overloads
     
     overload* get_overload(const std::vector<type*>& args);
     
@@ -93,9 +95,14 @@ struct st_field {
     type* ptype{nullptr};
 };
 
+struct st_overload {
+    overload* ol{nullptr}; // Not owned
+    st_function* function{nullptr}; // Not owned
+};
+
 struct st_label {};
 
-using st_variant = std::variant<st_type, st_variable, st_function, st_namespace, st_field, st_label>;
+using st_variant = std::variant<st_type, st_variable, st_function, st_namespace, st_field, st_overload, st_label>;
 
 struct st_entry {
     st_variant entry;
@@ -111,6 +118,7 @@ struct st_entry {
     st_function& as_function();
     st_namespace& as_namespace();
     st_field& as_field();
+    st_overload& as_overload();
     st_namespace& as_module();
     
     
@@ -120,10 +128,10 @@ struct st_entry {
     bool is_namespace();
     bool is_field();
     bool is_module();
+    bool is_overload();
     bool is_label();
     
     type* get_type();
-    type* get_type(u64 oid);
     
     std::string print(u64 depth = 0);
 };
@@ -172,3 +180,5 @@ public:
     dict<st_entry*> entries{}; // Owned
     dict<st_entry*> borrowed_entries{}; // NOT Owned
 };
+
+std::ostream& operator<<(std::ostream& os, const est_entry_type& st_entry_type);

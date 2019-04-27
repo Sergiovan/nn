@@ -135,16 +135,19 @@ void parser::print_types() {
 }
 
 ast* parser::_parse() {
-    try {
+//     try {
         ast* ret = program();
         if (unfinished.size()) {
             finish();
         }
         return ret;
-    } catch (...) {
-        logger::error() << "Unfixable error occurred. Leaving..." << logger::nend;
-        return nullptr;
-    }
+//     } catch (std::exception& ex) {
+//         logger::error() << ex.what() << logger::nend;
+//         return nullptr;
+//     } catch (...) {
+//         logger::error() << "Unfixable error occurred. Leaving..." << logger::nend;
+//         return nullptr;
+//     }
 }
 
 void parser::finish() {
@@ -522,7 +525,7 @@ ast* parser::iden(bool withthis, type** thistype) {
     }
     
     if (!sym) {
-        return error() << '"' << tok.value << '"' << "does not exist" << &tok << end_error{};
+        return error() << '"' << tok.value << '"' << " does not exist" << &tok << end_error{};
     }
     return ast::symbol(sym);
 }
@@ -2793,7 +2796,9 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
         next();
         return ret;
     } else if (!ol) {
-        ol = parent->add_function(name, ftype, nullptr, nullptr).second;
+        auto [f, oll] = parent->add_function(name, ftype, nullptr, nullptr);
+        ol = oll;
+        entry = f->as_function().st->get(ol->unique_name());
     }
     
     if (is(Symbol::BRACE_LEFT)) {
@@ -2805,6 +2810,9 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
         ol->value = scope(etable_owner::FUNCTION);
         delete ol->st;
         ol->st = st();
+        if (entry->is_function()) {
+            entry = entry->as_function().st->get(ol->unique_name());
+        }
         
     } else {
         if (ol && !ol->defined && declared) {
@@ -2943,6 +2951,7 @@ ast* parser::funcval() {
         scp = scope(etable_owner::FUNCTION);
     } else {
         error() << "Function values must be defined" << epanic_mode::SEMICOLON;
+        scp = ast::none();
     }
     
     cg.deactivate();
@@ -4011,8 +4020,7 @@ ast* parser::e1() {
                         continue;
                     } else {
                         rtype = ol->t->as_function().rets;
-                        exp->as_symbol().overload = ol->oid;
-                        exp->as_symbol().overload_defined = true;
+                        exp->as_symbol().symbol = exp->as_symbol().symbol->as_function().st->get(ol->unique_name());
                     }
                 } else {
                     error() << "Cannot call non-function of type " << exp->get_type() <<  epanic_mode::ESCAPE_PAREN;
@@ -4180,7 +4188,7 @@ ast* parser::ee() {
     
     if (is(Symbol::PAREN_LEFT)) {
         next(); // (
-        if (is_type() || is_infer()) {
+        if (is(Keyword::VOID) || is_type() || is_infer()) {
             ret = funcval();
         } else {
             ret = expression();

@@ -3,6 +3,7 @@
 #include "common/convenience.h"
 #include <list>
 #include <vector>
+#include <iostream>
 
 struct st_entry;
 struct ast;
@@ -33,17 +34,21 @@ struct ir_triple {
             ast* value;
             st_entry* iden;
             ir_triple* triple;
+            u64 immediate;
         };
-        enum {LITERAL, IDEN, TRIPLE} type{LITERAL};
+        enum {LITERAL, IDEN, TRIPLE, IMMEDIATE} type{LITERAL};
         
         ir_triple_param(ast* node);
         ir_triple_param(st_entry* entry);
         ir_triple_param(ir_triple* triple);
+        ir_triple_param(u64 immediate);
     };
     
     ir_op::code op{ir_op::COPY};
     ir_triple_param param1{(ast*) nullptr};
     ir_triple_param param2{(ast*) nullptr};
+    
+    std::string print();
 };
 
 struct ir {
@@ -66,6 +71,8 @@ struct ir {
     std::vector<ir_triple*> triples{}; // Owned
     ir* next{nullptr}; // Not owned
     ir* cond{nullptr}; // Not owned
+    
+    std::string print();
 };
 
 struct block {
@@ -79,3 +86,6 @@ struct block {
     ir* latest{nullptr}; // Not owned
     ir* end{nullptr};   // Not owned
 };
+
+std::ostream& operator<<(std::ostream& os, const ir_op::code& code);
+std::string print_sequence(ir* start);

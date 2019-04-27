@@ -3,11 +3,13 @@
 #include "common/ast.h"
 #include "common/symbol_table.h"
 #include "common/utils.h"
+#include "common/type.h"
 
 ir_builder::ir_builder::ir_builder(parse_info& p) : p(p) {
-    current = base = new ir{};
-    current->add({ir_op::NOOP});
+    base = new ir;
+    base->add({ir_op::NOOP});
     irs.push_back(base);
+    current = base;
 }
 
 void ir_builder::build(ast* node, symbol_table* sym) {    
@@ -24,9 +26,10 @@ void ir_builder::build(ast* node, symbol_table* sym) {
         case east_type::PRE_UNARY: [[fallthrough]];
         case east_type::POST_UNARY: [[fallthrough]];
         case east_type::BINARY: [[fallthrough]];
+        case east_type::CLOSURE: [[fallthrough]]; // Put the code somewhere!
         case east_type::BLOCK: break;
         default: 
-            logger::error() << "Found wrong ast_type at start: " << (int) node->t << logger::nend;
+            logger::error() << "Found wrong ast_type at start: " << node->t << logger::nend;
             return;
     }
     
@@ -37,6 +40,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             build(bnode, node->as_block().st);
         }
         
+        blocks.top().finish();
         blocks.pop();
     } else if (node->is_binary()) {
         using Grammar::Symbol;
@@ -45,26 +49,34 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             case Symbol::SYMDECL: { // Function, or type
                 if (bin.left->is_symbol()) {
                     switch (bin.left->as_symbol().symbol->t) {
-                        case est_entry_type::FUNCTION: {
-                            auto ir = labeled.find(bin.left->as_symbol().symbol);
+                        case est_entry_type::OVERLOAD: {
+                            auto dir = labeled.find(bin.left->as_symbol().symbol);
                             if (bin.right->is_none()) {
-                                if (ir == labeled.end()) {
-                                    labeled[bin.left->as_symbol().symbol] = new ::ir{};
+                                if (dir == labeled.end()) {
+                                    irs.push_back(new ::ir{});
+                                    labeled[bin.left->as_symbol().symbol] = irs.back();
                                 }
                             } else {
-                                if (ir == labeled.end()) {
+                                ir* prev_cur = current;
+                                
+                                if (dir == labeled.end()) {
                                     labeled[bin.left->as_symbol().symbol] = new_ir();
                                 } else {
-                                    current->next = ir->second;
-                                    current = ir->second;
+                                    current->next = dir->second;
+                                    current = dir->second;
                                 }
+                                
                                 build(bin.right, bin.right->as_block().st);
+                                
+                                new_ir();
+                                prev_cur->cond = current;
+                                prev_cur->add({JUMP, current->triples.front()});
                             }
                         }
                         case est_entry_type::TYPE: 
                             return;
                         default:
-                            logger::error() << "Wrong declaration type: " << (int) node->t << logger::nend;
+                            logger::error() << "Wrong declaration type: " << bin.left->as_symbol().symbol->t << logger::nend;
                     }
                 } else {
                     auto& left  = bin.left->as_block();
@@ -78,12 +90,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         if (i >= right.stmts.size()) {
                             break;
                         }
-                        if (right.stmts[i]->is_value()) {
-                            current->add(ir_triple{COPY, left.stmts[i]->as_symbol().symbol, right.stmts[i]});
-                        } else {
-                            build(right.stmts[i], right.st);
-                            current->add(ir_triple{COPY, left.stmts[i]->as_symbol().symbol, current->triples.back()});
-                        }
+                        add_proper(COPY, right.st, left.stmts[i], right.stmts[i]);
                     }
                 }
             }
@@ -103,6 +110,19 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         current->next = ir->second;
                         current = ir->second;
                     }
+                    break;
+                }
+                case Symbol::KWRETURN: {
+                    u64 rets = 0;
+                    if (un.node->is_block()) {
+                        auto& blk = un.node->as_block();
+                        rets = blk.stmts.size();
+                        for (int i = 0; i < blk.stmts.size(); ++i) {
+                            add_proper(RETVAL, blk.st, blk.stmts[i]);
+                        }
+                    }
+                    // TODO Proper destructors
+                    current->add({RETURN, rets});
                     break;
                 }
             }
@@ -128,7 +148,8 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     add_proper(NOT, sym, un.node);
                     break;
                 case Symbol::LNOT:
-                    add_proper(OR, sym, un.node, ast::qword(~1));
+                    add_proper(OR, sym, un.node);
+                    current->triples.back()->param2 = ~1ull;
                     current->add({NOT, current->triples.back()});
                     break;
                 case Symbol::AT:
@@ -138,14 +159,20 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     add_proper(ADDRESS, sym, un.node);
                     break;
                 default:
-                    logger::error() << "Wrong symbol type: " << (int) un.op << logger::nend;
+                    logger::error() << "Wrong symbol type: " << un.op << logger::nend;
             }
         }
+    } else if (node->is_closure()) {
+        
     }
 }
 
 void ir_builder::optimize() {
     return;
+}
+
+ir* ir_builder::get() {
+    return base;
 }
 
 void ir_builder::add_proper(ir_op::code code, symbol_table* sym, ast* param1, ast* param2) {
@@ -174,6 +201,7 @@ void ir_builder::add_proper(ir_op::code code, symbol_table* sym, ast* param1, as
 ir* ir_builder::new_ir() {
     ir* c = current;
     current = new ir{};
+    irs.push_back(current);
     c->next = current;
     current->add({ir_op::NOOP});
     return current;

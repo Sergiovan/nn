@@ -90,6 +90,11 @@ overload& overload::operator=(overload&& o) {
     return *this;
 }
 
+std::string overload::unique_name() {
+    using namespace std::string_literals;
+    return ":"s + t->print(true);
+}
+
 st_type::st_type(type* t, bool defined, symbol_table* st) :t(t), defined(defined), st(st) {
     
 }
@@ -458,6 +463,10 @@ st_field& st_entry::as_field() {
     return std::get<st_field>(entry);
 }
 
+st_overload& st_entry::as_overload() {
+    return std::get<st_overload>(entry);
+}
+
 st_namespace& st_entry::as_module() {
     return std::get<st_namespace>(entry);
 }
@@ -486,6 +495,11 @@ bool st_entry::is_module() {
     return t == est_entry_type::MODULE;
 }
 
+bool st_entry::is_overload() {
+    return t == est_entry_type::OVERLOAD;
+}
+
+
 bool st_entry::is_label() {
     return t == est_entry_type::LABEL;
 }
@@ -510,38 +524,8 @@ type* st_entry::get_type() {
         }
         case est_entry_type::FUNCTION:
             return as_function().overloads.size() != 1 ? type_table::t_fun : as_function().overloads.back()->t;
-        case est_entry_type::TYPE:
-            return as_type().t;
-        case est_entry_type::VARIABLE:
-            return as_variable().t;
-        case est_entry_type::MODULE: [[fallthrough]];
-        case est_entry_type::NAMESPACE: [[fallthrough]];
-        case est_entry_type::LABEL: 
-            return type_table::t_void;
-    }
-    return nullptr; // What
-}
-
-type* st_entry::get_type(u64 oid) {
-    switch (t) {
-        case est_entry_type::FIELD: 
-        {
-            type* ftype = as_field().ptype;
-            switch (ftype->tt) {
-                case ettype::FUNCTION:
-                    return type_table::t_sig;
-                case ettype::ENUM:
-                    return ftype;
-                case ettype::STRUCT:
-                    return ftype->as_struct().fields[as_field().field].t;
-                case ettype::UNION:
-                    return ftype->as_union().fields[as_field().field].t;
-                default:
-                    return nullptr; // Error, bad
-            }
-        }
-        case est_entry_type::FUNCTION:
-            return as_function().overloads[oid]->t;
+        case est_entry_type::OVERLOAD:
+            return as_overload().ol->t;
         case est_entry_type::TYPE:
             return as_type().t;
         case est_entry_type::VARIABLE:
@@ -614,6 +598,9 @@ std::string st_entry::print(u64 depth) {
         case est_entry_type::NAMESPACE: 
             ss << "NAMESPACE " << name << "\n";
             ss << as_module().st->print(depth + 1);
+            break;
+        case est_entry_type::OVERLOAD:
+            ss << "OVERLOAD " << name << "\n";
             break;
         case est_entry_type::LABEL: 
             ss << "LABEL " << name << "\n";
@@ -721,8 +708,14 @@ std::pair<st_entry*, overload*> symbol_table::add_function(const std::string& na
         entries.insert({name, f});
     }
     
-    f->as_function().overloads.push_back(new overload{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}, f->as_function().overloads.size()});
-    return {f, f->as_function().overloads.back()};
+    overload* nol = new overload{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}, f->as_function().overloads.size()};
+    f->as_function().overloads.push_back(nol);
+    
+    std::string unique_name = nol->unique_name();
+    st_entry* ne = new st_entry{st_overload{nol, &f->as_function()}, est_entry_type::OVERLOAD, unique_name};
+    f->as_function().st->entries.insert({unique_name, ne});
+    
+    return {f, nol};
 }
 
 st_entry* symbol_table::add_namespace(const std::string& name, symbol_table* st) {
@@ -860,3 +853,25 @@ std::string symbol_table::print(u64 depth) {
     return ss.str();
 }
 
+std::ostream& operator<<(std::ostream& os, const est_entry_type& st_entry_type) {
+    switch (st_entry_type) {
+        case est_entry_type::TYPE:
+            return os << "TYPE";
+        case est_entry_type::VARIABLE:
+            return os << "VARIABLE";
+        case est_entry_type::FUNCTION:
+            return os << "FUNCTION";
+        case est_entry_type::NAMESPACE:
+            return os << "NAMESPACE";
+        case est_entry_type::FIELD:
+            return os << "FIELD";
+        case est_entry_type::OVERLOAD:
+            return os << "OVERLOAD";
+        case est_entry_type::MODULE:
+            return os << "MODULE";
+        case est_entry_type::LABEL:
+            return os << "LABEL";
+        default:
+            return os << "INVALID";
+    }
+}

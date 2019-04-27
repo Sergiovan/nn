@@ -157,6 +157,11 @@ int main(string[] arg) {
 	laster, err = foo(2, (let wee(){return 1, 2, 3, 4, 5;})());
 	baz(a = 2, b = [1, 2, 3, 4, 5]);
 
+	fun<void()> func1 = (void func(){});
+	fun<void(int)> func2 = (void func(int a){});
+
+	func2(2);
+
 	if err || err == foo.NO_WAY {
 		return -69;
 	}
