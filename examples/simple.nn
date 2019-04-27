@@ -28,7 +28,7 @@ struct name {
 	double b;
 	int c : 8;
 	string d;
-	int foo() {
+	$constructor int foo() {
 		return 0;
 	}
 }
@@ -40,7 +40,7 @@ union uname {
 
 enum cutlery {FORK, SPOON, SPORK, TINY_ONE_POINT_FORK}
 
-# $main
+$main
 #> #> Yay, comments! <# <#
 int main(string[] arg) { 
 	int[] arr = [1, 2, 3, 4, 5, 6];
@@ -59,14 +59,14 @@ int main(string[] arg) {
 
 	c = _c.SPORK;
 
-	using int as i32;
+	$fake using int as i32;
 	using int*[] as api32;
 	using fun<int(int)> as fun_foo;
 
 	i32 huh = 1;
 	int okay = 2;
 	api32 nyeom = [null, null, null];
-	fun_foo a = fooo;
+	$unreal fun_foo a = fooo;
 
 	okay = huh;
 
@@ -88,7 +88,7 @@ int main(string[] arg) {
 	}
 	
 	switch c {
-		case cutlery.FORK {
+		case cutlery.FORK, cutlery.SPOON {
 			return -1;
 		}
 		case cutlery.SPORK continue;
@@ -100,11 +100,15 @@ int main(string[] arg) {
 		sol += i;
 	}
 	
+	while int i = 5; --i < 0 {
+		;
+	}
+
 	for int i = 1, 4 {
 		sol -= i;
 	}
-	
-	for int i = 0; i < 5; ++i {
+
+	for int i = 0; i < 5; ++i; i += 1 {
 		sol *= i;
 	}
 	

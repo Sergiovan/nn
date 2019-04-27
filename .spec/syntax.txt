@@ -230,14 +230,15 @@ safe_literal = number | b2number | b8number | b16number | banumber | string | ch
 compound_literal = array | struct_lit
 
 # Due to scope being recursive with statement, this one is put here despite the fact none of this is defined yet
-program = 
+program = {compilernote},
   { importstmt | 
     usingstmt | 
 	namespacestmt |
 	freedeclstmt }
 
 statement = {compilernote},
-  ( ifstmt | 
+  ( emptystmt |
+	ifstmt | 
 	forstmt | 
 	whilestmt | 
 	switchstmt |
@@ -259,7 +260,7 @@ statement = {compilernote},
 	scope )
 	
 (* Can replace a whole scope *)
-scopestatement = {compilernote}
+scopestatement = {compilernote},
   ( ifstmt |
 	forstmt |
 	whilestmt | 
@@ -275,6 +276,8 @@ scopestatement = {compilernote}
 	deletestmt |
 	scope )
 	
+emptystmt = semicolon
+
 scope = obrace, {statement}, cbrace
 
 ifstmt = cif, {fexpression, semicolon}, expression, (cdo, scopestatement | ifscope)
@@ -289,7 +292,7 @@ forcond =
 whilestmt = cwhile, {fexpression, semicolon}, expression, (cdo, scopestatement | scope)
 
 switchstmt = cswitch, {fexpression, semicolon}, expression, switchscope
-switchscope = obrace, {casestmt}, cbrace
+switchscope = obrace, {{compilernote}, casestmt}, cbrace
 casestmt = (kwcase, {{expression; comma}} | celse), (ccontinue | scope | cdo, scopestatement)
 
 trystmt = ctry, colon, {{statement}}, ccatch, (oparen, [tsig], iden, cparen, switchscope | craise, semicolon)
@@ -311,7 +314,7 @@ importstmt = kwimport, (iden, {opaccess, (iden | asterisk)} | string), [kwas, id
 usingstmt = kwusing, ((iden, {opaccess, (iden | asterisk)}, [kwas, iden]) | (type, kwas, iden)), semicolon
 
 namespacestmt = kwnamespace, iden, {opaccess, iden}, namespacescope
-namespacescope = obrace, {usingstmt | namespacestmt | freedeclstmt}, cbrace
+namespacescope = obrace, {{compilernote}, (usingstmt | namespacestmt | freedeclstmt)}, cbrace
 
 typemod = {kwqualifier | kwsign}
 arraysize = obracket, [expression], cbracket
@@ -340,13 +343,13 @@ funcval  = (type, {colon, type} | tvoid | tlet), [iden], oparen, [{parameter; co
 parameter = type, [opspread], [iden], [opassign, aexpression]
 
 structdecl = tstruct, iden, (structscope | semicolon)
-structscope = obrace {usingstmt | structdeclstmt}, cbrace
+structscope = obrace {{compilernote}, (usingstmt | structdeclstmt)}, cbrace
 
 uniondecl = tunion, iden, (unionscope | semicolon)
-unionscope = obrace, {uniondeclstmt}, cbrace
+unionscope = obrace, {{compilernote}, uniondeclstmt}, cbrace
 
 enumdecl = tenum, iden, (enumscope | semicolon)
-enumscope = obrace, {iden; comma}, cbrace
+enumscope = obrace, {{compilernote}, iden; comma}, cbrace
 
 assstmt = assignment, semicolon
 assignment = expression, {comma, expression}, assop, aexpression, {comma, aexpression}

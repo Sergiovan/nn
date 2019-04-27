@@ -529,10 +529,18 @@ ast* parser::iden(bool withthis, type** thistype) {
 
 ast* parser::compileriden() {
     next(); // Skip
+    if (is(Symbol::PAREN_LEFT)) {
+        skip_until(Symbol::PAREN_RIGHT);
+        next(); // )
+    }
     return nullptr; // TODO
 }
 
 ast* parser::compileropts() {
+    next(); // $
+    require(Symbol::BRACKET_LEFT);
+    skip_until(Symbol::BRACKET_RIGHT);
+    next(); // ]
     return nullptr; // TODO
 }
 
@@ -738,6 +746,10 @@ ast* parser::program() {
     auto& stmts = prog->as_block().stmts;
     
     while (true) {
+        while (is_compiler_token()) {
+            compilernote();
+        }
+        
         if (is(Keyword::USING)) {
             stmts.push_back(usingstmt());
         } else if (is(Keyword::IMPORT)) {
@@ -764,7 +776,10 @@ ast* parser::statement() {
     
     ast* ret{nullptr};
     
-    if (is(Keyword::IF)) {
+    if (is(Symbol::SEMICOLON)) {
+        ret = ast::none();
+        next(); // ;
+    } else if (is(Keyword::IF)) {
         ret = ifstmt();
     } else if (is(Keyword::FOR)) {
         ret = forstmt();
@@ -1167,6 +1182,9 @@ ast* parser::switchscope() {
     auto& stmts = cases->as_block().stmts;
     
     while (!is(Symbol::BRACE_RIGHT) && !is(TokenType::END_OF_FILE)) {
+        while (is_compiler_token()) {
+            compilernote();
+        }
         stmts.push_back(casestmt());
     }
     
@@ -1843,6 +1861,10 @@ ast* parser::namespacescope() {
     auto& stmts = ns->as_block().stmts;
     
     while (!is(Symbol::BRACE_RIGHT) && !is(TokenType::END_OF_FILE)) {
+        while (is_compiler_token()) {
+            compilernote();
+        }
+        
         if (is(Keyword::USING)) {
             stmts.push_back(usingstmt());
         } else if (is(Keyword::NAMESPACE)) {
@@ -3032,6 +3054,10 @@ ast* parser::structscope() {
     auto& stmts = block->as_block().stmts;
     
     while (!is(Symbol::BRACE_RIGHT) && !is(TokenType::END_OF_FILE)) {
+        while (is_compiler_token()) {
+            compilernote();
+        }
+        
         if (is(Keyword::USING)) {
             stmts.push_back(usingstmt());
         } else {
@@ -3110,6 +3136,9 @@ ast* parser::unionscope() {
     auto& stmts = block->as_block().stmts;
     
     while (!is(Symbol::BRACE_RIGHT) && !is(TokenType::END_OF_FILE)) {
+        while (is_compiler_token()) {
+            compilernote();
+        }
         stmts.push_back(uniondeclstmt());
     }
     
@@ -3185,6 +3214,10 @@ ast* parser::enumscope() {
     std::set<std::string> values{};
     
     while (!is(Symbol::BRACE_RIGHT) && !is(TokenType::END_OF_FILE)) {
+        while (is_compiler_token()) {
+            compilernote();
+        }
+        
         require(TokenType::IDENTIFIER);
         std::string name = c.value;
         next();
