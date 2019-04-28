@@ -2,10 +2,18 @@
 #include <sstream>
 #include "ast.h"
 #include "symbol_table.h"
+#include "type.h"
 #include <iomanip>
 
-ir_triple::ir_triple_param::ir_triple_param(ast* node) 
-    : value(node), type(LITERAL) {}
+ir_triple::ir_triple_param::ir_triple_param(ast* node) {
+    if (node && node->is_symbol()) {
+        iden = node->as_symbol().symbol;
+        type = IDEN;
+    } else {
+        value = node;
+        type = LITERAL;
+    }
+}
 ir_triple::ir_triple_param::ir_triple_param(st_entry* entry) 
     : iden(entry), type(IDEN) {};
 ir_triple::ir_triple_param::ir_triple_param(ir_triple* triple)
@@ -21,7 +29,7 @@ std::string ir_triple::print() {
         if (param1.type == ir_triple_param::LITERAL) {
             ss << param1.value->print_value();
         } else if (param1.type == ir_triple_param::IDEN) {
-            ss << "IDEN " << param1.iden->name;
+            ss << "IDEN " << param1.iden->name << " (" << param1.iden->get_type() << ")";
         } else if (param1.type == ir_triple_param::TRIPLE) {
             ss << "TRIPLE ()";
         } else {
@@ -33,7 +41,7 @@ std::string ir_triple::print() {
         if (param2.type == ir_triple_param::LITERAL) {
             ss << param2.value->print_value();
         } else if (param2.type == ir_triple_param::IDEN) {
-            ss << "IDEN " << param2.iden->name;
+            ss << "IDEN " << param2.iden->name << " (" << param2.iden->get_type() << ")";
         } else if (param2.type == ir_triple_param::TRIPLE) {
             ss << "TRIPLE ()";
         } else {
@@ -43,88 +51,93 @@ std::string ir_triple::print() {
     return ss.str();
 }
 
-    
-ir::ir() { }
-
-ir::~ir() {
-    for (auto ptr : triples) {
-        if (ptr) {
-            delete ptr;
-        } 
-    }
-}
-
-ir::ir(ir&& o) {
-    triples.swap(o.triples);
-}
-
-ir& ir::operator=(ir&& o) {
-    if (&o != this) {
-        triples.swap(o.triples);
-    }
-    return *this;
-}
-
-void ir::add(ir_triple t) {
-    triples.push_back(new ir_triple{t});
-}
-
-void ir::add(ir_triple t, u64 at) {
-    triples.insert(triples.begin() + at, new ir_triple{t});
-}
-
-void ir::merge_in(ir&& o) {
-    if (o.triples.empty()) {
-        return;
-    }
-    u64 tsize = triples.size();
-    triples.insert(triples.end(), o.triples.begin(), o.triples.end());
-    o.triples.clear();
-}
-
-void ir::merge_in(ir&& o, u64 at) {
-    u64 tsize = triples.size();
-    triples.insert(triples.begin() + at, o.triples.begin(), o.triples.end());
-    o.triples.clear();
-}
-
-void ir::move(u64 from, u64 to) {
-    ir_triple* elem = triples[from];
-    triples.erase(triples.begin() + from);
-    triples.insert(triples.begin() + to, elem);
-}
-
-std::string ir::print() {
+std::string ir_triple::print(const std::map<ir_triple*, u64>& triples) {
     std::stringstream ss{};
-    for (u64 i = 0; i < triples.size(); ++i) {
-        ss << (i ? "      " : "") << std::setw(5) << i << ": " << triples[i]->print() << "\n";
+    ss << op;
+    if (param1.value || param1.type == ir_triple_param::IMMEDIATE) {
+        ss << " | ";
+        if (param1.type == ir_triple_param::LITERAL) {
+            ss << param1.value->print_value();
+        } else if (param1.type == ir_triple_param::IDEN) {
+            ss << "IDEN " << param1.iden->name << " (" << param1.iden->get_type() << ")";
+        } else if (param1.type == ir_triple_param::TRIPLE) {
+            ss << "TRIPLE ";
+            if (auto id = triples.find(param1.triple); id != triples.end()) {
+                ss << id->second;
+            } else {
+                ss << "???";
+            }
+        } else {
+            ss << "IMMEDIATE " << param1.immediate;
+        }
     }
-    if (triples.empty()) {
-        ss << "\n";
+    if (param2.value || param2.type == ir_triple_param::IMMEDIATE) {
+        ss << " | ";
+        if (param2.type == ir_triple_param::LITERAL) {
+            ss << param2.value->print_value();
+        } else if (param2.type == ir_triple_param::IDEN) {
+            ss << "IDEN " << param2.iden->name << " (" << param2.iden->get_type() << ")";
+        } else if (param2.type == ir_triple_param::TRIPLE) {
+            ss << "TRIPLE ";
+            if (auto id = triples.find(param2.triple); id != triples.end()) {
+                ss << id->second;
+            } else {
+                ss << "???";
+            }
+        } else {
+            ss << "IMMEDIATE " << param2.immediate;
+        }
     }
     return ss.str();
 }
 
-block::block(ir* begin) {
-    start = latest = begin;
+void ir_triple_range::append(ir_triple* triple) {
+    end->next = triple;
+    end = triple;
 }
 
-void block::add(ir* new_ir) {
-    latest->next = new_ir;
-    latest = new_ir;
+void ir_triple_range::prepend(ir_triple* triple) {
+    triple->next = start;
+    start = triple;
 }
 
-void block::add_end(ir* new_end) {
-    ir* old_end = end;
-    end = new_end;
-    new_end->next = old_end;
+block::block(ir_triple_range begin) {
+    start = begin;
+}
+
+void block::add(ir_triple_range begin) {
+    start.end->next = begin.start;
+    start.end = begin.end;
+}
+
+void block::add(ir_triple* triple) {
+    start.append(triple);
+}
+
+void block::add_end(ir_triple_range end) {
+    if (end.start) {
+        end.end->next = block::end.start;
+        block::end.start = end.start;
+    } else {
+        block::end = end;
+    }
+}
+
+void block::add_end(ir_triple* triple) {
+    if (end.start) {
+        end.prepend(triple);
+    } else {
+        end = {triple, triple};
+    }
 }
 
 void block::finish() {
-    if (end) {
-        ir* temp = latest->next;
-        latest->next = end;
-        end->next = temp;
+    if (end.start) {
+        start.end->next = end.start;
+        start.end = end.end;
+        end = start;
+    } else {
+        end = start;
     }
 }
 
@@ -139,6 +152,10 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "MULTIPLY";
         case DIVIDE:
             return os << "DIVIDE";
+        case POWER:
+            return os << "POWER";
+        case MODULO:
+            return os << "MODULO";
         case INCREMENT:
             return os << "INCREMENT";
         case DECREMENT:
@@ -161,20 +178,34 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "XOR";
         case NOT:
             return os << "NOT";
+        case LESS:
+            return os << "LESS";
+        case LESS_EQUALS:
+            return os << "LESS_EQUALS";
+        case GREATER:
+            return os << "GREATER";
+        case GREATER_EQUALS:
+            return os << "GREATER_EQUALS";
+        case EQUALS:
+            return os << "EQUALS";
+        case NOT_EQUALS:
+            return os << "NOT_EQUALS";
+        case BIT_SET:
+            return os << "BIT_SET";
+        case BIT_NOT_SET:
+            return os << "BIT_NOT_SET";
         case JUMP:
             return os << "JUMP";
+        case SYMBOL:
+            return os << "SYMBOL";
+        case VALUE:
+            return os << "VALUE";
+        case TEMP:
+            return os << "TEMP";
         case IF_ZERO:
             return os << "IF_ZERO";
         case IF_NOT_ZERO:
             return os << "IF_NOT_ZERO";
-        case IF_LESS_THAN_ZERO:
-            return os << "IF_LESS_THAN_ZERO";
-        case IF_GREATER_THAN_ZERO:
-            return os << "IF_GREATER_THAN_ZERO";
-        case IF_BIT_SET:
-            return os << "IF_BIT_SET";
-        case IF_BIT_NOT_SET:
-            return os << "IF_BIT_NOT_SET";
         case CALL:
             return os << "CALL";
         case PARAM:
@@ -202,14 +233,21 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
     }
 }
 
-std::string print_sequence(ir* start) {
+std::string print_sequence(ir_triple* start) {
+    ir_triple* cur = start;
     std::stringstream ss{};
-    ir* cur = start;
+    std::map<ir_triple*, u64> triples{};
     u64 i = 0;
     while (cur) {
-        ss << std::setw(5) << i++ << " " << cur->print();
+        triples.insert({cur, i++});
+        cur = cur->next;
+    }
+    
+    cur = start;
+    i = 0;
+    while (cur) {
+        ss << std::setw(10) << i++ << ": " << cur->print(triples) << '\n';
         cur = cur->next;
     }
     return ss.str();
 }
-

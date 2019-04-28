@@ -11,15 +11,17 @@ struct ast;
 namespace ir_op {
     enum code {
         ADD, SUBTRACT, MULTIPLY, DIVIDE,
+        POWER, MODULO, 
         INCREMENT, DECREMENT, 
         NEGATE, SHIFT_LEFT, SHIFT_RIGHT,
         ROTATE_LEFT, ROTATE_RIGHT,
         AND, OR, XOR, NOT,
         
-        JUMP, IF_ZERO, IF_NOT_ZERO,
-        IF_LESS_THAN_ZERO, IF_GREATER_THAN_ZERO,
-        IF_BIT_SET, IF_BIT_NOT_SET,
+        LESS, LESS_EQUALS, GREATER, GREATER_EQUALS,
+        EQUALS, NOT_EQUALS, BIT_SET, BIT_NOT_SET,
         
+        JUMP, IF_ZERO, IF_NOT_ZERO,
+        SYMBOL, VALUE, TEMP, 
         CALL, PARAM, RETURN, RETVAL, 
         
         COPY, INDEX, OFFSET, ADDRESS, DEREFERENCE, LENGTH,
@@ -48,44 +50,33 @@ struct ir_triple {
     ir_triple_param param1{(ast*) nullptr};
     ir_triple_param param2{(ast*) nullptr};
     
+    ir_triple* next{nullptr};
+    ir_triple* cond{nullptr};
+    
     std::string print();
+    std::string print(const std::map<ir_triple*, u64>& triples);
 };
 
-struct ir {
-    ir();
+struct ir_triple_range {
+    ir_triple* start;
+    ir_triple* end;
     
-    ~ir();
-    ir(const ir& o) = delete;
-    ir(ir&& o);
-    ir& operator=(const ir& o) = delete;
-    ir& operator=(ir&& o);
-    
-    void add(ir_triple t);
-    void add(ir_triple t, u64 at);
-    
-    void merge_in(ir&& o);
-    void merge_in(ir&& o, u64 at);
-    
-    void move(u64 from, u64 to);
-    
-    std::vector<ir_triple*> triples{}; // Owned
-    ir* next{nullptr}; // Not owned
-    ir* cond{nullptr}; // Not owned
-    
-    std::string print();
+    void append(ir_triple* triple);
+    void prepend(ir_triple* triple);
 };
 
 struct block {
-    block(ir* begin);
+    block(ir_triple_range begin);
     
-    void add(ir* new_ir);
-    void add_end(ir* new_end);
+    void add(ir_triple_range begin);
+    void add(ir_triple* triple);
+    void add_end(ir_triple_range end);
+    void add_end(ir_triple* triple);
     void finish();
     
-    ir* start{nullptr}; // Not owned
-    ir* latest{nullptr}; // Not owned
-    ir* end{nullptr};   // Not owned
+    ir_triple_range start;
+    ir_triple_range end{nullptr, nullptr};
 };
 
 std::ostream& operator<<(std::ostream& os, const ir_op::code& code);
-std::string print_sequence(ir* start);
+std::string print_sequence(ir_triple* start);
