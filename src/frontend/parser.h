@@ -28,7 +28,7 @@ enum class eexpression_type {
     EXPRESSION, ASSIGNMENT, DECLARATION, INVALID
 };
 
-struct context {
+struct parser_context {
     symbol_table* st;
     type* function;
     type* _struct;
@@ -37,9 +37,9 @@ struct context {
     ast* first_param;
 };
 
-struct ctx_guard {
-    ctx_guard(parser& p);
-    ~ctx_guard();
+struct parser_ctx_guard {
+    parser_ctx_guard(parser& p);
+    ~parser_ctx_guard();
     
     void deactivate();
     
@@ -108,12 +108,12 @@ private:
     ast* _parse();
     void finish();
     
-    context& ctx();
+        parser_context& ctx();
     symbol_table* st();
     
-    context& push_context(bool clear = false);
-    context pop_context();
-    ctx_guard guard();
+        parser_context& push_context(bool clear = false);
+        parser_context pop_context();
+        parser_ctx_guard guard();
     
     error_message_manager error();
     ast* error(const std::string& msg, epanic_mode mode = epanic_mode::NO_PANIC, token* t = nullptr);
@@ -287,20 +287,20 @@ private:
     token c;
     lexer* l{nullptr};
     
-    std::stack<context> contexts{};
+    std::stack<parser_context> contexts{};
     symbol_table* root_st{nullptr};
     type_table& types;
     
     dict<symbol_table*> modules{};
     std::vector<std::pair<token, std::string>> errors{};
     
-    std::vector<std::pair<ast*, context>> unfinished{};
+    std::vector<std::pair<ast*, parser_context>> unfinished{};
     dict<ast*> labels{};
     
     bool forked{false};
     std::filesystem::path file_path{std::filesystem::current_path()};
     
-    friend struct ctx_guard;
+    friend struct parser_ctx_guard;
     friend struct error_message_manager;
 };
 

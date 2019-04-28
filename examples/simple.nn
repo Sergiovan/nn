@@ -78,14 +78,20 @@ int main(string[] arg) {
 	}
 	
 	try:
+		int in_try = 69;
 		bar();
 	catch (sig b) {
+		case bar.X_2 {
+			;
+		}
 		else {
 			if b != bar.X_2 {
 				raise THIS_AINT_GOOD;
 			}
 		}
 	}
+
+	in_try = -1;
 	
 	switch c {
 		case cutlery.FORK, cutlery.SPOON {
@@ -171,6 +177,7 @@ int main(string[] arg) {
 	
 	if true {
 		return 1;
+		return 2;
 	} else if nothing == 0 {
 		raise BAD_STUFF;
 	} else {

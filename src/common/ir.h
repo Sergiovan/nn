@@ -20,7 +20,8 @@ namespace ir_op {
         LESS, LESS_EQUALS, GREATER, GREATER_EQUALS,
         EQUALS, NOT_EQUALS, BIT_SET, BIT_NOT_SET,
         
-        JUMP, IF_ZERO, IF_NOT_ZERO,
+        JUMP, IF_FALSE, IF_TRUE, 
+        IF_ZERO = IF_FALSE, IF_NOT_ZERO = IF_TRUE,
         SYMBOL, VALUE, TEMP, 
         CALL, PARAM, RETURN, RETVAL, 
         
@@ -52,6 +53,8 @@ struct ir_triple {
     
     ir_triple* next{nullptr};
     ir_triple* cond{nullptr};
+    
+    std::string label{};
     
     std::string print();
     std::string print(const std::map<ir_triple*, u64>& triples);

@@ -7,7 +7,22 @@
 
 
 struct ast;
+struct type;
 class symbol_table;
+
+struct ir_builder_context {
+    type* ftype{nullptr};
+    u64 return_amount{0};
+    bool in_try{false};
+    bool safe_to_exit{true};
+    bool prev_safe_to_exit{true};
+    
+    ir_triple* fun_returning{nullptr};
+    ir_triple* fun_return{nullptr};
+    
+    ir_triple* loop_breaking{nullptr};
+    ir_triple* loop_continue{nullptr};
+};
 
 class ir_builder {
 public:
@@ -29,9 +44,14 @@ private:
     void start_block();
     void end_block();
     
+    void start_context();
+    void end_context();
+    
     ir_triple* current();
     ir_triple* current_end();
     block& current_block();
+    
+        ir_builder_context& ctx();
     
     parse_info& p;
     
@@ -39,5 +59,6 @@ private:
     
     std::vector<ir_triple*> triples{}; // Owned
     std::stack<block> blocks{};
+    std::stack<ir_builder_context> contexts{};
     std::map<st_entry*, ir_triple*> labeled{};
 };

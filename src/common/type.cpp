@@ -623,6 +623,10 @@ bool type::is_combination() {
     return tt == ettype::COMBINATION;
 }
 
+bool type::is_function() {
+    return tt == ettype::PFUNCTION || tt == ettype::FUNCTION;
+}
+
 bool type::is_function(bool pure) {
     return tt == (pure ? ettype::PFUNCTION : ettype::FUNCTION);
 }
@@ -639,6 +643,14 @@ type_flags type::get_default_flags() {
 
 bool type::has_special_flags() {
     return flags != get_default_flags();
+}
+
+type* type::get_function_returns() {
+    if (is_function(false)) {
+        return as_function().rets;
+    } else {
+        return as_pfunction().rets;
+    }
 }
 
 std::string type::print(bool simple) {

@@ -14,16 +14,16 @@
 
 using namespace Grammar;
 
-ctx_guard::ctx_guard(parser& p) : p(p) {
+parser_ctx_guard::parser_ctx_guard(parser& p) : p(p) {
     
 }
 
-ctx_guard::~ctx_guard() {
+parser_ctx_guard::~parser_ctx_guard() {
     deactivate();
 }
 
 
-void ctx_guard::deactivate() {
+void parser_ctx_guard::deactivate() {
     if (active) {
         p.pop_context();
         active = false;
@@ -168,7 +168,7 @@ void parser::finish() {
     }
 }
 
-context& parser::ctx() {
+parser_context& parser::ctx() {
     return contexts.top();
 }
 
@@ -176,18 +176,18 @@ symbol_table* parser::st() {
     return contexts.top().st;
 }
 
-context& parser::push_context(bool clear) {
-    contexts.emplace(clear ? context{} : ctx());
+parser_context& parser::push_context(bool clear) {
+    contexts.emplace(clear ? parser_context{} : ctx());
     return contexts.top();
 }
 
-context parser::pop_context() {
-    context top = contexts.top();
+parser_context parser::pop_context() {
+    parser_context top = contexts.top();
     contexts.pop();
     return top;    
 }
 
-ctx_guard parser::guard() {
+parser_ctx_guard parser::guard() {
     return {*this};
 }
 

@@ -9,10 +9,12 @@ ir_builder::ir_builder::ir_builder(parse_info& p) : p(p) {
     ir_triple* start = new ir_triple{ir_op::NOOP};
     triples.push_back(start);
     blocks.emplace(ir_triple_range{start, start});
+    start_context();
 }
 
 void ir_builder::build(ast* node, symbol_table* sym) {    
     using namespace ir_op;
+    using namespace std::string_literals;
     
     if (!node) {
         node = p.result;
@@ -59,6 +61,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                             if (bin.right->is_none()) {
                                 if (dir == labeled.end()) {
                                     ir_triple* noop = new ir_triple{NOOP};
+                                    noop->label = "Function start"s;
                                     triples.push_back(noop);
                                     labeled[bin.left->as_symbol().symbol] = noop;
                                 }
@@ -66,14 +69,32 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                                 ir_triple* prev_cur = add(JUMP);
                                 
                                 if (dir == labeled.end()) {
-                                    labeled[bin.left->as_symbol().symbol] = add(NOOP);
+                                    ir_triple* noop = add(NOOP);
+                                    labeled[bin.left->as_symbol().symbol] = noop;
+                                    noop->label = "Function start"s;
                                 } else {
                                     current()->next = dir->second;
                                     current_block().add(dir->second);
                                 }
                                 
+                                start_context();
+                                
+                                ctx().in_try = false;
+                                ctx().safe_to_exit = true;
+                                ctx().ftype = bin.t;
+                                ctx().fun_returning = add(TEMP, (u64) 0);
+                                if (ctx().ftype->get_function_returns()->is_combination()) {
+                                    ctx().return_amount = ctx().ftype->get_function_returns()->as_combination().types.size();
+                                } else {
+                                    ctx().return_amount = 1;
+                                }
+                                ctx().fun_return = create(RETURN, ctx().return_amount);
+                                ctx().fun_return->label = "Function return"s;
+                                
                                 build(bin.right, bin.right->as_block().st);
-                                add(NOOP);
+                                add(ctx().fun_return);
+                                
+                                end_context();
                                 
                                 prev_cur->param1 = prev_cur->cond = current();
                             }
@@ -111,14 +132,14 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 }
                 build(lblk.stmts.back(), lblk.st);
                 if (bin.right->is_block()) {
-                    ir_triple* if_jmp = add(IF_ZERO, current());
+                    ir_triple* if_jmp = add(IF_FALSE, current());
                     build(bin.right, sym);
                     add(NOOP);
                     if_jmp->param2 = if_jmp->cond = current();
                 } else if(bin.right->is_binary() && bin.right->as_binary().op == Symbol::KWELSE) {
                     auto& elsebin = bin.right->as_binary();
                     
-                    ir_triple* if_jmp = add(IF_ZERO, current());
+                    ir_triple* if_jmp = add(IF_FALSE, current());
                     
                     build(elsebin.left, sym);
                     
@@ -139,7 +160,11 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             case Symbol::KWFOR: {
                 auto& forcond = bin.left->as_unary();
                 start_block();
-                current_block().add_end(create(NOOP));
+                
+                ctx().loop_breaking = add(TEMP, (u64) 0);
+                ctx().loop_breaking->label = "Is breaking"s;
+                ctx().loop_continue = add(TEMP, (u64) 0);
+                ctx().loop_continue->label = "Is continuing"s;
                 
                 ir_triple* setup_end{nullptr};
                 ir_triple* step{nullptr};
@@ -158,7 +183,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         
                         condition = add(NOOP);
                         build(decl.stmts[1], decl.st);
-                        add(IF_ZERO, current(), current_end());
+                        add(IF_FALSE, current(), current_end());
                         current()->cond = current_end();
                         
                         break;
@@ -175,7 +200,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         add(COPY, tmp, current());
                         
                         condition = add(LESS, tmp, len);
-                        add(IF_ZERO, current(), current_end());
+                        add(IF_FALSE, current(), current_end());
                         current()->cond = current_end();
                         
                         break;
@@ -199,17 +224,17 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         step = add(ADD, decl.left->as_block().stmts[0], add_step);
                         add(COPY, decl.left->as_block().stmts[0], current());
                         condition = add(LESS, add_step, (u64) 0);
-                        ir_triple* neg_step_jmp = add(IF_ZERO);
+                        ir_triple* neg_step_jmp = add(IF_FALSE);
                         add(LESS_EQUALS, decl.left->as_block().stmts[0], last_val);
                         
-                        add(IF_ZERO, current(), current_end());
+                        add(IF_FALSE, current(), current_end());
                         current()->cond = current_end();
                         
                         ir_triple* less_eq_z_jmp  = add(JUMP);
                         add(GREATER_EQUALS, step, last_val);
                         neg_step_jmp->param1 = neg_step_jmp->cond = current();
                         
-                        add(IF_ZERO, current(), current_end());
+                        add(IF_FALSE, current(), current_end());
                         current()->cond = current_end();
                         
                         add(NOOP);
@@ -222,9 +247,16 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         break;
                 }
                 
+                ir_triple* end_of_loop = current_end();
                 ir_triple* end_jmp = create(JUMP, step);
                 end_jmp->cond = step;
                 current_block().add_end(end_jmp);
+                
+                ir_triple* is_break = create(IF_TRUE, ctx().loop_breaking, end_of_loop);
+                is_break->cond = end_of_loop;
+                ir_triple* clear_continue = is_break->next = create(COPY, ctx().loop_continue, (u64) 0);
+                
+                current_block().add_end(ir_triple_range{is_break, clear_continue});
                 
                 ir_triple* skip_step = create(JUMP, condition);
                 skip_step->cond = condition;
@@ -232,6 +264,10 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 skip_step->next = step;
                 
                 build(bin.right, sym);
+                
+                ctx().loop_breaking = nullptr;
+                ctx().loop_continue = nullptr;
+                
                 end_block();
                 break;
             }
@@ -256,6 +292,13 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             case Symbol::LESS_OR_EQUALS: {
                 ir_op::code op = symbol_to_ir_code(bin.op);
                 add(op, sym, bin.left, bin.right);
+                break;
+            }
+            case Symbol::INDEX: {
+                build(bin.left, sym);
+                ir_triple* arr = current();
+                build(bin.right, sym);
+                add(INDEX, arr, current());
                 break;
             }
             case Symbol::ADD_ASSIGN: [[fallthrough]];
@@ -322,20 +365,57 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     if (un.node->is_block()) {
                         auto& blk = un.node->as_block();
                         rets = blk.stmts.size();
-                        for (int i = 0; i < blk.stmts.size(); ++i) {
+                        u64 i = 0;
+                        for (; i < blk.stmts.size(); ++i) {
                             add(RETVAL, blk.st, blk.stmts[i]);
                         }
+                        while (i < ctx().return_amount) {
+                            ++i;
+                            add(RETVAL, (u64) 0);
+                        }
                     }
-                    // TODO Proper destructors
-                    // TODO Return sigs as 0
-                    add(RETURN, rets);
+                    if (ctx().safe_to_exit) {
+                        add(RETURN, ctx().return_amount);
+                    } else {
+                        add(COPY, 1, ctx().fun_returning);
+                        add(JUMP, current_end());
+                    }
                     break;
                 }
                 case Symbol::KWRAISE: {
-                    add(RETVAL, sym, un.node);
-                    add(RETURN, 1);
-                    // TODO Return other values as 0
+                    if (ctx().return_amount == 1) {
+                        add(RETVAL, sym, un.node);
+                    } else {
+                        for (type* t : ctx().ftype->get_function_returns()->as_combination().types) {
+                            if (t->is_primitive(etype_ids::SIG)) {
+                                add(RETVAL, sym, un.node);
+                            } else {
+                                add(RETVAL, (u64) 0);
+                            }
+                        }
+                    }
+                    if (ctx().safe_to_exit) {
+                        add(RETURN, ctx().return_amount);
+                    } else {
+                        add(COPY, 1, ctx().fun_returning);
+                        add(JUMP, current_end());
+                    }
                     break;
+                }
+                case Symbol::KWDEFER: {
+                    ir_triple* pre_defer = current();
+                    ir_triple* begin = add(NOOP);
+                    build(un.node, sym);
+                    ir_triple* post_defer = current();
+                    
+                    pre_defer->next = nullptr;
+                    current_block().start.end = pre_defer;
+                    current_block().add_end(ir_triple_range{begin, post_defer});
+                    ctx().safe_to_exit = false;
+                    break;
+                }
+                case Symbol::KWUSING: {
+                    break; // Nothing
                 }
                 default: 
                     logger::error() << "Unhandled unary case " << un.op << logger::nend;
@@ -458,13 +538,50 @@ void ir_builder::start_block() {
     ir_triple* noop = new ir_triple{ir_op::NOOP};
     current()->next = noop;
     blocks.emplace(ir_triple_range{noop, noop});
+    current_block().add_end(create(ir_op::NOOP));
+    start_context();
 }
 
-void ir_builder::end_block() {
+void ir_builder::end_block() {  
+    using namespace ir_op;
     auto& prev = blocks.top();
+    auto& prevctx = ctx();
+    blocks.pop();    
     prev.finish();
-    blocks.pop();
     blocks.top().add(prev.start);
+    end_context();
+    
+    if (!prevctx.prev_safe_to_exit) {
+        add(IF_TRUE, ctx().fun_returning, current_end());
+    } else {
+        ir_triple* jmp = add(IF_FALSE, prevctx.fun_returning);
+        ir_triple* ret = add(RETURN, prevctx.return_amount);
+        add(NOOP);
+        jmp->param2 = jmp->cond = current();
+    }
+    
+    if (ctx().loop_breaking) {
+        add(IF_TRUE, ctx().loop_breaking, current_end());
+    }
+    
+    if (ctx().loop_continue) {
+        add(IF_TRUE, ctx().loop_continue, current_end());
+    }
+    
+}
+
+void ir_builder::start_context() {
+    if (!contexts.empty()) {
+        bool safe_to_exit = contexts.top().safe_to_exit;
+        contexts.emplace(contexts.top());
+        contexts.top().prev_safe_to_exit = safe_to_exit;
+    } else {
+        contexts.emplace(ir_builder_context{});
+    }
+}
+
+void ir_builder::end_context() {
+    contexts.pop();
 }
 
 ir_triple* ir_builder::current() {
@@ -477,6 +594,10 @@ ir_triple* ir_builder::current_end() {
 
 block& ir_builder::current_block() {
     return blocks.top();
+}
+
+ir_builder_context& ir_builder::ctx() {
+    return contexts.top();
 }
 
 ir_op::code ir_builder::symbol_to_ir_code(Grammar::Symbol sym) {

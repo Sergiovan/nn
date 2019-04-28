@@ -265,10 +265,13 @@ struct type {
     bool is_union();
     bool is_enum();
     bool is_combination();
-    bool is_function(bool pure = false);
+    bool is_function();
+    bool is_function(bool pure);
     
     type_flags get_default_flags();
     bool has_special_flags();
+    
+    type* get_function_returns();
     
     std::string print(bool simple = false);
 };

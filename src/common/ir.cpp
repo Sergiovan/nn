@@ -64,6 +64,9 @@ std::string ir_triple::print(const std::map<ir_triple*, u64>& triples) {
             ss << "TRIPLE ";
             if (auto id = triples.find(param1.triple); id != triples.end()) {
                 ss << id->second;
+                if (!id->first->label.empty()) {
+                    ss << " \"" << id->first->label << "\"";
+                }
             } else {
                 ss << "???";
             }
@@ -81,12 +84,18 @@ std::string ir_triple::print(const std::map<ir_triple*, u64>& triples) {
             ss << "TRIPLE ";
             if (auto id = triples.find(param2.triple); id != triples.end()) {
                 ss << id->second;
+                if (!id->first->label.empty()) {
+                    ss << " \"" << id->first->label << "\"";
+                }
             } else {
                 ss << "???";
             }
         } else {
             ss << "IMMEDIATE " << param2.immediate;
         }
+    }
+    if (!label.empty()) {
+        ss << " -> \"" << label << "\"";
     }
     return ss.str();
 }
@@ -114,12 +123,12 @@ void block::add(ir_triple* triple) {
     start.append(triple);
 }
 
-void block::add_end(ir_triple_range end) {
+void block::add_end(ir_triple_range finish) {
     if (end.start) {
-        end.end->next = block::end.start;
-        block::end.start = end.start;
+        finish.end->next = end.start;
+        end.start = finish.start;
     } else {
-        block::end = end;
+        end = finish;
     }
 }
 
@@ -202,10 +211,10 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "VALUE";
         case TEMP:
             return os << "TEMP";
-        case IF_ZERO:
-            return os << "IF_ZERO";
-        case IF_NOT_ZERO:
-            return os << "IF_NOT_ZERO";
+        case IF_FALSE:
+            return os << "IF_FALSE";
+        case IF_TRUE:
+            return os << "IF_TRUE";
         case CALL:
             return os << "CALL";
         case PARAM:
