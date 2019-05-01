@@ -1234,7 +1234,7 @@ ast* parser::casestmt() {
     
     if (is(Keyword::CONTINUE)) {
         next(); // continue
-        bin.right = ast::unary(Symbol::KWCONTINUE);
+        bin.right = ast::unary(Symbol::KWCONTINUE, ast::none());
         require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
         next(); // ;
     } else if (is(Symbol::BRACE_LEFT)) {
@@ -1580,7 +1580,7 @@ ast* parser::continuestmt() {
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
-    return ast::unary(Symbol::KWCONTINUE);
+    return ast::unary(Symbol::KWCONTINUE, ast::none());
 }
 
 ast* parser::leavestmt() {

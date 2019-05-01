@@ -61,7 +61,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                             if (bin.right->is_none()) {
                                 if (dir == labeled.end()) {
                                     ir_triple* noop = new ir_triple{NOOP};
-                                    noop->label = "Function start"s;
+                                    noop->set_label("Function start"s);
                                     triples.push_back(noop);
                                     labeled[bin.left->as_symbol().symbol] = noop;
                                 }
@@ -71,7 +71,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                                 if (dir == labeled.end()) {
                                     ir_triple* noop = add(NOOP);
                                     labeled[bin.left->as_symbol().symbol] = noop;
-                                    noop->label = "Function start"s;
+                                    noop->set_label("Function start"s);
                                 } else {
                                     current()->next = dir->second;
                                     current_block().add(dir->second);
@@ -83,18 +83,20 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                                 ctx().safe_to_exit = true;
                                 ctx().ftype = bin.t;
                                 ctx().fun_returning = add(TEMP, (u64) 0);
+                                ctx().fun_returning->set_label("Function returning"s);
                                 if (ctx().ftype->get_function_returns()->is_combination()) {
                                     ctx().return_amount = ctx().ftype->get_function_returns()->as_combination().types.size();
                                 } else {
                                     ctx().return_amount = 1;
                                 }
                                 ctx().fun_return = create(RETURN, ctx().return_amount);
-                                ctx().fun_return->label = "Function return"s;
+                                ctx().fun_return->set_label("Function return"s);
                                 
                                 build(bin.right, bin.right->as_block().st);
                                 add(ctx().fun_return);
                                 
                                 end_context();
+                                add(NOOP);
                                 
                                 prev_cur->param1 = prev_cur->cond = current();
                             }
@@ -154,6 +156,9 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 } else {
                     logger::error() << "Unexpected if continuation " << bin.right->t << logger::nend;
                 }
+                if (lblk.stmts.size() > 1) {
+                    end_block();
+                }
                 
                 break;
             }
@@ -162,9 +167,9 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 start_block();
                 
                 ctx().loop_breaking = add(TEMP, (u64) 0);
-                ctx().loop_breaking->label = "Is breaking"s;
+                ctx().loop_breaking->set_label("For is breaking"s);
                 ctx().loop_continue = add(TEMP, (u64) 0);
-                ctx().loop_continue->label = "Is continuing"s;
+                ctx().loop_continue->set_label("For is continuing"s);
                 
                 ir_triple* setup_end{nullptr};
                 ir_triple* step{nullptr};
@@ -247,6 +252,9 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         break;
                 }
                 
+                step->set_label("For step"s);
+                condition->set_label("For condition"s);
+                
                 ir_triple* end_of_loop = current_end();
                 ir_triple* end_jmp = create(JUMP, step);
                 end_jmp->cond = step;
@@ -269,6 +277,275 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 ctx().loop_continue = nullptr;
                 
                 end_block();
+                break;
+            }
+            case Symbol::KWWHILE: {
+                auto& lblk = bin.left->as_block();
+                if (lblk.stmts.size() > 1) {
+                    start_block();
+                    for (u64 i = 0; i < lblk.stmts.size() - 1; ++i) {
+                        build(lblk.stmts[i], lblk.st);
+                    }
+                }
+                
+                start_block();
+                
+                ctx().loop_breaking = add(TEMP, (u64) 0);
+                ctx().loop_breaking->set_label("While is breaking"s);
+                ctx().loop_continue = add(TEMP, (u64) 0);
+                ctx().loop_continue->set_label("While is continuing"s);
+                
+                ir_triple* condition = add(NOOP);
+                condition->set_label("While condition"s);
+                
+                build(lblk.stmts.back(), lblk.st);
+                
+                ir_triple* end_of_loop = current_end();
+                ir_triple* end_jmp = create(JUMP, condition);
+                end_jmp->cond = condition;
+                current_block().add_end(end_jmp);
+                
+                ir_triple* is_break = create(IF_TRUE, ctx().loop_breaking, end_of_loop);
+                is_break->cond = end_of_loop;
+                ir_triple* clear_continue = is_break->next = create(COPY, ctx().loop_continue, (u64) 0);
+                
+                current_block().add_end(ir_triple_range{is_break, clear_continue});
+                
+                build(bin.right, sym);
+                
+                ctx().loop_breaking = nullptr;
+                ctx().loop_continue = nullptr;
+                
+                end_block();
+                
+                if (lblk.stmts.size() > 1) {
+                    end_block();
+                }
+                break;
+            }
+            case Symbol::KWSWITCH: {
+                auto& lblk = bin.left->as_block();
+                if (lblk.stmts.size() > 1) {
+                    start_block();
+                    for (u64 i = 0; i < lblk.stmts.size() - 1; ++i) {
+                        build(lblk.stmts[i], lblk.st);
+                    }
+                }
+                
+                start_block();
+                
+                ctx().loop_breaking = add(TEMP, (u64) 0);
+                ctx().loop_breaking->set_label("Switch is breaking"s);
+                
+                ir_triple* condition = add(NOOP);
+                condition->set_label("Switch condition"s);
+                
+                build(lblk.stmts.back(), lblk.st);
+                
+                ir_triple* condition_value = current(); 
+                condition_value->set_label("Switch value"s);
+                
+                auto& rblk = bin.right->as_block();
+                ir_triple* previous{nullptr};
+                ast** else_case{nullptr};
+                for (auto& nncase : rblk.stmts) {
+                    auto& casebin = nncase->as_binary();
+                    if (casebin.op == Symbol::KWCASE) {
+                        ir_triple* case_start = add(NOOP);
+                        case_start->set_label("Case start"s);
+                        if (previous) {
+                            previous->param1 = case_start;
+                            previous->cond   = case_start;
+                        }
+                        auto& casevals = casebin.left->as_block();
+                        ir_triple* case_block_start = create(NOOP);
+                        for (auto& val : casevals.stmts) {
+                            build(val, casevals.st);
+                            add(EQUALS, current(), condition_value);
+                            add(IF_TRUE, current(), case_block_start);
+                        }
+                        previous = add(JUMP);
+                        current_block().add(case_block_start);
+                        
+                        start_block();
+                        
+                        ctx().loop_continue = add(TEMP, (u64) 0);
+                        ctx().loop_continue->set_label("Case is continuing"s);
+                        
+                        current_block().add_end(create(COPY, ctx().loop_continue, (u64) 0));
+                        
+                        auto& case_right = casebin.right->as_unary();
+                        if (case_right.op == Symbol::KWCASE) {
+                            build(casebin.right->as_unary().node, sym);
+                        } else {
+                            build(casebin.right, sym);
+                        }
+                        
+                        ctx().loop_continue = nullptr;
+                        
+                        end_block();
+                        
+                    } else if (casebin.op == Symbol::KWELSE) {
+                        else_case = &nncase;
+                    } else {
+                        logger::error() << "Wrong keyword inside switch-case: " << casebin.op << logger::nend;
+                    }
+                }
+                if (else_case) {
+                    auto& elsebin = (*else_case)->as_binary();
+                    ir_triple* else_start = add(NOOP);
+                    else_start->set_label("Else start"s);
+                    if (previous) {
+                        previous->param1 = else_start;
+                        previous->cond   = else_start;
+                    }
+                    ir_triple* else_block_start = add(NOOP);
+                    previous = add(JUMP);
+                    previous->next = else_block_start;
+                    
+                    start_block();
+                    
+                    ctx().loop_continue = add(TEMP, (u64) 0);
+                    ctx().loop_continue->set_label("Else is continuing"s);
+                    
+                    build(elsebin.right->as_unary().node, sym);
+                    
+                    ctx().loop_continue = nullptr;
+                    
+                    end_block();
+                }
+                
+                ctx().loop_breaking = nullptr;
+                
+                end_block();
+                
+                if (lblk.stmts.size() > 1) {
+                    end_block();
+                }
+                break;
+            }
+            case Symbol::KWTRY: {
+                start_block();
+                
+                ctx().in_try = true;
+                ir_triple* sig_val = ctx().loop_breaking = add(TEMP, (u64) 0);
+                
+                ir_triple* catch_begin = create(NOOP);
+                ir_triple* no_catch = create(NOOP);
+                current_block().add_end(no_catch);
+                ir_triple* jump_to_catch = create(IF_TRUE, sig_val, catch_begin);
+                jump_to_catch->cond = catch_begin;
+                current_block().add_end(jump_to_catch);
+                
+                build(bin.left, sym);
+                ir_triple* skip_catch = add(JUMP, no_catch);
+                skip_catch->cond = no_catch;
+                
+                current_block().add(catch_begin);
+                
+                if (bin.right->as_unary().op == Symbol::KWCATCH) {
+                    
+                    start_block();
+                    
+                    ctx().loop_breaking = add(TEMP, (u64) 0);
+                    ctx().loop_breaking->set_label("Catch is breaking"s);
+                    
+                    ir_triple* sig_value = sig_val; 
+                    sig_value->set_label("Sig value"s);
+                    
+                    auto& blk = bin.right->as_unary().node->as_block();
+                    
+                    ir_triple* previous{nullptr};
+                    ast** else_case{nullptr};
+                    for (auto& nncase : blk.stmts) {
+                        auto& casebin = nncase->as_binary();
+                        if (casebin.op == Symbol::KWCASE) {
+                            ir_triple* case_start = add(NOOP);
+                            case_start->set_label("Catch start"s);
+                            if (previous) {
+                                previous->param1 = case_start;
+                                previous->cond   = case_start;
+                            }
+                            auto& casevals = casebin.left->as_block();
+                            ir_triple* case_block_start = create(NOOP);
+                            for (auto& val : casevals.stmts) {
+                                build(val, casevals.st);
+                                add(EQUALS, current(), sig_value);
+                                add(IF_TRUE, current(), case_block_start);
+                            }
+                            previous = add(JUMP);
+                            current_block().add(case_block_start);
+                            
+                            start_block();
+                            
+                            ctx().loop_continue = add(TEMP, (u64) 0);
+                            ctx().loop_continue->set_label("Catch is continuing"s);
+                            
+                            current_block().add_end(create(COPY, ctx().loop_continue, (u64) 0));
+                            
+                            auto& case_right = casebin.right->as_unary();
+                            if (case_right.op == Symbol::KWCASE) {
+                                build(casebin.right->as_unary().node, sym);
+                            } else {
+                                build(casebin.right, sym);
+                            }
+                            
+                            ctx().loop_continue = nullptr;
+                            
+                            end_block();
+                            
+                        } else if (casebin.op == Symbol::KWELSE) {
+                            else_case = &nncase;
+                        } else {
+                            logger::error() << "Wrong keyword inside try-catch: " << casebin.op << logger::nend;
+                        }
+                    }
+                    if (else_case) {
+                        auto& elsebin = (*else_case)->as_binary();
+                        ir_triple* else_start = add(NOOP);
+                        else_start->set_label("Catch-else start"s);
+                        if (previous) {
+                            previous->param1 = else_start;
+                            previous->cond   = else_start;
+                        }
+                        ir_triple* else_block_start = add(NOOP);
+                        previous = add(JUMP);
+                        previous->next = else_block_start;
+                        
+                        start_block();
+                        
+                        ctx().loop_continue = add(TEMP, (u64) 0);
+                        ctx().loop_continue->set_label("Catch-else is continuing"s);
+                        
+                        build(elsebin.right->as_unary().node, sym);
+                        
+                        ctx().loop_continue = nullptr;
+                        
+                        end_block();
+                    }
+                    
+                    ctx().loop_breaking = nullptr;
+                    
+                    end_block();
+                } else {
+                    build(bin.left, sym); // raise
+                }
+                
+                ctx().loop_breaking = nullptr;
+                end_block();
+                break;
+            }
+            case Symbol::FUN_CALL: {
+                auto& params = bin.right->as_block();
+                for (auto& param : params.stmts) {
+                    build(param, params.st);
+                    add(PARAM, current());
+                }
+                if (bin.left->is_symbol()) {
+                    auto func_loc = labeled.find(bin.left->as_symbol().symbol);
+                    // TODO Do this
+                    
+                }
                 break;
             }
             case Symbol::MULTIPLY: [[fallthrough]];
@@ -341,10 +618,50 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     ir_triple* store = current();
                     if (op != NOOP) {
                         add(op, store, vals[i]);
+                        add(COPY, store, current());
+                    } else {
+                        add(COPY, store, vals[i]);
                     }
                     
-                    add(COPY, store, current());
                 }
+                break;
+            }
+            case Symbol::LAND: {
+                ir_triple* val = add(TEMP, (u64) 0);
+                ir_triple* land_first_end = create(NOOP);
+                ir_triple* real_end = create(VALUE, val);
+                build(bin.left, sym);
+                ir_triple* first_value = current();
+                ir_triple* first_jump = add(IF_TRUE, first_value, land_first_end);
+                first_jump->cond = land_first_end;
+                add(COPY, val, first_value);
+                add(JUMP, real_end);
+                current_block().add(land_first_end);
+                build(bin.right, sym);
+                add(COPY, val, current());
+                current_block().add(real_end);
+                break;
+            }
+            case Symbol::LOR: {
+                ir_triple* val = add(TEMP, (u64) 0);
+                ir_triple* lor_first_end = create(NOOP);
+                ir_triple* real_end = create(VALUE, val);
+                build(bin.left, sym);
+                ir_triple* first_value = current();
+                ir_triple* first_jump = add(IF_FALSE, first_value, lor_first_end);
+                first_jump->cond = lor_first_end;
+                add(COPY, val, first_value);
+                add(JUMP, real_end);
+                current_block().add(lor_first_end);
+                build(bin.right, sym);
+                add(COPY, val, current());
+                current_block().add(real_end);
+                break;
+            }
+            case Symbol::ACCESS: {
+                u64 field = bin.right->as_symbol().symbol->as_field().field;
+                build(bin.left);
+                add(OFFSET, current(), field);
                 break;
             }
             default:
@@ -356,8 +673,25 @@ void ir_builder::build(ast* node, symbol_table* sym) {
         auto& un = node->as_unary();
         if (un.post) {
             switch (un.op) {
+                case Symbol::INCREMENT: {
+                    ir_triple* pre_value = add(VALUE, un.node);
+                    add(INCREMENT, sym, un.node);
+                    add(VALUE, pre_value);
+                    break;
+                }
+                case Symbol::DECREMENT: {
+                    ir_triple* pre_value = add(VALUE, un.node);
+                    add(DECREMENT, sym, un.node);
+                    add(VALUE, pre_value);
+                    break;
+                }
                 case Symbol::KWLABEL: {
-                    labeled[un.node->as_symbol().symbol] = add(NOOP); // GOTO Handled later
+                    auto label = labeled.find(un.node->as_symbol().symbol);
+                    if (label == labeled.end()) {
+                        labeled[un.node->as_symbol().symbol] = add(NOOP); // GOTO Handled later
+                    } else {
+                        current_block().add(label->second);
+                    }
                     break;
                 }
                 case Symbol::KWRETURN: {
@@ -417,6 +751,44 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 case Symbol::KWUSING: {
                     break; // Nothing
                 }
+                case Symbol::KWCONTINUE: {
+                    if (ctx().loop_continue) {
+                        add(COPY, ctx().loop_continue, 1);
+                        ir_triple* continue_jump = add(JUMP, current_end());
+                        continue_jump->cond = current_end();
+                    } else {
+                        logger::error() << "Continue outside of loop" << logger::nend;
+                    }
+                    break;
+                }
+                case Symbol::KWBREAK: {
+                    if (ctx().loop_breaking) {
+                        add(COPY, ctx().loop_breaking, 1);
+                        ir_triple* breaking_jump = add(JUMP, current_end());
+                        breaking_jump->cond = current_end();
+                    } else {
+                        logger::error() << "Continue outside of loop" << logger::nend;
+                    }
+                    break;
+                }
+                case Symbol::KWLEAVE: {
+                    ir_triple* leaving_jump = add(JUMP, current_end());
+                    leaving_jump->cond = current_end();
+                    break;
+                }
+                case Symbol::KWGOTO: {
+                    auto& sym = un.node->as_unary().node->as_symbol();
+                    auto label = labeled.find(sym.symbol);
+                    ir_triple* label_triple{nullptr};
+                    if (label == labeled.end()) {
+                        label_triple = labeled[sym.symbol] = create(NOOP);
+                    } else {
+                        label_triple = label->second;
+                    }
+                    ir_triple* goto_jump = add(JUMP, label_triple); // Ridiculously dangerous
+                    goto_jump->cond = label_triple;
+                    break;
+                }
                 default: 
                     logger::error() << "Unhandled unary case " << un.op << logger::nend;
             }
@@ -458,7 +830,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             }
         }
     } else if (node->is_closure()) {
-        
+        logger::error() << "Unhandled: CLOSURE" << logger::nend;
     } else {
         logger::error() << "Wrong node type " << node->t << logger::nend;
     }

@@ -54,7 +54,11 @@ struct ir_triple {
     ir_triple* next{nullptr};
     ir_triple* cond{nullptr};
     
+#ifdef DEBUG
     std::string label{};
+#endif
+    
+    void set_label(const std::string& str);
     
     std::string print();
     std::string print(const std::map<ir_triple*, u64>& triples);

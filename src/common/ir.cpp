@@ -21,6 +21,12 @@ ir_triple::ir_triple_param::ir_triple_param(ir_triple* triple)
 ir_triple::ir_triple_param::ir_triple_param(u64 immediate)
     : immediate(immediate), type(IMMEDIATE) {};
     
+void ir_triple::set_label(const std::string& str) {
+#ifdef DEBUG
+    label = str;
+#endif
+}
+    
 std::string ir_triple::print() {
     std::stringstream ss{};
     ss << op;

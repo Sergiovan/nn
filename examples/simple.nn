@@ -68,6 +68,8 @@ int main(string[] arg) {
 	api32 nyeom = [null, null, null];
 	$unreal fun_foo a = fooo;
 
+	fooo(2);
+
 	okay = huh;
 
 	using _c.*;
@@ -175,6 +177,17 @@ int main(string[] arg) {
 	char some_char = 'b';
 	string some_string = "Do me this favor";
 	
+	struct nested {
+		int a;
+	}
+
+	struct nest {
+		nested b;
+	}
+
+	nest d;
+	d.b.a = 1;
+
 	if true {
 		return 1;
 		return 2;
