@@ -70,9 +70,11 @@ std::string ir_triple::print(const std::map<ir_triple*, u64>& triples) {
             ss << "TRIPLE ";
             if (auto id = triples.find(param1.triple); id != triples.end()) {
                 ss << id->second;
+#ifdef DEBUG
                 if (!id->first->label.empty()) {
                     ss << " \"" << id->first->label << "\"";
                 }
+#endif
             } else {
                 ss << "???";
             }
@@ -90,9 +92,11 @@ std::string ir_triple::print(const std::map<ir_triple*, u64>& triples) {
             ss << "TRIPLE ";
             if (auto id = triples.find(param2.triple); id != triples.end()) {
                 ss << id->second;
+#ifdef DEBUG
                 if (!id->first->label.empty()) {
                     ss << " \"" << id->first->label << "\"";
                 }
+#endif
             } else {
                 ss << "???";
             }
@@ -100,9 +104,11 @@ std::string ir_triple::print(const std::map<ir_triple*, u64>& triples) {
             ss << "IMMEDIATE " << param2.immediate;
         }
     }
+#ifdef DEBUG
     if (!label.empty()) {
         ss << " -> \"" << label << "\"";
     }
+#endif
     return ss.str();
 }
 
@@ -193,6 +199,32 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "XOR";
         case NOT:
             return os << "NOT";
+        case CONCATENATE:
+            return os << "CONCATENATE";
+        case CAST_FTD:
+            return os << "CAST_FLOAT_TO_DOUBLE";
+        case CAST_DTF:
+            return os << "CAST_DOUBLE_TO_FLOAT";
+        case CAST_STU:
+            return os << "CAST_SIGNED_TO_UNSIGNED";
+        case CAST_UTS:
+            return os << "CAST_UNSIGNED_TO_SIGNED";
+        case CAST_UTF:
+            return os << "CAST_UNSIGNED_TO_FLOAT";
+        case CAST_STF:
+            return os << "CAST_SIGNED_TO_FLOAT";
+        case CAST_UTD:
+            return os << "CAST_UNSIGNED_TO_DOUBLE";
+        case CAST_STD:
+            return os << "CAST_SIGNED_TO_DOUBLE";
+        case CAST_FTU:
+            return os << "CAST_FLOAT_TO_UNSIGNED";
+        case CAST_FTS:
+            return os << "CAST_FLOAT_TO_SIGNED";
+        case CAST_DTU:
+            return os << "CAST_DOUBLE_TO_UNSIGNED";
+        case CAST_DTS:
+            return os << "CAST_DOUBLE_TO_SIGNED";
         case LESS:
             return os << "LESS";
         case LESS_EQUALS:
@@ -223,12 +255,18 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "IF_TRUE";
         case CALL:
             return os << "CALL";
+        case CALL_CLOSURE:
+            return os << "CALL_CLOSURE";
         case PARAM:
             return os << "PARAM";
         case RETURN:
             return os << "RETURN";
         case RETVAL:
             return os << "RETVAL";
+        case NEW:
+            return os << "NEW";
+        case DELETE:
+            return os << "DELETE";
         case COPY:
             return os << "COPY";
         case INDEX:

@@ -92,7 +92,32 @@ overload& overload::operator=(overload&& o) {
 
 std::string overload::unique_name() {
     using namespace std::string_literals;
-    return ":"s + t->print(true);
+    std::stringstream ss{};
+    type_function& fun = t->as_function();
+    ss << ":";
+    if (fun.ste->name.length()) {
+        ss << fun.ste->name;
+    }
+    ss << "(";
+    for (auto& param : fun.params) {
+        if (param.flags & eparam_flags::SPREAD) {
+            ss << param.t->as_pointer().t->print(true);
+            ss << "...";
+        } else {
+            ss << param.t->print(true);
+        }
+        if (param.name.length()) {
+            ss << " " << param.name;
+        }
+        if (param.flags & eparam_flags::DEFAULTABLE) {
+            ss << "=";
+        }
+        if (&param != &fun.params.back()) {
+            ss << ", ";
+        }
+    }
+    ss << ")";
+    return ss.str();
 }
 
 st_type::st_type(type* t, bool defined, symbol_table* st) :t(t), defined(defined), st(st) {

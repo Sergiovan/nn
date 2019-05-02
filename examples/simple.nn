@@ -68,7 +68,7 @@ int main(string[] arg) {
 	api32 nyeom = [null, null, null];
 	$unreal fun_foo a = fooo;
 
-	fooo(2);
+	a(2);
 
 	okay = huh;
 
@@ -127,6 +127,7 @@ int main(string[] arg) {
 		delete b;
 		leave;
 		int* c = new int{10};
+		int* d, int[] e = new int{1}, int[5]{[2, 3, 4, 5, 6]};
 	}
 	
 	# leave;
@@ -164,6 +165,13 @@ int main(string[] arg) {
 	int laster, sig err = foo(2, 1, 2, 3, 4, 5);
 	laster, err = foo(2, (let wee(){return 1, 2, 3, 4, 5;})());
 	baz(a = 2, b = [1, 2, 3, 4, 5]);
+
+	int ca = 1;
+	int cb = 2;
+
+	let pc = (void sum() [*ca, *cb] {@cb = @ca + @cb;});
+	pc();
+	pc();
 
 	fun<void()> func1 = (void func(){});
 	fun<void(int)> func2 = (void func(int a){});

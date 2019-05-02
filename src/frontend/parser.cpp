@@ -1669,10 +1669,10 @@ ast* parser::importstmt() {
     
     std::string module_name{p.string()};
     symbol_table* mod{nullptr};
-    
+    ast* module{nullptr};
     if (auto stored_module = modules.find(module_name); stored_module == modules.end()) {
         parser pars = fork();
-        ast* module = pars.parse(module_name, true).result;
+        module = pars.parse(module_name, true).result;
         if (pars.has_errors()) {
             errors.insert(errors.end(), pars.errors.begin(), pars.errors.end());
         }
@@ -1684,15 +1684,16 @@ ast* parser::importstmt() {
         mod = pars.get_as_module();
         modules.insert({p.string(), mod});
     } else {
+        module = ast::none();
         mod = stored_module->second;
     }
     
     if (asterisk) {
         st()->merge_st(mod);
-        ret = ast::binary(Symbol::KWIMPORT, what, ast::none());
+        ret = ast::binary(Symbol::KWIMPORT, what, module);
     } else {
         st_entry* sym = st()->add_module(as, mod);
-        ret = ast::binary(Symbol::KWIMPORT, what, ast::symbol(sym));
+        ret = ast::binary(Symbol::KWIMPORT, what, module);
     }
     
     return ret;
@@ -2897,11 +2898,17 @@ ast* parser::funcval() {
         while (!is(Symbol::BRACKET_RIGHT) && !is(TokenType::END_OF_FILE)) {
             ast* jail = ast::unary();
             auto& un = jail->as_unary();
-            if (is(Symbol::AT)) {
-                next(); // @
-                un.op = Symbol::AT;
+            if (is(Symbol::ADDRESS)) {
+                next(); // *
+                un.op = Symbol::ADDRESS;
             } else {
                 un.op = Symbol::ASSIGN;
+            }
+            if(!require(TokenType::IDENTIFIER, epanic_mode::IN_ARRAY)) {
+                if (is(Symbol::COMMA)) {
+                    next(); // ,
+                }
+                continue;
             }
             ast* identifier = iden(false);
             auto& idn = identifier->as_symbol();
@@ -2915,7 +2922,7 @@ ast* parser::funcval() {
             
             un.node = identifier;
             type* t{idn.symbol->as_variable().t};
-            if (un.op == Symbol::AT) {
+            if (un.op == Symbol::ADDRESS) {
                 type nt{ettype::POINTER, 0, etype_flags::CONST, type_pointer{eptr_type::NAKED, 0, t}};
                 t = types.get_or_add(nt);
             }
@@ -3495,10 +3502,8 @@ ast* parser::e17() {
         } else if (!yes->get_type()->is_weak_equalish(no->get_type())) {
             error() << "Types " << yes->get_type() << " and " << no->get_type() << " of ternary condition results are not compatible";
         }
-        ast* block = ast::block(st());
-        block->as_block().stmts.push_back(yes);
-        block->as_block().stmts.push_back(no);
-        exp = ast::binary(Symbol::TERNARY_CONDITION, exp, block, yes->get_type(), true);
+        ast* choice = ast::binary(Symbol::TERNARY_CHOICE, yes, no);
+        exp = ast::binary(Symbol::TERNARY_CONDITION, exp, choice, yes->get_type(), true);
     }
     return exp;
 }
@@ -3963,6 +3968,16 @@ ast* parser::e1() {
                         } else {
                             require(Symbol::PAREN_RIGHT);
                         }
+                    }
+                    
+                    if (exp->is_symbol() && exp->as_symbol().symbol->is_function()) {
+                        if (exp->as_symbol().symbol->as_function().overloads.size() != 1) {
+                            error() << "Function had more than one overload but was treated as single overload" << epanic_mode::ULTRA_PANIC;
+                        }
+                        
+                        overload* ol = exp->as_symbol().symbol->as_function().overloads[0];
+                        rtype = ol->t->as_function().rets;
+                        exp->as_symbol().symbol = exp->as_symbol().symbol->as_function().st->get(ol->unique_name());
                     }
                     
                     for (auto& stmt : stmts) {

@@ -16,6 +16,11 @@ namespace ir_op {
         NEGATE, SHIFT_LEFT, SHIFT_RIGHT,
         ROTATE_LEFT, ROTATE_RIGHT,
         AND, OR, XOR, NOT,
+        CONCATENATE,
+        
+        CAST_FTD, CAST_DTF, CAST_STU, CAST_UTS,
+        CAST_UTF, CAST_STF, CAST_UTD, CAST_STD,
+        CAST_FTU, CAST_FTS, CAST_DTU, CAST_DTS,
         
         LESS, LESS_EQUALS, GREATER, GREATER_EQUALS,
         EQUALS, NOT_EQUALS, BIT_SET, BIT_NOT_SET,
@@ -23,8 +28,9 @@ namespace ir_op {
         JUMP, IF_FALSE, IF_TRUE, 
         IF_ZERO = IF_FALSE, IF_NOT_ZERO = IF_TRUE,
         SYMBOL, VALUE, TEMP, 
-        CALL, PARAM, RETURN, RETVAL, 
+        CALL, CALL_CLOSURE, PARAM, RETURN, RETVAL, 
         
+        NEW, DELETE, 
         COPY, INDEX, OFFSET, ADDRESS, DEREFERENCE, LENGTH,
         
         NOOP

@@ -51,11 +51,12 @@ private:
     ir_triple* current_end();
     block& current_block();
     
-        ir_builder_context& ctx();
+    ir_builder_context& ctx();
     
     parse_info& p;
     
     ir_op::code symbol_to_ir_code(Grammar::Symbol sym);
+    ir_op::code conversion_operator(type* from, type* to);
     
     std::vector<ir_triple*> triples{}; // Owned
     std::stack<block> blocks{};

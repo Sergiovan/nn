@@ -933,8 +933,8 @@ bool ast::is_value() {
         case east_type::QWORD: [[fallthrough]];
         case east_type::STRING: [[fallthrough]];
         case east_type::ARRAY: [[fallthrough]];
-        case east_type::CLOSURE: [[fallthrough]];   
         case east_type::STRUCT: return true;
+        case east_type::CLOSURE: [[fallthrough]];
         case east_type::PRE_UNARY: [[fallthrough]];
         case east_type::POST_UNARY: [[fallthrough]];
         case east_type::BINARY: [[fallthrough]];

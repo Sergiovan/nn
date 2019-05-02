@@ -86,6 +86,8 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                                 ctx().fun_returning->set_label("Function returning"s);
                                 if (ctx().ftype->get_function_returns()->is_combination()) {
                                     ctx().return_amount = ctx().ftype->get_function_returns()->as_combination().types.size();
+                                } else if (ctx().ftype->get_function_returns()->is_primitive(etype_ids::VOID)){
+                                    ctx().return_amount = 0;
                                 } else {
                                     ctx().return_amount = 1;
                                 }
@@ -100,9 +102,21 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                                 
                                 prev_cur->param1 = prev_cur->cond = current();
                             }
+                            break;
                         }
-                        case est_entry_type::TYPE: 
+                        case est_entry_type::TYPE: {
+                            // We only care about functions here
+                            if (!bin.right->is_block()) {
+                                return;
+                            }
+                            auto& declblock = bin.right->as_block();
+                            for (auto& decl : declblock.stmts) {
+                                if (decl->get_type()->is_function()) {
+                                    build(decl, declblock.st);
+                                }
+                            }
                             return;
+                        }
                         default:
                             logger::error() << "Wrong declaration type: " << bin.left->as_symbol().symbol->t << logger::nend;
                     }
@@ -154,12 +168,31 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     
                     else_jmp->param1 = else_jmp->cond = current();
                 } else {
-                    logger::error() << "Unexpected if continuation " << bin.right->t << logger::nend;
+                    ir_triple* if_jmp = add(IF_FALSE, current());
+                    build(bin.right, sym);
+                    add(NOOP);
+                    if_jmp->param2 = if_jmp->cond = current();
                 }
                 if (lblk.stmts.size() > 1) {
                     end_block();
                 }
                 
+                break;
+            }
+            case Symbol::TERNARY_CONDITION: {
+                ir_triple* val = add(TEMP, (u64) 0);
+                build(bin.left, sym);
+                ir_triple* jmp = add(IF_FALSE, current());
+                auto& choices = bin.right->as_binary();
+                build(choices.left, sym);
+                add(COPY, val, current());
+                ir_triple* first_choice_jump = add(JUMP);
+                ir_triple* second_choice_start = add(NOOP);
+                build(choices.right, sym);
+                add(COPY, val, current());
+                ir_triple* choice_end = add(VALUE, val);
+                first_choice_jump->param1 = first_choice_jump->cond = choice_end;
+                jmp->param1 = jmp->cond = second_choice_start;
                 break;
             }
             case Symbol::KWFOR: {
@@ -400,8 +433,6 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         previous->cond   = else_start;
                     }
                     ir_triple* else_block_start = add(NOOP);
-                    previous = add(JUMP);
-                    previous->next = else_block_start;
                     
                     start_block();
                     
@@ -509,8 +540,6 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                             previous->cond   = else_start;
                         }
                         ir_triple* else_block_start = add(NOOP);
-                        previous = add(JUMP);
-                        previous->next = else_block_start;
                         
                         start_block();
                         
@@ -537,14 +566,50 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             }
             case Symbol::FUN_CALL: {
                 auto& params = bin.right->as_block();
+                ir_triple* res{nullptr};
+                type* fun_rets{nullptr};
                 for (auto& param : params.stmts) {
-                    build(param, params.st);
-                    add(PARAM, current());
+                    add(PARAM, params.st, param);
                 }
                 if (bin.left->is_symbol()) {
+                    fun_rets = bin.left->get_type()->get_function_returns();
                     auto func_loc = labeled.find(bin.left->as_symbol().symbol);
-                    // TODO Do this
-                    
+                    if (func_loc == labeled.end()) {
+                        res = add(CALL_CLOSURE, bin.left, params.stmts.size());
+                    } else {
+                        res = add(CALL, func_loc->second, params.stmts.size());
+                    }
+                } else {
+                    build(bin.left, sym); // Build closure
+                    res = add(CALL_CLOSURE, current(), params.stmts.size());
+                }
+                if (ctx().in_try) {
+                    if (fun_rets->is_combination()) {
+                        auto& types = fun_rets->as_combination().types;
+                        u64 size = 0;
+                        for (u64 i = 0; i < types.size(); ++ i) {
+                            if (types[i]->is_primitive(etype_ids::SIG)) {
+                                ir_triple* post_break = create(NOOP);
+                                ir_triple* sigval = add(OFFSET, res, size);
+                                ir_triple* jmp = add(IF_FALSE, sigval, post_break);
+                                jmp->cond = post_break;
+                                add(COPY, ctx().loop_breaking, sigval);
+                                ir_triple* breaking_jump = add(JUMP, current_end());
+                                breaking_jump->cond = current_end();
+                                current_block().add(post_break);
+                                break;
+                            }
+                            size += types[i]->get_size();
+                        }
+                    } else if (fun_rets->is_primitive(etype_ids::SIG)) {
+                        ir_triple* post_break = create(NOOP);
+                        ir_triple* jmp = add(IF_FALSE, res, post_break);
+                        jmp->cond = post_break;
+                        add(COPY, ctx().loop_breaking, res);
+                        ir_triple* breaking_jump = add(JUMP, current_end());
+                        breaking_jump->cond = current_end();
+                        current_block().add(post_break);
+                    }
                 }
                 break;
             }
@@ -571,11 +636,58 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 add(op, sym, bin.left, bin.right);
                 break;
             }
+            case Symbol::CONCATENATE: {
+                add(CONCATENATE, sym, bin.left, bin.right); // TODO Expand
+                break;
+            }
             case Symbol::INDEX: {
                 build(bin.left, sym);
                 ir_triple* arr = current();
                 build(bin.right, sym);
+                if (bin.left->get_type()->is_pointer()) {
+                    add(MULTIPLY, current(), bin.left->get_type()->as_pointer().t->get_size());
+                } else {
+                    add(MULTIPLY, current(), 4);
+                }
                 add(INDEX, arr, current());
+                break;
+            }
+            case Symbol::KWNEW: {
+                auto& lblk = bin.left->as_block();
+                auto& rblk = bin.right->as_block();
+                u64 size{0};
+                add(VALUE, (u64) 0);
+                ir_triple* value = current();
+                for (auto& stmt : lblk.stmts) {
+                    auto& typ = stmt->as_nntype();
+                    ir_triple* this_val = add(VALUE, stmt->get_type()->get_size());
+                    for (auto& size : typ.array_sizes) {
+                        build(size, lblk.st);
+                        this_val = add(MULTIPLY, this_val, current());
+                    }
+                    value = add(ADD, value, this_val);
+                }
+                ir_triple* ptr = add(NEW, value);
+                ir_triple* deref = add(DEREFERENCE, ptr);
+                
+                add(VALUE, (u64) 0);
+                value = current();
+                
+                for (u64 i = 0; i < rblk.stmts.size(); ++i) {
+                    build(rblk.stmts[i], rblk.st);
+                    ir_triple* ptr_val = current();
+                    auto& typ = lblk.stmts[i]->as_nntype();
+                    add(OFFSET, deref, value);
+                    add(COPY, current(), ptr_val);
+                    
+                    ir_triple* this_val = add(VALUE, lblk.stmts[i]->get_type()->get_size());
+                    for (auto& size : typ.array_sizes) {
+                        build(size, lblk.st);
+                        this_val = add(MULTIPLY, this_val, current());
+                    }
+                    value = add(ADD, value, this_val);
+                }
+                add(VALUE, ptr);
                 break;
             }
             case Symbol::ADD_ASSIGN: [[fallthrough]];
@@ -606,8 +718,11 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     if (rblk.stmts[i]->get_type()->is_combination()) {
                         auto& cmb = rblk.stmts[i]->get_type()->as_combination().types;
                         u64 j = 0;
+                        u64 size = 0;
                         while (vals.size() < needed && j < cmb.size()) {
-                            vals.push_back(add(OFFSET, val, j++));
+                            vals.push_back(add(OFFSET, val, size));
+                            size += cmb[j]->get_size();
+                            j++;
                         }
                     } else {
                         vals.push_back(val);
@@ -626,6 +741,15 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 }
                 break;
             }
+            case Symbol::CAST: {
+                ir_op::code op = conversion_operator(bin.left->get_type(), bin.right->get_type());
+                // logger::debug() << "Casting " << bin.left->get_type() << " to " << bin.right->get_type() << " gives " << op << logger::nend;  
+                build(bin.left, sym);
+                if (op != NOOP) {
+                    add(op, current());
+                }
+                break;
+            }
             case Symbol::LAND: {
                 ir_triple* val = add(TEMP, (u64) 0);
                 ir_triple* land_first_end = create(NOOP);
@@ -635,7 +759,8 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 ir_triple* first_jump = add(IF_TRUE, first_value, land_first_end);
                 first_jump->cond = land_first_end;
                 add(COPY, val, first_value);
-                add(JUMP, real_end);
+                ir_triple* land_first_jump = add(JUMP, real_end);
+                land_first_jump->cond = real_end;
                 current_block().add(land_first_end);
                 build(bin.right, sym);
                 add(COPY, val, current());
@@ -651,17 +776,33 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                 ir_triple* first_jump = add(IF_FALSE, first_value, lor_first_end);
                 first_jump->cond = lor_first_end;
                 add(COPY, val, first_value);
-                add(JUMP, real_end);
+                ir_triple* lor_first_jump = add(JUMP, real_end);
+                lor_first_jump->cond = real_end;
                 current_block().add(lor_first_end);
                 build(bin.right, sym);
                 add(COPY, val, current());
                 current_block().add(real_end);
                 break;
             }
+            case Symbol::LXOR: {
+                add(XOR, sym, bin.left, bin.right);
+                break;
+            }
             case Symbol::ACCESS: {
                 u64 field = bin.right->as_symbol().symbol->as_field().field;
                 build(bin.left);
-                add(OFFSET, current(), field);
+                u64 size = 0;
+                type* stype = bin.left->get_type();
+                if (stype->is_struct()) {
+                    for (u64 i = 0; i < field; ++i) {
+                        size += stype->as_struct().fields[i].t->get_size();
+                    }
+                }
+                add(OFFSET, current(), size);
+                break;
+            }
+            case Symbol::KWIMPORT: {
+                build(bin.right, sym);
                 break;
             }
             default:
@@ -683,6 +824,21 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     ir_triple* pre_value = add(VALUE, un.node);
                     add(DECREMENT, sym, un.node);
                     add(VALUE, pre_value);
+                    break;
+                }
+                case Symbol::KWDELETE: {
+                    auto& blk = un.node->as_block();
+                    for (auto elem : blk.stmts) {
+                        add(DELETE, blk.st, elem);
+                    }
+                    break;
+                }
+                case Symbol::POINTER: {
+                    add(ADDRESS, sym, un.node);
+                    break;
+                }
+                case Symbol::AT: {
+                    add(DEREFERENCE, sym, un.node);
                     break;
                 }
                 case Symbol::KWLABEL: {
@@ -746,6 +902,10 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     current_block().start.end = pre_defer;
                     current_block().add_end(ir_triple_range{begin, post_defer});
                     ctx().safe_to_exit = false;
+                    break;
+                }
+                case Symbol::KWNAMESPACE: {
+                    build(un.node, sym);
                     break;
                 }
                 case Symbol::KWUSING: {
@@ -830,7 +990,56 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             }
         }
     } else if (node->is_closure()) {
-        logger::error() << "Unhandled: CLOSURE" << logger::nend;
+        auto& cls = node->as_closure();
+        ir_triple* prev_cur = add(JUMP);
+        ir_triple* fun_begin = add(NOOP);
+        
+        start_context();
+        ctx().in_try = false;
+        ctx().safe_to_exit = true;
+        ctx().ftype = cls.function->get_type();
+        ctx().fun_returning = add(TEMP, (u64) 0);
+        ctx().fun_returning->set_label("Closure returning"s);
+        if (ctx().ftype->get_function_returns()->is_combination()) {
+            ctx().return_amount = ctx().ftype->get_function_returns()->as_combination().types.size();
+        } else {
+            ctx().return_amount = 1;
+        }
+        ctx().fun_return = create(RETURN, ctx().return_amount);
+        ctx().fun_return->set_label("Closure return"s);
+        
+        build(cls.function->as_function().block, sym);
+        add(ctx().fun_return);
+        
+        end_context();
+        add(NOOP);
+        prev_cur->param1 = prev_cur->cond = current();
+        
+        u64 size = 24;
+        u64 pre_made = 0;
+        for (u64 i = 0; i < cls.size; ++i) {
+            pre_made += cls.elems[i]->get_type()->get_size();
+        }
+        size += pre_made;
+        ir_triple* closure = add(NEW, size);
+        ir_triple* closure_deref = add(DEREFERENCE, closure);
+        add(COPY, closure_deref, size);
+        u64 cumul_size = 8;
+        for (u64 i = 0; i < cls.size; ++i) {
+            auto& elem = cls.elems[i]->as_unary();
+            add(OFFSET, closure_deref, cumul_size);
+            ir_triple* offset_spot = current();
+            if (elem.op == Grammar::Symbol::ADDRESS) {
+                add(ADDRESS, sym, elem.node);
+                add(COPY, offset_spot, current());
+            } else {
+                add(COPY, offset_spot, elem.node);
+            }
+            cumul_size += cls.elems[i]->get_type()->get_size();
+        }
+        add(OFFSET, closure_deref, cumul_size + 8);
+        add(COPY, current(), fun_begin);
+        add(VALUE, closure);
     } else {
         logger::error() << "Wrong node type " << node->t << logger::nend;
     }
@@ -923,21 +1132,23 @@ void ir_builder::end_block() {
     blocks.top().add(prev.start);
     end_context();
     
-    if (!prevctx.prev_safe_to_exit) {
-        add(IF_TRUE, ctx().fun_returning, current_end());
-    } else {
-        ir_triple* jmp = add(IF_FALSE, prevctx.fun_returning);
-        ir_triple* ret = add(RETURN, prevctx.return_amount);
-        add(NOOP);
-        jmp->param2 = jmp->cond = current();
-    }
-    
-    if (ctx().loop_breaking) {
-        add(IF_TRUE, ctx().loop_breaking, current_end());
-    }
-    
-    if (ctx().loop_continue) {
-        add(IF_TRUE, ctx().loop_continue, current_end());
+    if (ctx().ftype) {
+        if (!prevctx.prev_safe_to_exit) {
+            add(IF_TRUE, ctx().fun_returning, current_end());
+        } else {
+            ir_triple* jmp = add(IF_FALSE, prevctx.fun_returning);
+            ir_triple* ret = add(RETURN, prevctx.return_amount);
+            add(NOOP);
+            jmp->param2 = jmp->cond = current();
+        }
+        
+        if (ctx().loop_breaking) {
+            add(IF_TRUE, ctx().loop_breaking, current_end());
+        }
+        
+        if (ctx().loop_continue) {
+            add(IF_TRUE, ctx().loop_continue, current_end());
+        }
     }
     
 }
@@ -1000,3 +1211,52 @@ ir_op::code ir_builder::symbol_to_ir_code(Grammar::Symbol sym) {
     }
 }
 
+ir_op::code ir_builder::conversion_operator(type* from, type* to) {
+    using namespace ir_op;
+    if (from == to) {
+        return NOOP;
+    }
+    if (from->is_primitive(etype_ids::FLOAT)) {
+        if (to->is_primitive(etype_ids::DOUBLE)) {
+            return CAST_FTD;
+        } else if (to->flags & etype_flags::SIGNED) {
+            return CAST_FTS;
+        } else if (to->is_numeric()) {
+            return CAST_FTU;
+        } else {
+            return NOOP;
+        }
+    } else if (from->is_primitive(etype_ids::DOUBLE)) {
+        if (to->is_primitive(etype_ids::FLOAT)) {
+            return CAST_DTF;
+        } else if (to->flags & etype_flags::SIGNED) {
+            return CAST_DTS;
+        } else if (to->is_numeric()) {
+            return CAST_DTU;
+        } else {
+            return NOOP;
+        }
+    } else if (from->flags & etype_flags::SIGNED) {
+        if (to->is_primitive(etype_ids::FLOAT)) {
+            return CAST_STF;
+        } else if (to->is_primitive(etype_ids::DOUBLE)) {
+            return CAST_STD;
+        } else if (to->is_numeric() && !(to->flags & etype_flags::SIGNED)) {
+            return CAST_STU;
+        } else {
+            return NOOP;
+        }
+    } else if (from->is_numeric()) {
+        if (to->is_primitive(etype_ids::FLOAT)) {
+            return CAST_UTF;
+        } else if (to->is_primitive(etype_ids::DOUBLE)) {
+            return CAST_UTD;
+        } else if (to->flags & etype_flags::SIGNED) {
+            return CAST_UTS;
+        } else {
+            return NOOP;
+        }
+    } else {
+        return NOOP;
+    }
+}

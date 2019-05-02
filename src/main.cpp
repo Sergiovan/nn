@@ -35,7 +35,7 @@ int main(int argc, char** argv) {
     parser p{};
     
     auto start = std::chrono::high_resolution_clock::now();
-    parse_info res = p.parse(argc > 1 ? argv[1] : "examples/simple.nn", true);
+    parse_info res = p.parse(argc > 1 ? argv[1] : "examples/morse.nn", true);
     
     auto end = std::chrono::high_resolution_clock::now();
     
