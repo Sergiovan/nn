@@ -76,27 +76,35 @@ Instructions to perform casting.
 They all have a version with an extra parameter where the result is stored, instead of overwriting.
 CSTU <any> - Cast op1 from signed to unsigned.
 CSTF <any> - Cast op1 from signed to float.
+CSTD <any> - Cast op1 from signed to double.
 CUTS <any> - Cast op1 from unsigned to signed.
-CUT
+CUTF <any> - Cast op1 from unsiged to float.
+CUTD <any> - Cast op1 from unsigned to double.
+CFTS <any> - Cast op1 from float to signed.
+CFTU <any> - Cast op1 from float to unsigned.
+CFTD <any> - Cast op1 from float to double.
+CDTS <any> - Cast op1 from double to signed.
+CDTU <any> - Cast op1 from double to unsigned.
+CDTF <any> - Cast op1 from double to float.
 
 ~~ Arithmetic and bit manip ~~
 Instructions to perform arithmetic and bit manipulation. 
 They all have a version with an extra parameter where the result is stored, instead of overwriting.
 Prefixed with [SFD] for signed, float and double versions.
 
-ADD <any> <reg> - Add op1 and op2. Store in op2.
-INC <reg> - Increment op1.
-SUB <any> <reg> - Subtract op1 from op2. Store in op2.
-DEC <reg> - Decrement op1.
-MUL <any> <reg> - Multiply op1 and op2. Store in op2.
-DIV <any> <reg> - Divide op2 by op1. Store in op2.
-MOD <any> <reg> - Divide op2 and op1. Store remainder in op2.
-ABS <reg> - Get absolute value of op1. Store in op1.
-NEG <reg> - Get negative of op1. Store in op1. Note that unsigned NEG does not have a single op version, only NEGS and NEGF do.
-SHR <any:1> <reg> - Shift op2 right by op1. Store in op2.
-SHL <any:1> <reg> - Shift op2 left by op1. Store in op2.
-RTR <any:1> <reg> - Rotate op2 right by op1. Store in op2.
-RTL <any:1> <reg> - Rotate op2 left by op1. Store in op2.
+[SFD]ADD <any> <reg> - Add op1 and op2. Store in op2.
+[S]INC <reg> - Increment op1.
+[SFD]SUB <any> <reg> - Subtract op1 from op2. Store in op2.
+[S]DEC <reg> - Decrement op1.
+[SFD]MUL <any> <reg> - Multiply op1 and op2. Store in op2.
+[SFD]DIV <any> <reg> - Divide op2 by op1. Store in op2.
+[S]MOD <any> <reg> - Divide op2 and op1. Store remainder in op2.
+[SFD]ABS <reg> - Get absolute value of op1. Store in op1.
+[SFD]NEG <reg> - Get negative of op1. Store in op1. Note that NEG does not have an unsigned version.
+[S]SHR <any:1> <reg> - Shift op2 right by op1. Store in op2.
+[S]SHL <any:1> <reg> - Shift op2 left by op1. Store in op2.
+[S]RTR <any:1> <reg> - Rotate op2 right by op1. Store in op2.
+[S]RTL <any:1> <reg> - Rotate op2 left by op1. Store in op2.
 AND <any> <reg> - And op1 and op2. Store in op2.
 OR  <any> <reg> - Or op1 and op2. Store in op2.
 XOR <any> <reg> - Xor op1 and op2. Store in op2.
