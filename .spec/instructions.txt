@@ -1,46 +1,43 @@
-Registers: 
-13 + program counter + status flags + stack pointer.
-Named ra-rm, pc, sf and sp respectively.
-Program counter is updated before instruction is run.
+Registers:
+16 general purpose registers, r1-r16.
+16 floating point registers, f1-f16.
+Program counter, pc or r17.
+Status flag register, sf or r18.
+Stack pointer register, sp or r19.
+Each register is 64 bits long.
+
+Program counter is updated before each instruction is run.
 Status flags:
  0 : Zero flag. Previous arithmetic operation resulted in zero.
- 1 : Check flag. Previous comparison or check was true.
-Registers can hold 8 bytes each.
-There are 10 type identifiers:
-- [64]: 8 bytes, unsigned.
-- [64]s: 8 bytes, signed.
-- 8: 1 byte.
-- 8s: 1 byte, signed.
-- 16: 2 bytes.
-- 16s: 2 bytes, signed.
-- 32: 4 bytes.
-- 32s: 4 bytes, signed.
-- f: 4 bytes, floating point.
-- d: 8 bytes, floating point.
-
-Register names are suffixed with one type identifier.
 
 Instructions:
-All instructions take at least 2 bytes. Operands may take more bytes. First 10 bits are instruction, then 6 bits for operand flags.
-<reg> = Any register. 1 byte. Preceeded by $.
-<val> = Any value. 8 bytes. Can be suffexed with an underscore followed by a type identifier to indicate type and sign. Numbers can be given in decimal, hexadecimal, octal or binary form.
-Registers and values can be preceeded by a type identifier and @ to take the value at that address with that size.
+Iden: 2 bits operands. 6 bits operand types. 8 bits opcode.
+Operand: 
+ - Register: 1 bit floating. 2 bits length. 5 bits register number.
+ - Memory: 2 bits length. 2 bits displacement type. 2 bits displacement. 1 bit displacement signed. 1 bits empty. 1-8 bytes location. 1-8 bytes displacement.
+ - Immediate: 2 bits length. 6 bits empty. 1-8 bytes immediate.
+
+<reg> = Any register. 1 byte. Preceeded by $. Suffixed by _8, _16, _32, _64 for size.
+<val> = Any value. 8 bytes. Can be suffixed by [sfd] to signify signed, floating point or double. 
+        Numbers can be given in decimal, hexadecimal (0x), octal (0o) or binary (0b) form.
+Registers and values can be encased in brackets to take the value at that address with that size. 
+Registers dereferenced this way may have an offset given by (+|-)number.
 <idn> = An identifier. No quotes.
 <x,y> = x or y.
 <any> = Anything.
 <:x> = Exactly x bytes.
 <:x+> = x or more bytes.
 <:x-> = x or less bytes.
+@opx: Memory location pointed at by opx.
 
 ~~ General ~~
 General instructions.
 NOP - No operation.
+LOAD <any> <reg> - Copy value of @op1 to op2.
+STOR <reg> <any> - Copy value of op1 to @op2.
 MOV <any> <reg> - Copy value of op1 to op2.
-MOV <any> <val> - Copy value of op1 to memory location op2.
-MVI <any> <reg> - Copy value of sp + signed op1 to op2.
-MVI <any> <any> <reg> - Copy value of @(signed op1 + signed op2) to op3. 
 CPY <any> <any> <any> - Copy op3 bytes from location op1 to op2.
-ZRO - <any> <any> - Zero op2 bytes at location op1.
+ZRO - <any> <any> - Zero op2 bytes at @op1. 
 SET - <any:1> <any> <any> - Set op3 bytes at location op2 to value op1.
 BRK - Break and jump to debugger.
 HLT - Stops the program.
@@ -66,24 +63,26 @@ JCH <any> - Jump to op1 if check flag is set.
 JNCH <any> - Jump to op1 if check flag is not set.
 
 ~~ Stack ~~
-PUSH <val> - Push op1 onto the stack, move the stack pointer up by size of op1.
-PUSH <reg> - Push op1 onto the stack, move the stack pointer up by size of op1.
-PUSH <any> <any> - Push op2 bytes from op1 onto the stack, move the stack pointer up by op2.
+PUSH <any> - Push op1 onto the stack, move the stack pointer up by size of op1.
+PUSH <any> <any> - Push op2 bytes from @op1 onto the stack, move the stack pointer up by op2.
 POP <val> - Move the stack pointer down by op1 bytes.
-POP <any> <any> - Pop op2 bytes from stack pointer to op1. Move stack pointer down op2 bytes.
 POP <reg> - Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
 BTIN <any> - Call builtin function op1. Pushes call pc onto stack.
 CALL <any> - Call function at location op1. Pushes call pc onto stack.
 RET - Return from function. Pops from the stack to pc.
 
-~~ Pointers and arrays ~~
-DRF <reg> - Take value in memory at offset op1 and store it in op1.
-DRF <any> <reg> - Take value in memory at offset op1 and store it in op2.
-IDX <any> <reg> - Take value in memory at offset op2 + (op1 * ~op2) and store it in op2.
-IDX <any> <reg> <reg> - Take value in memory at offset op2 + (op1 * ~op2) and store it in op3.
+~~ Casting ~~
+Instructions to perform casting.
+They all have a version with an extra parameter where the result is stored, instead of overwriting.
+CSTU <any> - Cast op1 from signed to unsigned.
+CSTF <any> - Cast op1 from signed to float.
+CUTS <any> - Cast op1 from unsigned to signed.
+CUT
 
 ~~ Arithmetic and bit manip ~~
-Instructions to perform arithmetic and bit manipulation. They all have a version with an extra parameter where the result is stored, instead of overwriting.
+Instructions to perform arithmetic and bit manipulation. 
+They all have a version with an extra parameter where the result is stored, instead of overwriting.
+Prefixed with [SFD] for signed, float and double versions.
 
 ADD <any> <reg> - Add op1 and op2. Store in op2.
 INC <reg> - Increment op1.
