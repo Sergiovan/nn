@@ -14,14 +14,15 @@ Instructions: At least 2 bytes, at most 26 bytes.
 Iden: 8 bits opcode. 2 bits operands. 6 bits operand types. 
 Operand: 
  - Register: 1 bit floating. 2 bits length. 5 bits register number.
- - Memory: 2 bits length. 2 bits displacement type. 2 bits displacement size. 1 bit displacement signed. 1 bits empty. 1-8 bytes location. 1-8 bytes displacement.
+ - Memory: 1 bit location type. 2 bits length. 2 bits displacement type. 2 bits displacement size. 1 bit displacement signed. 1-8 bytes location. 1-8 bytes displacement.
  - Immediate: 2 bits length. 6 bits empty. 1-8 bytes immediate.
 
 Registers, values and memory locations can be preceded by one of the following type specifiers: u8, u16, u32, u64, s8, s16, s32, s64, f32, f64. The default if none is specified is u64.
 <reg> = Any register. 1 byte. Preceeded by $.
 <val> = Any value. 8 bytes. 
         Numbers can be given in decimal, hexadecimal (0x), octal (0o) or binary (0b) form.
-Registers and values can be encased in brackets to take the value at that address with that size. These will always be taken as u64.
+Registers and values can be encased in brackets to take the value at that address w
+ith that size. These will always be taken as u64.
 Registers dereferenced this way may have an offset given by (+|-)number.
 <idn> = An identifier. No quotes.
 <x,y> = x or y.

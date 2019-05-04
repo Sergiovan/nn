@@ -55,11 +55,11 @@ namespace nnasm {
     };
     
     struct mem_hdr {
+        bool reg : 1;
         u8 len : 2;
         u8 dis_type : 2;
         u8 dis_len : 2;
         bool dis_signed : 1;
-        u8 _empty : 1;
     };
     
     struct imm_hdr {

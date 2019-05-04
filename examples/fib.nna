@@ -13,17 +13,17 @@
 VAL num 100000000
 
 LBL fib
-MOV 0 $ra
-MOV 0 $rb
-MOV 1 $rc
+MOV 0 $r1
+MOV 0 $r2
+MOV 1 $r3
 LBL while_cond
-	CLT $ra <num
+	CLT $r1 <num
 	JCH while_body
 	HLT
 
 LBL while_body
-	MOV $rc $rd
-	ADD $rb $rc
-	MOV $rd $rb
-	ADD 1 $ra
+	MOV $r3 $r4
+	ADD $r2 $r3
+	MOV $r4 $r2
+	ADD 1 $r1
 	JMP while_cond
