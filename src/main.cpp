@@ -14,7 +14,8 @@
 #include "common/ir.h"
 #include "frontend/ast_to_ir.h"
 
-#include "frontend/asm_compiler.h"
+#include "backend/nnasm.h"
+#include "frontend/nnasm_compiler.h"
 #include "vm/machine.h"
 
 int main(int argc, char** argv) {
@@ -32,7 +33,14 @@ int main(int argc, char** argv) {
     logger::info() << vm.print_info() << logger::nend;
     */
     
-    parser p{};
+    auto fmt = nnasm::format::get_formats();
+    
+    for (auto& [code, fmts] : fmt) {
+        logger::info() << code << ": " << fmts.size() << " format(s)" << logger::nend;
+    }
+    
+    
+    /* parser p{};
     
     auto start = std::chrono::high_resolution_clock::now();
     parse_info res = p.parse(argc > 1 ? argv[1] : "examples/morse.nn", true);
@@ -53,7 +61,7 @@ int main(int argc, char** argv) {
         
         logger::log() << '\n' << print_sequence(b.get()) << logger::nend;
         logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
-    }
+    } */
     
     /*
     reader* r = reader::from_file("examples/mastermind2.nn");

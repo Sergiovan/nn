@@ -10,17 +10,18 @@ Program counter is updated before each instruction is run.
 Status flags:
  0 : Zero flag. Previous arithmetic operation resulted in zero.
 
-Instructions:
-Iden: 2 bits operands. 6 bits operand types. 8 bits opcode.
+Instructions: At least 2 bytes, at most 26 bytes.
+Iden: 8 bits opcode. 2 bits operands. 6 bits operand types. 
 Operand: 
  - Register: 1 bit floating. 2 bits length. 5 bits register number.
- - Memory: 2 bits length. 2 bits displacement type. 2 bits displacement. 1 bit displacement signed. 1 bits empty. 1-8 bytes location. 1-8 bytes displacement.
+ - Memory: 2 bits length. 2 bits displacement type. 2 bits displacement size. 1 bit displacement signed. 1 bits empty. 1-8 bytes location. 1-8 bytes displacement.
  - Immediate: 2 bits length. 6 bits empty. 1-8 bytes immediate.
 
-<reg> = Any register. 1 byte. Preceeded by $. Suffixed by _8, _16, _32, _64 for size.
-<val> = Any value. 8 bytes. Can be suffixed by [sfd] to signify signed, floating point or double. 
+Registers, values and memory locations can be preceded by one of the following type specifiers: u8, u16, u32, u64, s8, s16, s32, s64, f32, f64. The default if none is specified is u64.
+<reg> = Any register. 1 byte. Preceeded by $.
+<val> = Any value. 8 bytes. 
         Numbers can be given in decimal, hexadecimal (0x), octal (0o) or binary (0b) form.
-Registers and values can be encased in brackets to take the value at that address with that size. 
+Registers and values can be encased in brackets to take the value at that address with that size. These will always be taken as u64.
 Registers dereferenced this way may have an offset given by (+|-)number.
 <idn> = An identifier. No quotes.
 <x,y> = x or y.
@@ -36,29 +37,31 @@ NOP - No operation.
 LOAD <any> <reg> - Copy value of @op1 to op2.
 STOR <reg> <any> - Copy value of op1 to @op2.
 MOV <any> <reg> - Copy value of op1 to op2.
-CPY <any> <any> <any> - Copy op3 bytes from location op1 to op2.
+CPY <any> <any> <any> - Copy op3 bytes from @op1 to @op2.
 ZRO - <any> <any> - Zero op2 bytes at @op1. 
-SET - <any:1> <any> <any> - Set op3 bytes at location op2 to value op1.
+SET - <any:1> <any> <any> - Set op3 bytes at @op2 to value op1.
 BRK - Break and jump to debugger.
 HLT - Stops the program.
 
 ~~ Comparisons and checks ~~
-Comparison and check instructions. S means the comparison is signed. F means the comparison is for floating points.
+Comparison and check instructions. S means the comparison is signed. 
+Prefixed with [SFD] for signed, float and double versions.
 CZRO <any> - Sets check flag if op1 is zero.
 CNZR <any> - Sets check flag if op1 is not zero.
 CEQ <any> <any> - Sets check flag if op1 equals op2.
 CNEQ <any> <any> - Sets check flag if op1 does not equal op2.
-CLT <any> <any> - Sets check flag if op1 is less than op2.
-CLE <any> <any> - Sets check flag if op1 is less or equal to op2.
-CGT <any> <any> - Sets check flag if op1 is greater than op2.
-CGE <any> <any> - Sets check flag if op1 is greater or equal to op2.
 CBS <any> <any:1> - Sets check flag if bit op2 is set in op1.
 CBNS <any> <any:1> - Sets check flag if bit op2 is not set in op1.
+
+[SFD]CLT <any> <any> - Sets check flag if op1 is less than op2.
+[SFD]CLE <any> <any> - Sets check flag if op1 is less or equal to op2.
+[SFD]CGT <any> <any> - Sets check flag if op1 is greater than op2.
+[SFD]CGE <any> <any> - Sets check flag if op1 is greater or equal to op2.
 
 ~~ Flow control ~~
 Instructions to jump around the program.
 JMP <any> - Copy value of op1 to program counter.
-JMPR <any> - Jump to pc + signed op1.
+JMPR <any> - Jump to pc + op1.
 JCH <any> - Jump to op1 if check flag is set.
 JNCH <any> - Jump to op1 if check flag is not set.
 
@@ -89,7 +92,7 @@ CDTF <any> - Cast op1 from double to float.
 
 ~~ Arithmetic and bit manip ~~
 Instructions to perform arithmetic and bit manipulation. 
-They all have a version with an extra parameter where the result is stored, instead of overwriting.
+They all have a version with an extra reg parameter where the result is stored, instead of overwriting.
 Prefixed with [SFD] for signed, float and double versions.
 
 [SFD]ADD <any> <reg> - Add op1 and op2. Store in op2.
@@ -99,7 +102,7 @@ Prefixed with [SFD] for signed, float and double versions.
 [SFD]MUL <any> <reg> - Multiply op1 and op2. Store in op2.
 [SFD]DIV <any> <reg> - Divide op2 by op1. Store in op2.
 [S]MOD <any> <reg> - Divide op2 and op1. Store remainder in op2.
-[SFD]ABS <reg> - Get absolute value of op1. Store in op1.
+[SFD]ABS <reg> - Get absolute value of op1. Store in op1. Note that ABS does not have an unsigned version.
 [SFD]NEG <reg> - Get negative of op1. Store in op1. Note that NEG does not have an unsigned version.
 [S]SHR <any:1> <reg> - Shift op2 right by op1. Store in op2.
 [S]SHL <any:1> <reg> - Shift op2 left by op1. Store in op2.
