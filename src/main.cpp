@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
     logger::info() << vm.print_info() << logger::nend;
     */
     
-    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/fib.nna"};
+    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
     ac.compile();
     ac.print_errors();
     

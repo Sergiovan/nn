@@ -116,6 +116,6 @@ NOT <reg> - Not op1. Store in op1.
 
 ~~ Pseudoinstructions ~~
 VAL <idn> <val> - Create internal value op2 with name op1. Can be used anywhere, preceded by <.
-DB <idn> <val>... - Statically store value op3... of size op2 with name op1. Used as an address. Can be preceeded by ~ to get size and be used as a value.
+DB <idn> <val>... - Statically store value op2... with name op1. Used as an address. Can be preceeded by ~ to get size and be used as a value.
 DBS <idn> <val>... - Statically store string value op2... with name op1. Used as an address. Can be preceeded by ~ to get size and be used as a value.
 LBL <idn> - Create label with name op1.

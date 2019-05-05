@@ -159,6 +159,7 @@ std::string nnasm_token::print() {
             break;
         case nnasm_token_type::REGISTER: {
             auto& reg = as_register();
+            ss << reg.type << " "; 
             if (reg.floating) {
                 ss << "$f" << (u16) reg.number;
             } else {
@@ -176,7 +177,7 @@ std::string nnasm_token::print() {
         }
         case nnasm_token_type::MEMORY: {
             auto& mem = as_memory();
-            ss << "[";
+            ss << mem.type << " [";
             if (mem.data == nnasm_token_type::REGISTER) {
                 ss << nnasm_token{mem.data, mem.reg_data}.print();
             } else if (mem.data == nnasm_token_type::IMMEDIATE) {
@@ -204,7 +205,7 @@ std::string nnasm_token::print() {
             break;
         }
         case nnasm_token_type::IMMEDIATE:
-            ss << as_immediate().data;
+            ss << as_immediate().type << " " << as_immediate().data;
             break;
         case nnasm_token_type::INDIRECT:
             ss << *as_indirect().tok; // TODO
@@ -279,18 +280,262 @@ void nnasm_compiler::compile() {
     }
     first_pass();
     second_pass();
+    
+    for (auto& tok : tokens) {
+        logger::debug() << tok->print() << logger::nend;
+    } 
+    
 }
 
 void nnasm_compiler::first_pass() {
     if (done) {
         return;
     }
-    nnasm_token cur;
+    
+    auto expect = [this] (nnasm_token& tok, nnasm_token_type type) {
+        if (tok.type != type) {
+            std::stringstream ss{};
+            ss << "Expected " << type << " but got \"" << tok.print() << "\" instead";
+            error(ss.str());
+            return false;
+        }
+        return true;
+    };
+    
+    using namespace nnasm;
+    
+    auto fmts = format::get_formats();
+    
+    auto cur = next();
     u64 i = 1;
-    do {
+    while (!cur.is_end()) {
+        if (!expect(cur, nnasm_token_type::OPCODE)) {
+            cur = next();
+            continue;
+        }
+        
+        switch (cur.as_opcode().opcode) {
+            case opcode::LBL: {
+                auto idn = next();
+                if (!expect(idn, nnasm_token_type::IDEN)) {
+                    cur = next();
+                    continue;
+                }
+                tokens.push_back(new nnasm_token{cur});
+                tokens.push_back(new nnasm_token{idn});
+                auto& iden = idn.as_iden().iden;
+                if (auto ptr = indirects.find(iden); ptr == indirects.end()) {
+                    indirects.insert({idn.as_iden().iden, new u64{tokens.size() - 1}});
+                } else {
+                    *(ptr->second) = tokens.size() - 1;
+                }
+                cur = next();
+                continue;
+            }
+            case opcode::VAL: {
+                auto idn = next(); 
+                if (!expect(idn, nnasm_token_type::IDEN)) {
+                    cur = next();
+                    continue;
+                }
+                auto val = next();
+                if (val.is_end() || val.is_error() || val.is_opcode()) {
+                    std::stringstream ss{};
+                    ss << "Value cannot be " << val.type;
+                    error(ss.str());
+                    continue;
+                }
+                values.insert({idn.as_iden().iden, val});
+                cur = next();
+                continue;
+            }
+            case opcode::DB: {
+                auto idn = next();
+                if (!expect(idn, nnasm_token_type::IDEN)) {
+                    cur = next();
+                    continue;
+                }
+                tokens.push_back(new nnasm_token{cur});
+                tokens.push_back(new nnasm_token{idn});
+                auto& iden = idn.as_iden().iden;
+                if (auto ptr = indirects.find(iden); ptr == indirects.end()) {
+                    indirects.insert({idn.as_iden().iden, new u64{tokens.size() - 1}});
+                } else {
+                    *(ptr->second) = tokens.size() - 1;
+                }
+                cur = next();
+                while (!cur.is_end() && !cur.is_opcode()) {
+                    if (cur.is_error()) {
+                        prev_type = nnasm_type::NONE;
+                        cur = next();
+                        continue;
+                    }
+                    if (cur.is_type()) {
+                        prev_type = cur.as_type().type;
+                        cur = next();
+                        continue;
+                    }
+                    if (!expect(cur, nnasm_token_type::IMMEDIATE)) {
+                        cur = next();
+                        continue;
+                    }
+                    tokens.push_back(new nnasm_token{cur});
+                    prev_type = nnasm_type::NONE;
+                    cur = next();
+                }
+                continue;
+            }
+            case opcode::DBS: { // TODO
+                auto idn = next();
+                if (!expect(idn, nnasm_token_type::IDEN)) {
+                    cur = next();
+                    continue;
+                }
+                tokens.push_back(new nnasm_token{cur});
+                tokens.push_back(new nnasm_token{idn});
+                auto& iden = idn.as_iden().iden;
+                if (auto ptr = indirects.find(iden); ptr == indirects.end()) {
+                    indirects.insert({idn.as_iden().iden, new u64{tokens.size() - 1}});
+                } else {
+                    *(ptr->second) = tokens.size() - 1;
+                }
+                cur = next();
+                while (!cur.is_end() && !cur.is_opcode()) {
+                    if (cur.is_error()) {
+                        prev_type = nnasm_type::NONE;
+                        cur = next();
+                        continue;
+                    }
+                    if (cur.is_type()) {
+                        prev_type = cur.as_type().type;
+                        cur = next();
+                        continue;
+                    }
+                    if (!expect(cur, nnasm_token_type::IMMEDIATE)) {
+                        cur = next();
+                        continue;
+                    }
+                    tokens.push_back(new nnasm_token{cur});
+                    prev_type = nnasm_type::NONE;
+                    cur = next();
+                }
+                continue;
+            }
+            default:
+                break;
+        }
+        
+        tokens.push_back(new nnasm_token{cur});
+        
+        opcode code = cur.as_opcode().opcode;
+        format::instruction instr;
+        u8 op = 0;
         cur = next();
-        logger::debug() << std::setw(5) << i++ << ": " << cur.print() << logger::nend;
-    } while (!cur.is_end());
+        while (!cur.is_end() && !cur.is_opcode()) {
+            if (cur.is_error()) {
+                prev_type = nnasm_type::NONE;
+                cur = next();
+                continue;
+            }
+            if (cur.is_type()) {
+                prev_type = cur.as_type().type;
+                cur = next();
+                continue;
+            }
+            
+            if (cur.is_immediate()) {
+                instr.op[op].imm = true;
+                prev_type = cur.as_immediate().type;
+            } else if (cur.is_register()) {
+                instr.op[op].reg = true;
+                prev_type = cur.as_register().type;
+            } else if (cur.is_memory()) {
+                instr.op[op].mem = true;
+                prev_type = cur.as_memory().type;
+            } else if (cur.is_iden()) {
+                instr.op[op].imm = true;
+                if (prev_type == nnasm_type::NONE) {
+                    prev_type = nnasm_type::U64;
+                }
+            } else if (cur.is_indirect() || cur.is_string()) {
+                std::stringstream ss{};
+                ss << "Invalid token " << cur.print();
+                error(ss.str());
+                prev_type = nnasm_type::U64;
+            }
+
+            tokens.push_back(new nnasm_token{cur});
+            
+            switch (prev_type) {
+                case nnasm_type::U8:
+                    instr.op[op].u = true;
+                    instr.op[op]._8 = true;
+                    break;
+                case nnasm_type::U16:
+                    instr.op[op].u = true;
+                    instr.op[op]._16 = true;
+                    break;
+                case nnasm_type::U32:
+                    instr.op[op].u = true;
+                    instr.op[op]._32 = true;
+                    break;
+                case nnasm_type::U64:
+                    instr.op[op].u = true;
+                    instr.op[op]._64 = true;
+                    break;
+                case nnasm_type::S8:
+                    instr.op[op].s = true;
+                    instr.op[op]._8 = true;
+                    break;
+                case nnasm_type::S16:
+                    instr.op[op].s = true;
+                    instr.op[op]._16 = true;
+                    break;
+                case nnasm_type::S32:
+                    instr.op[op].s = true;
+                    instr.op[op]._32 = true;
+                    break;
+                case nnasm_type::S64:
+                    instr.op[op].s = true;
+                    instr.op[op]._64 = true;
+                    break;
+                case nnasm_type::F32:
+                    instr.op[op].f = true;
+                    instr.op[op]._32 = true;
+                    break;
+                case nnasm_type::F64:
+                    instr.op[op].f = true;
+                    instr.op[op]._64 = true;
+                    break;
+                case nnasm_type::NONE: {
+                    std::stringstream ss{};
+                    ss << "Type for " << cur.print() << " not defined";
+                    error(ss.str());
+                    break;
+                }
+            }
+            
+            ++op;
+            
+            prev_type = nnasm_type::NONE;
+            cur = next();
+        }
+        
+        auto& formats = fmts.at(code);
+        bool found = false;
+        for (auto& format : formats) {
+            if ((format.raw & instr.raw) == instr.raw) {
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found) {
+            std::stringstream ss{};
+            ss << "Invalid format for " << code << ": 0x" << std::hex << instr.raw;
+            error(ss.str());
+        }
+    }
 }
 
 void nnasm_compiler::second_pass() {
@@ -474,7 +719,11 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
             
             mem.offset = nnasm_token_type::END;
             
-            prev_type = nnasm_type::U64;
+            if (prev_type == nnasm_type::NONE) {
+                prev_type = nnasm_type::U64;
+            }
+            
+            mem.type = prev_type;
             
             nnasm_token first = to_token(matches[1].str());
             if (!first.is_register() && !first.is_immediate() && !first.is_iden()) {
@@ -551,7 +800,13 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
             nnasm_token_register reg{};
             if (tok[1] == 'f') {
                 reg.floating = true;
+                if (prev_type == nnasm_type::NONE) {
+                    prev_type = nnasm_type::F64;
+                }
+            } else if (prev_type == nnasm_type::NONE) {
+                prev_type = nnasm_type::U64;
             }
+            reg.type = prev_type;
             char* after;
             u32 n = std::strtoul(tok.data() + 2, &after, 10);
             if (*after) {
@@ -566,15 +821,15 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                 error(ss.str());
                 return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
             }
-            reg.number = n;
+            reg.number = n;            
             return nnasm_token{nnasm_token_type::REGISTER, reg};
         } else if (tok.length() == 3) {
             if (tok[1] == 'p' && tok[2] == 'c') {
-                return nnasm_token{nnasm_token_type::REGISTER, nnasm_token_register{false, 17}};
+                return nnasm_token{nnasm_token_type::REGISTER, nnasm_token_register{prev_type, false, 17}};
             } else if (tok[1] == 's' && tok[2] == 'f') {
-                return nnasm_token{nnasm_token_type::REGISTER, nnasm_token_register{false, 18}};
+                return nnasm_token{nnasm_token_type::REGISTER, nnasm_token_register{prev_type, false, 18}};
             } else if (tok[1] == 's' && tok[2] == 'p') {
-                return nnasm_token{nnasm_token_type::REGISTER, nnasm_token_register{false, 19}};
+                return nnasm_token{nnasm_token_type::REGISTER, nnasm_token_register{prev_type, false, 19}};
             }
         }
         
@@ -631,8 +886,8 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                 error(ss.str());
                 return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
             }
-            
-            return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{num}};
+
+            return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{prev_type, num}};
         }
         
         bool floating = signless.find_first_of('.') != std::string::npos;
@@ -648,7 +903,7 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                 }
                 u32 imm{};
                 std::memcpy(&imm, &f, sizeof(u32));
-                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{imm}};
+                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{prev_type, imm}};
             } else if (prev_type == nnasm_type::F64 || prev_type == nnasm_type::NONE) {
                 char* after;
                 float d = std::strtod(tok.data(), &after);
@@ -658,9 +913,10 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                     error(ss.str());
                     return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
                 }
+                prev_type = nnasm_type::F64;
                 u64 imm{};
                 std::memcpy(&imm, &d, sizeof(u64));
-                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{imm}};
+                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{prev_type, imm}};
             } else {
                 std::stringstream ss{};
                 ss << "Cannot convert \"" << tok << "\" to " << prev_type;
@@ -677,15 +933,25 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                     error(ss.str());
                     return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
                 }
-                if ((prev_type == nnasm_type::S8 && s != (i8) s) || (prev_type == nnasm_type::S16 && s != (i16) s) || (prev_type == nnasm_type::S32 && s != (i32) s)) {
+                if (prev_type == nnasm_type::NONE) {
+                    if (s == (i8) s) {
+                        prev_type = nnasm_type::S8;
+                    } else if (s == (i16) s) {
+                        prev_type = nnasm_type::S16;
+                    } else if (s == (i32) s) {
+                        prev_type = nnasm_type::S32;
+                    } else {
+                        prev_type = nnasm_type::S64;
+                    }
+                } else if ((prev_type == nnasm_type::S8 && s != (i8) s) || (prev_type == nnasm_type::S16 && s != (i16) s) || (prev_type == nnasm_type::S32 && s != (i32) s)) {
                     std::stringstream ss{};
                     ss << "Cannot convert \"" << tok << "\" to " << prev_type;
                     error(ss.str());
-                    return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
+                    return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}}; 
                 }
                 u64 imm{0};
                 std::memcpy(&imm, &s, sizeof(u64));
-                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{imm}};
+                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{prev_type, imm}};
             } else if (prev_type == nnasm_type::F32) {
                 char* after;
                 float f = std::strtof(tok.data(), &after);
@@ -697,7 +963,7 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                 }
                 u32 imm{};
                 std::memcpy(&imm, &f, sizeof(u32));
-                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{imm}};
+                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{prev_type, imm}};
             } else if (prev_type == nnasm_type::F64) {
                 char* after;
                 double d = std::strtod(tok.data(), &after);
@@ -709,7 +975,7 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                 }
                 u64 imm{};
                 std::memcpy(&imm, &d, sizeof(u64));
-                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{imm}};
+                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{prev_type, imm}};
             } else {
                 char* after;
                 u64 u = std::strtoll(tok.data(), &after, 10);
@@ -719,13 +985,23 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
                     error(ss.str());
                     return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
                 }
-                if ((prev_type == nnasm_type::U8 && u != (u8) u) || (prev_type == nnasm_type::U16 && u != (u16) u) || (prev_type == nnasm_type::U32 && u != (u32) u)) {
+                if (prev_type == nnasm_type::NONE) {
+                    if (u == (u8) u) {
+                        prev_type = nnasm_type::U8;
+                    } else if (u == (u16) u) {
+                        prev_type = nnasm_type::U16;
+                    } else if (u == (u32) u) {
+                        prev_type = nnasm_type::U32;
+                    } else {
+                        prev_type = nnasm_type::U64;
+                    }
+                } else if ((prev_type == nnasm_type::U8 && u != (u8) u) || (prev_type == nnasm_type::U16 && u != (u16) u) || (prev_type == nnasm_type::U32 && u != (u32) u)) {
                     std::stringstream ss{};
                     ss << "Cannot convert \"" << tok << "\" to " << prev_type;
                     error(ss.str());
                     return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
                 }
-                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{u}};
+                return nnasm_token{nnasm_token_type::IMMEDIATE, nnasm_token_immediate{prev_type, u}};
             }
         }
     } else if (tok[0] == '"') {
@@ -734,8 +1010,14 @@ nnasm_token nnasm_compiler::to_token(const std::string& tok) {
         return nnasm_token{nnasm_token_type::OPCODE, nnasm_token_opcode{ptr->second}};
     } else if (auto ptr = type_dict.find(tok); ptr != type_dict.end()) {
         return nnasm_token{nnasm_token_type::TYPE, nnasm_token_nnasm_type{ptr->second}};
-    } else {
+    } else if (tok[0] == '_' || std::isalpha(tok[0])) {
+        prev_type = nnasm_type::U64;
         return nnasm_token{nnasm_token_type::IDEN, nnasm_token_iden{tok}};
+    } else {
+        std::stringstream ss{};
+        ss << "Invalid token \"" << tok << "\"";
+        error(ss.str());
+        return nnasm_token{nnasm_token_type::ERROR, nnasm_token_end{}};
     }
 }
 

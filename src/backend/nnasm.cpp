@@ -5,9 +5,9 @@ using namespace nnasm;
 // format::operand::operand(u16 raw) : raw(raw) { }
 
 format::instruction::instruction(u16 op1, u16 op2, u16 op3) { 
-    instruction::op1.raw = op1;
-    instruction::op2.raw = op2;
-    instruction::op3.raw = op3;
+    instruction::op[0].raw = op1;
+    instruction::op[1].raw = op2;
+    instruction::op[2].raw = op3;
     _empty = 0;
 }
 
@@ -60,7 +60,7 @@ const std::map<nnasm::opcode, std::vector<format::instruction>> format::get_form
     auto insert_sfd_arithmetic = [&ret] (opcode code, bool single_op = false) {
         const std::string scode = op_to_name.at(code);
         
-        if (single_op) {
+        if (!single_op) {
             ret.insert({code, {{raw::any_uint, raw::reg | raw::uint}, {raw::any_uint, raw::any_uint, raw::reg | raw::uint}}});
             ret.insert({name_to_op.at('S' + scode), {{raw::any_sint, raw::reg | raw::sint}, {raw::any_sint, raw::any_sint, raw::reg | raw::sint}}});
             ret.insert({name_to_op.at('F' + scode), {{raw::any_float, raw::reg | raw::_float}, {raw::any_float, raw::any_float, raw::reg | raw::_float}}});
@@ -84,8 +84,8 @@ const std::map<nnasm::opcode, std::vector<format::instruction>> format::get_form
     auto insert_shift_arithmetic = [&ret] (opcode code) {
         const std::string scode = op_to_name.at(code);
         
-        ret.insert({code, {{raw::byte, raw::reg | raw::uint}, {raw::byte, raw::any_uint, raw::reg | raw::uint}}});
-        ret.insert({name_to_op.at('S' + scode), {{raw::byte, raw::reg | raw::sint}, {raw::byte, raw::any_sint, raw::reg | raw::sint}}});
+        ret.insert({code, {{raw::any_byte, raw::reg | raw::uint}, {raw::any_byte, raw::any_uint, raw::reg | raw::uint}}});
+        ret.insert({name_to_op.at('S' + scode), {{raw::any_byte, raw::reg | raw::sint}, {raw::any_byte, raw::any_sint, raw::reg | raw::sint}}});
     };
     
     auto insert_bit_logical = [&ret] (opcode code, bool single_op = false) {
@@ -103,7 +103,7 @@ const std::map<nnasm::opcode, std::vector<format::instruction>> format::get_form
     insert(opcode::MOV, {raw::any, raw::any_reg});
     insert(opcode::CPY, {raw::mem_loc, raw::mem_loc, raw::any_uint});
     insert(opcode::ZRO, {raw::mem_loc, raw::any_uint});
-    insert(opcode::SET, {raw::byte, raw::mem_loc, raw::any_uint});
+    insert(opcode::SET, {raw::any_byte, raw::mem_loc, raw::any_uint});
     insert_0(opcode::BRK);
     insert_0(opcode::HLT);
     
@@ -111,8 +111,8 @@ const std::map<nnasm::opcode, std::vector<format::instruction>> format::get_form
     insert(opcode::CNZR, {raw::any});
     insert(opcode::CEQ, {raw::any, raw::any});
     insert(opcode::CNEQ, {raw::any, raw::any});
-    insert(opcode::CBS, {raw::any, raw::byte});
-    insert(opcode::CBNS, {raw::any, raw::byte});
+    insert(opcode::CBS, {raw::any, raw::any_byte});
+    insert(opcode::CBNS, {raw::any, raw::any_byte});
     
     insert_cmp_sfd(opcode::CLT);
     insert_cmp_sfd(opcode::CLE);

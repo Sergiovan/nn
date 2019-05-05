@@ -26,6 +26,7 @@ struct nnasm_token_opcode {
 };
 
 struct nnasm_token_register {
+    nnasm_type type;
     u8 floating : 1;
     u8 number : 7;
 };
@@ -35,6 +36,7 @@ struct nnasm_token_indirect {
 };
 
 struct nnasm_token_memory {
+    nnasm_type type;
     nnasm_token_type data;
     nnasm_token_type offset;
     bool offset_signed;
@@ -51,6 +53,7 @@ struct nnasm_token_memory {
 };
 
 struct nnasm_token_immediate {
+    nnasm_type type;
     u64 data;
 };
 
@@ -147,6 +150,7 @@ private:
     
     std::vector<nnasm_token*> tokens{};
     dict<u64*> indirects{};
+    
     dict<nnasm_token> values{};
     
     u8* program{nullptr};
