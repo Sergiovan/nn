@@ -10,11 +10,11 @@ Program counter is updated before each instruction is run.
 Status flags:
  0 : Zero flag. Previous arithmetic operation resulted in zero.
 
-Instructions: At least 2 bytes, at most 26 bytes.
+Instructions: At least 2 bytes, at most 32 bytes.
 Iden: 8 bits opcode. 2 bits operands. 6 bits operand types. 
 Operand: 
  - Register: 1 bit floating. 2 bits length. 5 bits register number.
- - Memory: 1 bit location type. 2 bits length. 2 bits displacement type. 2 bits displacement size. 1 bit displacement signed. 1-8 bytes location. 1-8 bytes displacement.
+ - Memory: 1 bit location type. 2 bits length. 2 bits displacement type. 2 bits displacement size. 1 bit displacement signed. 1-8 bytes location. 1-8 bytes displacement. 2-9 bytes total for displacement + location.
  - Immediate: 2 bits length. 6 bits empty. 1-8 bytes immediate.
 
 Registers, values and memory locations can be preceded by one of the following type specifiers: u8, u16, u32, u64, s8, s16, s32, s64, f32, f64. The default if none is specified is u64.

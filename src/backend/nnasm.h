@@ -54,12 +54,13 @@ namespace nnasm {
         u8 reg : 5;
     };
     
+    // [location +- offset]
     struct mem_hdr {
-        bool reg : 1;
-        u8 len : 2;
-        u8 dis_type : 2;
-        u8 dis_len : 2;
-        bool dis_signed : 1;
+        u8 len : 2; // Size of pointed at
+        bool reg : 1; // Location is register
+        u8 dis_type : 2; // Type of offset
+        u8 imm_len : 2; // Length of immediate (Only one immediate possible, else optimized out)
+        bool dis_signed : 1; // Offset is subtracted
     };
     
     struct imm_hdr {

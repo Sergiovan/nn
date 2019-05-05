@@ -33,10 +33,13 @@ int main(int argc, char** argv) {
     logger::info() << vm.print_info() << logger::nend;
     */
     
-    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
-    ac.compile();
-    ac.print_errors();
+    auto start = std::chrono::high_resolution_clock::now();
+    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/fib.nna"};
+    ac.compile();    
+    auto end = std::chrono::high_resolution_clock::now();
     
+    ac.print_errors();
+    logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
     
     /* parser p{};
     

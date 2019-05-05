@@ -13,7 +13,7 @@ Check examples for .nn and .nna examples.
   * Syntax: Mostly done.
   * Semantics (Casting, Name resolution, Operator precedence): Mostly done.
   * Parser (Mangling): Mostly done.
-  * ASM: Fuck.
+  * ASM: Mostly done.
   * Data structure (Objects in memory, Program memory): Ongoing. 
   * Execution (Allocator, Function calls): Ongoing.
   * Other (TODOs, pitfalls, previous attempts): Ongoing forever.
@@ -23,5 +23,5 @@ Check examples for .nn and .nna examples.
 * IR Generator: Mostly done.
 * IR Optimizer: Stub.
 * IR-to-ASM compiler: Not started.
-* Assembler: Fuck.
+* Assembler: Ongoing.
 * VM: Fuck.

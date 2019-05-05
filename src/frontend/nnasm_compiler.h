@@ -4,10 +4,11 @@
 #include <variant>
 #include <iostream>
 #include <fstream>
+#include <set>
 
 enum class nnasm_token_type {
     INVALID, OPCODE, REGISTER, MEMORY, IMMEDIATE,
-    INDIRECT, VALUE, STRING, IDEN, TYPE, END, ERROR
+    STRING, IDEN, TYPE, END, ERROR
 };
 
 enum class nnasm_type {
@@ -31,38 +32,28 @@ struct nnasm_token_register {
     u8 number : 7;
 };
 
-struct nnasm_token_indirect {
-    u64* tok;
-};
-
-struct nnasm_token_memory {
-    nnasm_type type;
-    nnasm_token_type data;
-    nnasm_token_type offset;
-    bool offset_signed;
-    union {
-        u64 imm_data;
-        nnasm_token_register reg_data;
-        nnasm_token_indirect ind_data;
-    };
-    union {
-        u64 imm_offset;
-        nnasm_token_register reg_offset;
-        nnasm_token_indirect ind_offset;
-    };
-};
-
 struct nnasm_token_immediate {
     nnasm_type type;
     u64 data;
 };
 
-struct nnasm_token_string {
-    std::string str;
-};
-
 struct nnasm_token_iden {
     std::string iden;
+};
+
+using nnasm_memory_variant = std::variant<nnasm_token_immediate, nnasm_token_register, nnasm_token_iden>;
+
+struct nnasm_token_memory {
+    nnasm_type type;
+    nnasm_token_type location;
+    nnasm_token_type offset;
+    bool offset_signed;
+    nnasm_memory_variant location_data;
+    nnasm_memory_variant offset_data;
+};
+
+struct nnasm_token_string {
+    std::string str;
 };
 
 struct nnasm_token_nnasm_type {
@@ -72,7 +63,7 @@ struct nnasm_token_nnasm_type {
 struct nnasm_token_end {};
 
 using nnasm_token_variant = std::variant<nnasm_token_opcode, nnasm_token_register, nnasm_token_memory, 
-                                         nnasm_token_immediate,  nnasm_token_indirect, nnasm_token_string, 
+                                         nnasm_token_immediate, nnasm_token_string, 
                                          nnasm_token_iden, nnasm_token_nnasm_type, nnasm_token_end>;
 
 struct nnasm_token {
@@ -83,7 +74,6 @@ struct nnasm_token {
     bool is_register();
     bool is_memory();
     bool is_immediate();
-    bool is_indirect();
     bool is_string();
     bool is_iden();
     bool is_type();
@@ -94,7 +84,6 @@ struct nnasm_token {
     nnasm_token_register&   as_register();
     nnasm_token_memory&     as_memory();
     nnasm_token_immediate&  as_immediate();
-    nnasm_token_indirect&   as_indirect();
     nnasm_token_string&     as_string();
     nnasm_token_iden&       as_iden();
     nnasm_token_nnasm_type& as_type();
@@ -110,6 +99,7 @@ struct nnexe_header {
     u64 data_start = 0;
     u64 size = 0;
     u64 initial = 4 << 20;
+    u8  _empty[88] = { 0 };
 };
 
 class nnasm_compiler {
@@ -149,7 +139,7 @@ private:
     std::vector<std::string> errors{};
     
     std::vector<nnasm_token*> tokens{};
-    dict<u64*> indirects{};
+    std::set<std::string> idens{};
     
     dict<nnasm_token> values{};
     
