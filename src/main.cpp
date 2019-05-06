@@ -34,12 +34,18 @@ int main(int argc, char** argv) {
     */
     
     auto start = std::chrono::high_resolution_clock::now();
-    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/fib.nna"};
+    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/add.nna"};
     ac.compile();    
     auto end = std::chrono::high_resolution_clock::now();
     
     ac.print_errors();
     logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
+    
+    virtualmachine vm{};
+    vm.load(ac.get_program(), ac.get_size());
+    vm.run();
+    
+    logger::debug() << "\n" << vm.print_registers() << logger::nend;
     
     /* parser p{};
     

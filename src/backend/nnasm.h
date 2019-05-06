@@ -6,18 +6,28 @@
 #include <iostream>
 #include "common/convenience.h"
 
+struct nnexe_header {
+    char magic[4] = {'N', 'N', 'E', 'P'};
+    u32 version = 0;
+    u64 code_start = 128;
+    u64 data_start = 0;
+    u64 size = 0;
+    u64 initial = 4 << 20;
+    u8  _empty[88] = { 0 };
+};
+
 namespace nnasm {
     enum class opcode : u8 {
         NOP, LOAD, STOR, MOV, CPY, ZRO, SET, BRK, HLT,
         CZRO, CNZR, CEQ, CNEQ, CBS, CBNS, 
         CLT, SCLT, FCLT, DCLT, CLE, SCLE, FCLE, DCLE, 
         CGT, SCGT, FCGT, DCGT, CGE, SCGE, FCGE, DCGE, 
-        JMP, JMPR, JCH, JNCH, PUSH, POP, BTIN, CALL, RET,
+        JMP, JMPR, SJMPR, JCH, JNCH, PUSH, POP, BTIN, CALL, RET,
         CSTU, CSTF, CSTD, CUTS, CUTF, CUTD, CFTS, CFTU, CFTD, CDTS, CDTU, CDTF, 
         ADD, SADD, FADD, DADD, INC, SINC, SUB, SSUB, FSUB, DSUB, DEC, SDEC,
         MUL, SMUL, FMUL, DMUL, DIV, SDIV, FDIV, DDIV, MOD, SMOD,
         SABS, FABS, DABS, SNEG, FNEG, DNEG, 
-        SHR, SSHR, SHL, SSHL, RTR, SRTR, RTL, SRTL, 
+        SHR, SSHR, SHL, SSHL, RTR, RTL, 
         AND, OR, XOR, NOT,
         
         VAL, DB, DBS, LBL,
@@ -108,6 +118,7 @@ namespace nnasm {
         
         {"JMP", opcode::JMP},
         {"JMPR", opcode::JMPR},
+        {"SJMPR", opcode::SJMPR},
         {"JCH", opcode::JCH},
         {"JNCH", opcode::JNCH},
         
@@ -164,9 +175,7 @@ namespace nnasm {
         {"SHL", opcode::SHL},
         {"SSHL", opcode::SSHL},
         {"RTR", opcode::RTR},
-        {"SRTR", opcode::SRTR},
         {"RTL", opcode::RTL},
-        {"SRTL", opcode::SRTL},
         
         {"AND", opcode::AND},
         {"OR", opcode::OR},

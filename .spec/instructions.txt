@@ -9,6 +9,7 @@ Each register is 64 bits long.
 Program counter is updated before each instruction is run.
 Status flags:
  0 : Zero flag. Previous arithmetic operation resulted in zero.
+ 1 : Check flag. Previous check operation passed.
 
 Instructions: At least 2 bytes, at most 32 bytes.
 Iden: 8 bits opcode. 2 bits operands. 6 bits operand types. 
@@ -62,7 +63,7 @@ CBNS <any> <any:1> - Sets check flag if bit op2 is not set in op1.
 ~~ Flow control ~~
 Instructions to jump around the program.
 JMP <any> - Copy value of op1 to program counter.
-JMPR <any> - Jump to pc + op1.
+[S]JMPR <any> - Jump to pc + op1.
 JCH <any> - Jump to op1 if check flag is set.
 JNCH <any> - Jump to op1 if check flag is not set.
 
@@ -107,8 +108,8 @@ Prefixed with [SFD] for signed, float and double versions.
 [SFD]NEG <reg> - Get negative of op1. Store in op1. Note that NEG does not have an unsigned version.
 [S]SHR <any:1> <reg> - Shift op2 right by op1. Store in op2.
 [S]SHL <any:1> <reg> - Shift op2 left by op1. Store in op2.
-[S]RTR <any:1> <reg> - Rotate op2 right by op1. Store in op2.
-[S]RTL <any:1> <reg> - Rotate op2 left by op1. Store in op2.
+RTR <any:1> <reg> - Rotate op2 right by op1. Store in op2.
+RTL <any:1> <reg> - Rotate op2 left by op1. Store in op2.
 AND <any> <reg> - And op1 and op2. Store in op2.
 OR  <any> <reg> - Or op1 and op2. Store in op2.
 XOR <any> <reg> - Xor op1 and op2. Store in op2.

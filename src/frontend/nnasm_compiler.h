@@ -92,16 +92,6 @@ struct nnasm_token {
     std::string print();
 };
 
-struct nnexe_header {
-    char magic[4] = {'N', 'N', 'E', 'P'};
-    u32 version = 0;
-    u64 code_start = 128;
-    u64 data_start = 0;
-    u64 size = 0;
-    u64 initial = 4 << 20;
-    u8  _empty[88] = { 0 };
-};
-
 class nnasm_compiler {
 public:
     nnasm_compiler(const std::string& file);

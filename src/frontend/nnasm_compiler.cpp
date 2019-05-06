@@ -948,6 +948,7 @@ void nnasm_compiler::second_pass() {
     
     hdr.data_start = datastart;
     hdr.size = filesize;
+    hdr.initial = 1 << 24; // 8 MB
     
     
     u8* buff = program;

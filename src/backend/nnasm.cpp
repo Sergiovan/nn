@@ -88,6 +88,10 @@ const std::map<nnasm::opcode, std::vector<format::instruction>> format::get_form
         ret.insert({name_to_op.at('S' + scode), {{raw::any_byte, raw::reg | raw::sint}, {raw::any_byte, raw::any_sint, raw::reg | raw::sint}}});
     };
     
+    auto insert_shift_arithmetic_nos = [&ret] (opcode code) {
+        ret.insert({code, {{raw::any_byte, raw::reg | raw::uint}, {raw::any_byte, raw::any_uint, raw::reg | raw::uint}}});
+    };
+    
     auto insert_bit_logical = [&ret] (opcode code, bool single_op = false) {
         
         if (single_op) {
@@ -120,7 +124,8 @@ const std::map<nnasm::opcode, std::vector<format::instruction>> format::get_form
     insert_cmp_sfd(opcode::CGE);
     
     insert(opcode::JMP, {raw::mem_loc});
-    insert(opcode::JMPR, {raw::any_int});
+    insert(opcode::JMPR, {raw::any_uint});
+    insert(opcode::SJMPR, {raw::any_sint});
     insert(opcode::JCH, {raw::mem_loc});
     insert(opcode::JNCH, {raw::mem_loc});
     
@@ -156,8 +161,8 @@ const std::map<nnasm::opcode, std::vector<format::instruction>> format::get_form
     insert_sfd_no_u_arithmetic(opcode::SNEG);
     insert_shift_arithmetic(opcode::SHR);
     insert_shift_arithmetic(opcode::SHL);
-    insert_shift_arithmetic(opcode::RTR);
-    insert_shift_arithmetic(opcode::RTL);
+    insert_shift_arithmetic_nos(opcode::RTR);
+    insert_shift_arithmetic_nos(opcode::RTL);
     insert_bit_logical(opcode::AND);
     insert_bit_logical(opcode::OR);
     insert_bit_logical(opcode::XOR);
