@@ -5,6 +5,7 @@
 #include "backend/nnasm.h"
 #include "common/utils.h"
 
+#define PROFILE false
 
 virtualmachine::virtualmachine() {
     
@@ -44,6 +45,8 @@ void virtualmachine::run() {
         pc.u = code - memory; // Start of code
         sp.u = allocated;
         ended = false;
+        steps = 0;
+        start_time = std::chrono::high_resolution_clock::now();
     }
     
     while (!ended && !to_pause) {
@@ -56,80 +59,94 @@ void virtualmachine::run() {
     }
     if (ended) {
         started = false;
+        end_time = std::chrono::high_resolution_clock::now();
     }
 }
 
+#define FIX_UNSIGNED(i) (ops_val[i].u & (u64)(-((op_sizes[i] << 3) != 0)) & ((u64)(-1) >> (64 - (op_sizes[i] << 3))))
+
+#define FIX_SIGNED(i) (((((((1 << ((op_sizes[i] << 3) - 1)) & ops_val[i].s) == 0) -1) << ((op_sizes[i] << 3) - 1)) | ops_val[i].s))
+
 void virtualmachine::step() {
     using namespace nnasm;
+    using namespace std::chrono;
     
-    instr_hdr instr = read_from_pc<instr_hdr>();
-    vmregister ops_temp[3] { {0}, {0}, {0} };
-    vmregister* ops[3] {&ops_temp[0], &ops_temp[1], &ops_temp[2]};
+    // BEGIN Load instruction
+#if PROFILE
+    auto begin_load = std::chrono::high_resolution_clock::now();
+#endif
+    
+    instr_hdr instr;
+    std::memcpy(&instr, memory + pc.u, sizeof(instr_hdr));
+    pc.u += sizeof(instr_hdr);
+    vmregister ops_val[3] { {0}, {0}, {0} };
+    vmregister* ops[3] {&ops_val[0], &ops_val[1], &ops_val[2]};
     u8 op_sizes[3] {0, 0, 0};
     
     for (u8 i = 0; i < instr.operands; ++i) {
         opertype op;
-        switch(i) {
+        switch (i) {
             case 0: op = (opertype) instr.op1type; break;
             case 1: op = (opertype) instr.op2type; break;
             case 2: op = (opertype) instr.op3type; break;
         }
         
         if (op == opertype::REG) {
-            reg_hdr reg = read_from_pc<reg_hdr>();
+            reg_hdr reg;
+            std::memcpy(&reg, memory + pc.u, sizeof(reg_hdr));
+            pc.u += sizeof(reg_hdr);
+            u8 size = op_sizes[i] = 1 << reg.len;
             if (reg.floating) {
                 ops[i] = &floating_registers[reg.reg];
             } else {
                 ops[i] = &general_registers[reg.reg];
             }
-            op_sizes[i] = 1 << (3 + reg.len);
+            std::memcpy(&ops_val[i], ops[i], size);
         } else if (op == opertype::VAL) {
-            imm_hdr imm = read_from_pc<imm_hdr>();
-            op_sizes[i] = 1 << (3 + imm.len);
-            switch((operlen) imm.len) {
-                case operlen::_8:  ops_temp[i].u = read_from_pc<u8>(); break;
-                case operlen::_16: ops_temp[i].u = read_from_pc<u16>(); break;
-                case operlen::_32: ops_temp[i].u = read_from_pc<u32>(); break;
-                case operlen::_64: ops_temp[i].u = read_from_pc<u64>(); break;
-            }
+            imm_hdr imm;
+            std::memcpy(&imm, memory + pc.u, sizeof(imm_hdr));
+            pc.u += sizeof(imm_hdr);
+            u8 size = op_sizes[i] = 1 << imm.len;
+            std::memcpy(&ops_val[i], memory + pc.u, size);
+            pc.u += size;
         } else { // Mem
-            mem_hdr mem = read_from_pc<mem_hdr>();
+            mem_hdr mem;
+            std::memcpy(&mem, memory + pc.u, sizeof(mem_hdr));
+            pc.u += sizeof(mem_hdr);
             u64 loc = 0;
-            op_sizes[i] = 1 << (3 + mem.len);
+            op_sizes[i] = 1 << mem.len;
             if (mem.reg) {
-                reg_hdr reg = read_from_pc<reg_hdr>();
+                reg_hdr reg;
+                std::memcpy(&reg, memory + pc.u, sizeof(reg_hdr));
+                pc.u += sizeof(reg_hdr);
                 if (reg.floating) {
                     loc = floating_registers[reg.reg].u;
                 } else {
                     loc = general_registers[reg.reg].u;
                 }
             } else {
-                switch ((operlen) mem.imm_len) {
-                    case operlen::_8:  loc = read_from_pc<u8>(); break;
-                    case operlen::_16: loc = read_from_pc<u16>(); break;
-                    case operlen::_32: loc = read_from_pc<u32>(); break;
-                    case operlen::_64: loc = read_from_pc<u64>(); break;
-                }
+                u8 imm_size = 1 << (mem.imm_len);
+                std::memcpy(&loc, memory + pc.u, imm_size);
+                pc.u += imm_size;
             }
             
             if (mem.dis_type) {
                 u64 off = 0;
                 switch ((opertype) mem.dis_type) {
                     case opertype::REG: {
-                        reg_hdr reg = read_from_pc<reg_hdr>();
+                        reg_hdr reg;
+                        std::memcpy(&reg, memory + pc.u, sizeof(reg_hdr));
+                        pc.u += sizeof(reg_hdr);
                         if (reg.floating) {
                             off = floating_registers[reg.reg].u;
                         } else {
                             off = general_registers[reg.reg].u;
                         }
                     }
-                    case opertype::VAL: {
-                        switch ((operlen) mem.imm_len) {
-                            case operlen::_8:  off = read_from_pc<u8>(); break;
-                            case operlen::_16: off = read_from_pc<u16>(); break;
-                            case operlen::_32: off = read_from_pc<u32>(); break;
-                            case operlen::_64: off = read_from_pc<u64>(); break;
-                        }
+                    default: {
+                        u8 imm_size = 1 << (mem.imm_len);
+                        std::memcpy(&off, memory + pc.u, imm_size);
+                        pc.u += imm_size;
                     }
                 }
                 if (mem.dis_signed) {
@@ -144,15 +161,22 @@ void virtualmachine::step() {
             }
             
             ops[i] = reinterpret_cast<vmregister*>(memory + loc);
+            std::memcpy(&ops_val[i], ops[i], op_sizes[i]);
         }
     }
+    // END Load instruction
+#if PROFILE
+    loading += duration_cast<nanoseconds>(std::chrono::high_resolution_clock::now() - begin_load).count();
     
+    auto begin_execute = std::chrono::high_resolution_clock::now();
+#endif
+    // BEGIN Execute instruction
     switch ((opcode) instr.code) {
         case opcode::NOP: {
             break;
         }
         case opcode::LOAD: {
-            u8* from = memory + ops[0]->u;
+            u8* from = memory + ops_val[0].u;
             if (from + op_sizes[1] > end) {
                 trap(vmtraps::illegal_read);
                 return;
@@ -161,7 +185,7 @@ void virtualmachine::step() {
             break;
         }
         case opcode::STOR: {
-            u8* to = memory + ops[1]->u;
+            u8* to = memory + ops_val[1].u;
             if (to + op_sizes[0] > end || to < data) {
                 trap(vmtraps::illegal_write);
                 return;
@@ -174,9 +198,9 @@ void virtualmachine::step() {
             break;
         }
         case opcode::CPY: {
-            u8* from = memory + ops[0]->u;
-            u8* to = memory + ops[1]->u;
-            u64 amount = ops[2]->u;
+            u8* from = memory + ops_val[0].u;
+            u8* to = memory + ops_val[1].u;
+            u64 amount = ops_val[2].u;
             if (from + amount > end) {
                 trap(vmtraps::illegal_read);
                 return;
@@ -193,8 +217,8 @@ void virtualmachine::step() {
             break;
         }
         case opcode::ZRO: {
-            u8* to = memory + ops[0]->u;
-            u64 amount = ops[1]->u;
+            u8* to = memory + ops_val[0].u;
+            u64 amount = ops_val[1].u;
             if (to + amount > end || to < data) {
                 trap(vmtraps::illegal_write);
                 return;
@@ -203,9 +227,9 @@ void virtualmachine::step() {
             break;
         }
         case opcode::SET: {
-            u8 val = (u8) ops[0]->u;
-            u8* to = memory + ops[1]->u;
-            u64 amount = ops[2]->u;
+            u8 val = (u8) ops_val[0].u;
+            u8* to = memory + ops_val[1].u;
+            u64 amount = ops_val[2].u;
             if (to + amount > end || to < data) {
                 trap(vmtraps::illegal_write);
                 return;
@@ -225,119 +249,119 @@ void virtualmachine::step() {
         }
         case opcode::CZRO: {
             sfr.u = 0;
-            sf.check = ops[0]->u == 0;
+            sf.check = ops_val[0].u == 0;
             break;
         }
         case opcode::CNZR: {
             sfr.u = 0;
-            sf.check = ops[0]->u != 0;
+            sf.check = ops_val[0].u != 0;
             break;
         }
         case opcode::CEQ: {
             sfr.u = 0;
-            sf.check = ops[0]->u == ops[1]->u;
+            sf.check = ops_val[0].u == ops_val[1].u;
             break;
         }
         case opcode::CNEQ: {
             sfr.u = 0;
-            sf.check = ops[0]->u != ops[1]->u;
+            sf.check = ops_val[0].u != ops_val[1].u;
             break;
         }
         case opcode::CBS: {
             sfr.u = 0;
-            sf.check = (ops[0]->u & (1ull << ops[1]->u));
+            sf.check = (ops_val[0].u & (1ull << ops_val[1].u));
             break;
         }
         case opcode::CBNS: {
             sfr.u = 0;
-            sf.check = (ops[0]->u & (1ull << ops[1]->u)) == 0;
+            sf.check = (ops_val[0].u & (1ull << ops_val[1].u)) == 0;
             break;
         }
         
         case opcode::CLT: {
             sfr.u = 0;
-            sf.check = ops[0]->u < ops[1]->u;
+            sf.check = ops_val[0].u < ops_val[1].u;
             break;
         }
         case opcode::SCLT: {
             sfr.u = 0;
-            sf.check = ops[0]->s < ops[1]->s;
+            sf.check = FIX_SIGNED(0) < FIX_SIGNED(1);
             break;
         }
         case opcode::FCLT: {
             sfr.u = 0;
-            sf.check = ops[0]->f < ops[1]->f;
+            sf.check = ops_val[0].f < ops_val[1].f;
             break;
         }
         case opcode::DCLT: {
             sfr.u = 0;
-            sf.check = ops[0]->d < ops[1]->d;
+            sf.check = ops_val[0].d < ops_val[1].d;
             break;
         }
         case opcode::CLE: {
             sfr.u = 0;
-            sf.check = ops[0]->u <= ops[1]->u;
+            sf.check = ops_val[0].u <= ops_val[1].u;
             break;
         }
         case opcode::SCLE: {
             sfr.u = 0;
-            sf.check = ops[0]->s <= ops[1]->s;
+            sf.check = FIX_SIGNED(0) <= FIX_SIGNED(1);
             break;
         }
         case opcode::FCLE: {
             sfr.u = 0;
-            sf.check = ops[0]->f <= ops[1]->f;
+            sf.check = ops_val[0].f <= ops_val[1].f;
             break;
         }
         case opcode::DCLE: {
             sfr.u = 0;
-            sf.check = ops[0]->d <= ops[1]->d;
+            sf.check = ops_val[0].d <= ops_val[1].d;
             break;
         }
         
         case opcode::CGT: {
             sfr.u = 0;
-            sf.check = ops[0]->u > ops[1]->u;
+            sf.check = ops_val[0].u > ops_val[1].u;
             break;
         }
         case opcode::SCGT: {
             sfr.u = 0;
-            sf.check = ops[0]->s > ops[1]->s;
+            sf.check = FIX_SIGNED(0) > FIX_SIGNED(1);
             break;
         }
         case opcode::FCGT: {
             sfr.u = 0;
-            sf.check = ops[0]->f > ops[1]->f;
+            sf.check = ops_val[0].f > ops_val[1].f;
             break;
         }
         case opcode::DCGT: {
             sfr.u = 0;
-            sf.check = ops[0]->d > ops[1]->d;
+            sf.check = ops_val[0].d > ops_val[1].d;
             break;
         }
         case opcode::CGE: {
             sfr.u = 0;
-            sf.check = ops[0]->u >= ops[1]->u;
+            sf.check = ops_val[0].u >= ops_val[1].u;
             break;
         }
         case opcode::SCGE: {
             sfr.u = 0;
-            sf.check = ops[0]->s >= ops[1]->s;
+            sf.check = FIX_SIGNED(0) >= FIX_SIGNED(1);
             break;
         }
         case opcode::FCGE: {
             sfr.u = 0;
-            sf.check = ops[0]->f >= ops[1]->f;
+            sf.check = ops_val[0].f >= ops_val[1].f;
             break;
         }
         case opcode::DCGE: {
             sfr.u = 0;
-            sf.check = ops[0]->d >= ops[1]->d;
+            sf.check = ops_val[0].d >= ops_val[1].d;
             break;
         }
         
         case opcode::JMP: {
-            u64 to = ops[0]->u;
+            u64 to = ops_val[0].u;
             if (memory + to > data) {
                 trap(vmtraps::illegal_jump);
                 return;
@@ -346,7 +370,7 @@ void virtualmachine::step() {
             break;
         }
         case opcode::JMPR: {
-            u64 to = pc.u + ops[0]->u;
+            u64 to = pc.u + ops_val[0].u;
             if (memory + to > data) {
                 trap(vmtraps::illegal_jump);
                 return;
@@ -355,7 +379,7 @@ void virtualmachine::step() {
             break;
         }
         case opcode::SJMPR: {
-            u64 to = pc.s + ops[0]->u;
+            u64 to = pc.s + ops_val[0].u;
             if (memory + to > data) {
                 trap(vmtraps::illegal_jump);
                 return;
@@ -364,7 +388,7 @@ void virtualmachine::step() {
             break;
         }
         case opcode::JCH: {
-            u64 to = ops[0]->u;
+            u64 to = ops_val[0].u;
             if (memory + to > data) {
                 trap(vmtraps::illegal_jump);
                 return;
@@ -375,7 +399,7 @@ void virtualmachine::step() {
             break;
         }
         case opcode::JNCH: {
-            u64 to = ops[0]->u;
+            u64 to = ops_val[0].u;
             if (memory + to > data) {
                 trap(vmtraps::illegal_jump);
                 return;
@@ -388,16 +412,16 @@ void virtualmachine::step() {
         case opcode::PUSH: {
             if (instr.operands == 1) {
                 u8 size = op_sizes[0];
-                if (sp.u - size > allocated - stack_size) {
+                if (sp.u - size < allocated - stack_size) {
                     trap(vmtraps::stack_overflow);
                     return;
                 }
                 sp.u -= size;
                 std::memcpy(memory + sp.u, ops[0], size);
             } else {
-                u8 size = ops[1]->u;
-                u8* from = memory + ops[0]->u;
-                if (sp.u - size > allocated - stack_size) {
+                u8 size = ops_val[1].u;
+                u8* from = memory + ops_val[0].u;
+                if (sp.u - size < allocated - stack_size) {
                     trap(vmtraps::stack_overflow);
                     return;
                 }
@@ -419,7 +443,7 @@ void virtualmachine::step() {
                 std::memcpy(&ops[0], memory + sp.u, size);
                 sp.u += size;
             } else {
-                u8 size = ops[0]->u;
+                u8 size = ops_val[0].u;
                 if (sp.u + size > allocated) {
                     trap(vmtraps::stack_underflow);
                     return;
@@ -429,7 +453,7 @@ void virtualmachine::step() {
             break;
         }
         case opcode::BTIN: {
-            switch (ops[0]->u) {
+            switch (ops_val[0].u) {
                 default: 
                     trap(vmtraps::illegal_btin);
                     return;
@@ -437,12 +461,12 @@ void virtualmachine::step() {
             break;
         }
         case opcode::CALL: {
-            u64 to = pc.u + ops[0]->u;
+            u64 to = ops_val[0].u;
             if (memory + to > data) {
                 trap(vmtraps::illegal_jump);
                 return;
             }
-            if (sp.u - sizeof(vmregister) > allocated - stack_size) {
+            if (sp.u - sizeof(vmregister) < allocated - stack_size) {
                 trap(vmtraps::stack_overflow);
                 return;
             }
@@ -461,406 +485,238 @@ void virtualmachine::step() {
             break;
         }
         case opcode::CSTU: {
-            if (instr.operands == 1) {
-                ops[0]->u = (u64) ops[0]->s;
-            } else {
-                ops[1]->u = (u64) ops[0]->s;
-            }
+            u64 u = (u64) FIX_SIGNED(0);
+            std::memcpy(ops[instr.operands - 1], &u, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::CSTF: {
-            if (instr.operands == 1) {
-                ops[0]->f = (float) ops[0]->s;
-            } else {
-                ops[1]->f = (float) ops[0]->s;
-            }
+            ops[instr.operands - 1]->f = (float) FIX_SIGNED(0);
             break;
         }
         case opcode::CSTD: {
-            if (instr.operands == 1) {
-                ops[0]->d = (double) ops[0]->s;
-            } else {
-                ops[1]->d = (double) ops[0]->s;
-            }
+            ops[instr.operands - 1]->d = (double) FIX_SIGNED(0);
             break;
         }
         case opcode::CUTS: {
-            if (instr.operands == 1) {
-                ops[0]->s = (i64) ops[0]->u;
-            } else {
-                ops[1]->s = (i64) ops[0]->u;
-            }
+            i64 s = ops_val[0].u;
+            std::memcpy(ops[instr.operands - 1], &s, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::CUTF: {
-            if (instr.operands == 1) {
-                ops[0]->f = (float) ops[0]->u;
-            } else {
-                ops[1]->f = (float) ops[0]->u;
-            }
+            ops[instr.operands - 1]->f = (float) ops_val[0].u;
             break;
         }
         case opcode::CUTD: {
-            if (instr.operands == 1) {
-                ops[0]->d = (double) ops[0]->u;
-            } else {
-                ops[1]->d = (double) ops[0]->u;
-            }
+            ops[instr.operands - 1]->d = (double) ops_val[0].u;
             break;
         }
         case opcode::CFTS: {
-            if (instr.operands == 1) {
-                ops[0]->s = (i64) ops[0]->f;
-            } else {
-                ops[1]->s = (i64) ops[0]->f;
-            }
+            i64 s = ops_val[0].f;
+            std::memcpy(ops[instr.operands - 1], &s, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::CFTU: {
-            if (instr.operands == 1) {
-                ops[0]->u = (u64) ops[0]->f;
-            } else {
-                ops[1]->u = (u64) ops[0]->f;
-            }
+            u64 u = ops_val[0].f;
+            std::memcpy(ops[instr.operands - 1], &u, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::CFTD: {
-            if (instr.operands == 1) {
-                ops[0]->d = (double) ops[0]->f;
-            } else {
-                ops[1]->d = (double) ops[0]->f;
-            }
+            ops[instr.operands - 1]->d = (double) ops[0]->f;
             break;
         }
         case opcode::CDTS: {
-            if (instr.operands == 1) {
-                ops[0]->s = (i64) ops[0]->d;
-            } else {
-                ops[1]->s = (i64) ops[0]->d;
-            }
+            i64 s = ops_val[0].d;
+            std::memcpy(ops[instr.operands - 1], &s, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::CDTU: {
-            if (instr.operands == 1) {
-                ops[0]->u = (u64) ops[0]->d;
-            } else {
-                ops[1]->u = (u64) ops[0]->d;
-            }
+            u64 u = ops_val[0].d;
+            std::memcpy(ops[instr.operands - 1], &u, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::CDTF: {
-            if (instr.operands == 1) {
-                ops[0]->f = (float) ops[0]->d;
-            } else {
-                ops[1]->f = (float) ops[0]->d;
-            }
+            ops[instr.operands - 1]->f = (float) ops[0]->d;
             break;
         }
         
         case opcode::ADD: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u + ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u + ops[1]->u;
-            }
+            u64 res = ops_val[0].u + ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SADD: {
-            if (instr.operands == 2) {
-                ops[1]->s = ops[0]->s + ops[1]->s;
-            } else {
-                ops[2]->s = ops[0]->s + ops[1]->s;
-            }
+            i64 res = FIX_SIGNED(0) + FIX_SIGNED(1);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::FADD: {
-            if (instr.operands == 2) {
-                ops[1]->f = ops[0]->f + ops[1]->f;
-            } else {
-                ops[2]->f = ops[0]->f + ops[1]->f;
-            }
+            ops[instr.operands - 1]->f = ops_val[0].f + ops_val[1].f;
             break;
         }
         case opcode::DADD: {
-            if (instr.operands == 2) {
-                ops[1]->d = ops[0]->d + ops[1]->d;
-            } else {
-                ops[2]->d = ops[0]->d + ops[1]->d;
-            }
+            ops[instr.operands - 1]->d = ops_val[0].d + ops_val[1].d;
             break;
         }
         case opcode::INC: {
-            if (instr.operands == 1) {
-                ++ops[0]->u;
-            } else {
-                ops[1]->u = ops[0]->u + 1;
-            }
+            u64 res = ops_val[0].u + 1;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SINC: {
-            if (instr.operands == 1) {
-                ++ops[0]->s;
-            } else {
-                ops[1]->s = ops[0]->s + 1;
-            }
+            i64 res = FIX_SIGNED(0) + 1;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SUB: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u - ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u - ops[1]->u;
-            }
+            u64 res = ops_val[0].u - ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SSUB: {
-            if (instr.operands == 2) {
-                ops[1]->s = ops[0]->s - ops[1]->s;
-            } else {
-                ops[2]->s = ops[0]->s - ops[1]->s;
-            }
+            i64 res = FIX_SIGNED(0) - FIX_SIGNED(1);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::FSUB: {
-            if (instr.operands == 2) {
-                ops[1]->f = ops[0]->f - ops[1]->f;
-            } else {
-                ops[2]->f = ops[0]->f - ops[1]->f;
-            }
+            ops[instr.operands - 1]->f = ops_val[0].f - ops_val[1].f;
             break;
         }
         case opcode::DSUB: {
-            if (instr.operands == 2) {
-                ops[1]->d = ops[0]->d - ops[1]->d;
-            } else {
-                ops[2]->d = ops[0]->d - ops[1]->d;
-            }
+            ops[instr.operands - 1]->d = ops_val[0].d - ops_val[1].d;
             break;
         }
         case opcode::DEC: {
-            if (instr.operands == 1) {
-                --ops[0]->u;
-            } else {
-                ops[1]->u = ops[0]->u - 1;
-            }
+            u64 res = ops_val[0].u - 1;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SDEC: {
-            if (instr.operands == 1) {
-                --ops[0]->s;
-            } else {
-                ops[1]->s = ops[0]->s - 1;
-            }
+            i64 res = FIX_SIGNED(0) - 1;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::MUL: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u * ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u * ops[1]->u;
-            }
+            u64 res = ops_val[0].u * ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SMUL: {
-            if (instr.operands == 2) {
-                ops[1]->s = ops[0]->s * ops[1]->s;
-            } else {
-                ops[2]->s = ops[0]->s * ops[1]->s;
-            }
+            i64 res = FIX_SIGNED(0) * FIX_SIGNED(1);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::FMUL: {
-            if (instr.operands == 2) {
-                ops[1]->f = ops[0]->f * ops[1]->f;
-            } else {
-                ops[2]->f = ops[0]->f * ops[1]->f;
-            }
+            ops[instr.operands - 1]->f = ops_val[0].f * ops_val[1].f;
             break;
         }
         case opcode::DMUL: {
-            if (instr.operands == 2) {
-                ops[1]->d = ops[0]->d * ops[1]->d;
-            } else {
-                ops[2]->d = ops[0]->d * ops[1]->d;
-            }
+            ops[instr.operands - 1]->d = ops_val[0].d * ops_val[1].d;
             break;
         }
         case opcode::DIV: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[1]->u / ops[0]->u;
-            } else {
-                ops[2]->u = ops[1]->u / ops[0]->u;
-            }
+            u64 res = ops_val[1].u / ops_val[0].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SDIV: {
-            if (instr.operands == 2) {
-                ops[1]->s = ops[1]->s / ops[0]->s;
-            } else {
-                ops[2]->s = ops[1]->s / ops[0]->s;
-            }
+            i64 res = FIX_SIGNED(1) / FIX_SIGNED(0);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::FDIV: {
-            if (instr.operands == 2) {
-                ops[1]->f = ops[1]->f / ops[0]->f;
-            } else {
-                ops[2]->f = ops[1]->f / ops[0]->f;
-            }
+            ops[instr.operands - 1]->f = ops_val[1].f / ops_val[0].f;
             break;
         }
         case opcode::DDIV: {
-            if (instr.operands == 2) {
-                ops[1]->d = ops[1]->d / ops[0]->d;
-            } else {
-                ops[2]->d = ops[1]->d / ops[0]->d;
-            }
+            ops[instr.operands - 1]->d = ops_val[1].d / ops_val[0].d;
             break;
         }
         case opcode::MOD: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u % ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u % ops[1]->u;
-            }
+            u64 res = ops_val[0].u % ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SMOD: {
-            if (instr.operands == 2) {
-                ops[1]->s = ops[0]->s % ops[1]->s;
-            } else {
-                ops[2]->s = ops[0]->s % ops[1]->s;
-            }
+            i64 res = FIX_SIGNED(0) % FIX_SIGNED(1);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SABS: {
-            if (instr.operands == 1) {
-                ops[0]->s = std::abs(ops[0]->s);
-            } else {
-                ops[1]->s = std::abs(ops[0]->s);
-            }
+            i64 res = std::abs(FIX_SIGNED(0));
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::FABS: {
-            if (instr.operands == 1) {
-                ops[0]->f = std::abs(ops[0]->f);
-            } else {
-                ops[1]->f = std::abs(ops[0]->f);
-            }
+            ops[instr.operands - 1]->f = std::abs(ops_val[0].f);
             break;
         }
         case opcode::DABS: {
-            if (instr.operands == 1) {
-                ops[0]->d = std::abs(ops[0]->d);
-            } else {
-                ops[1]->d = std::abs(ops[0]->d);
-            }
+            ops[instr.operands - 1]->d = std::abs(ops_val[0].d);
             break;
         }
         case opcode::SNEG: {
-            if (instr.operands == 1) {
-                ops[0]->s = -ops[0]->s;
-            } else {
-                ops[1]->s = -ops[0]->s;
-            }
+            i64 res = -FIX_SIGNED(0);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::FNEG: {
-            if (instr.operands == 1) {
-                ops[0]->f = -ops[0]->f;
-            } else {
-                ops[1]->f = -ops[0]->f;
-            }
+            ops[instr.operands - 1]->f = -ops_val[0].f;
             break;
         }
         case opcode::DNEG: {
-            if (instr.operands == 1) {
-                ops[0]->d = -ops[0]->d;
-            } else {
-                ops[1]->d = -ops[0]->d;
-            }
+            ops[instr.operands - 1]->d = -ops_val[0].d;
             break;
         }
         
         case opcode::SHR: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u >> ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u >> ops[1]->u;
-            }
+            u64 res = ops_val[0].u >> ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SSHR: {
-            if (instr.operands == 2) {
-                ops[1]->s = ops[0]->s >> ops[1]->s;
-            } else {
-                ops[2]->s = ops[0]->s >> ops[1]->s;
-            }
+            i64 res = FIX_SIGNED(0) >> FIX_SIGNED(1);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SHL: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u << ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u << ops[1]->u;
-            }
+            u64 res = ops_val[0].u << ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::SSHL: {
-            if (instr.operands == 2) {
-                ops[1]->s = ops[0]->s << ops[1]->s;
-            } else {
-                ops[2]->s = ops[0]->s << ops[1]->s;
-            }
+            i64 res = FIX_SIGNED(0) << FIX_SIGNED(1);
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::RTR: {
-            if (instr.operands == 2) {
-                ops[1]->u = (ops[0]->u >> ops[1]->u) | (ops[0]->u << (64 - ops[1]->u));
-            } else {
-                ops[2]->u = (ops[0]->u >> ops[1]->u) | (ops[0]->u << (64 - ops[1]->u));
-            }
+            u64 res = (ops_val[0].u >> ops_val[1].u) | (ops_val[0].u << (op_sizes[0] - ops_val[1].u));
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::RTL: {
-            if (instr.operands == 2) {
-                ops[1]->u = (ops[0]->u << ops[1]->u) | (ops[0]->u >> (64 - ops[1]->u));
-            } else {
-                ops[2]->u = (ops[0]->u << ops[1]->u) | (ops[0]->u >> (64 - ops[1]->u));
-            }
+            u64 res = (ops_val[0].u << ops_val[1].u) | (ops_val[0].u >> (op_sizes[0] - ops_val[1].u));
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         
         case opcode::AND: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u & ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u & ops[1]->u;
-            }
+            u64 res = ops_val[0].u & ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::OR: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u | ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u | ops[1]->u;
-            }
+            u64 res = ops_val[0].u | ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::XOR: {
-            if (instr.operands == 2) {
-                ops[1]->u = ops[0]->u ^ ops[1]->u;
-            } else {
-                ops[2]->u = ops[0]->u ^ ops[1]->u;
-            }
+            u64 res = ops_val[0].u ^ ops_val[1].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         case opcode::NOT: {
-            if (instr.operands == 2) {
-                ops[0]->u = ~ops[0]->u;
-            } else {
-                ops[1]->u = ~ops[0]->u;
-            }
+            u64 res = ~ops_val[0].u;
+            std::memcpy(ops[instr.operands - 1], &res, op_sizes[instr.operands - 1]);
             break;
         }
         default: {
@@ -868,6 +724,11 @@ void virtualmachine::step() {
             break;
         }
     }
+    // END Execute instruction
+#if PROFILE
+    executing += duration_cast<nanoseconds>(std::chrono::high_resolution_clock::now() - begin_execute).count();
+#endif
+    ++steps;
 }
 
 void virtualmachine::pause() {
@@ -879,7 +740,29 @@ void virtualmachine::stop() {
 }
 
 std::string virtualmachine::print_info() {
-    return {};
+    using namespace std::chrono;
+    std::stringstream ss{};
+    if (ended) {
+        ss << "Program done\n";
+        auto time = end_time - start_time;
+        ss << "Program took " << duration_cast<microseconds>(time).count() << "us\n";
+        ss << "Executed " << steps << " instructions @ " << ((double) steps / (double) duration_cast<seconds>(time).count()) << " instructions/sec\n";
+#if PROFILE
+        ss << "Took " << loading << "ns loading instructions\n";
+        ss << "Took " << executing << "ns executing instructions\n";
+#endif
+    } else if (paused) {
+        ss << "Program paused\n";
+    } else {
+        ss << "Program running\n";
+    }
+    
+    ss << std::hex << "Allocated 0x" << allocated << " bytes\n";
+    ss << " Read only memory: 0x" << read_only_end << " bytes\n";
+    ss << " Static memory: 0x" << (heap - data) << " bytes\n";
+    ss << " Heap size: 0x" <<  (((end - 1) - heap) - stack_size) << " bytes\n";
+    ss << " Stack size: 0x" << stack_size << " bytes\n";
+    return ss.str();
 }
 
 std::string virtualmachine::print_registers() {
@@ -981,6 +864,10 @@ void virtualmachine::clear() {
 
 void virtualmachine::trap(i64 signal) {
     // TODO Do something
-    logger::error() << "Got signal " << signal << logger::nend;
+    if (signal > 0) {
+        logger::error() << "Got signal " << signal << logger::nend;
+    } else {
+        logger::info() << "Got signal " << signal << logger::nend;
+    }
 }
 

@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
     */
     
     auto start = std::chrono::high_resolution_clock::now();
-    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/add.nna"};
+    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
     ac.compile();    
     auto end = std::chrono::high_resolution_clock::now();
     
@@ -45,7 +45,8 @@ int main(int argc, char** argv) {
     vm.load(ac.get_program(), ac.get_size());
     vm.run();
     
-    logger::debug() << "\n" << vm.print_registers() << logger::nend;
+    logger::debug() << "\n" << vm.print_info() << logger::nend;
+    // logger::debug() << "\n" << vm.print_registers() << logger::nend;
     
     /* parser p{};
     

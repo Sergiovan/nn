@@ -23,7 +23,7 @@ INCLUDEFLAGS=$(patsubst %, -I%, $(realpath $(INCLUDEDIR)))
 
 CXXFLAGS =-std=c++17 $(INCLUDEFLAGS)
 CXXDFLAGS=-g -O0 -DDEBUG
-CXXRFLAGS=-O2
+CXXRFLAGS=-Ofast
 
 folders=$(sort $(dir $(wildcard src/*/)))
 cpp=$(foreach var,$(folders),$(wildcard $(var)*.cpp))

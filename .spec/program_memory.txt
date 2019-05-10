@@ -11,4 +11,4 @@ Runnable code: From address code start to file size, padded to 8 bytes with 00.
 
 Static memory: Memory available from the beginning.
 
-Memory: Heap grows downwards, stack grows upwards. Negative pointers for the stack, positive pointers for the rest.
+Memory: Heap grows downwards, stack grows upwards.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstring>
 
 #include "common/convenience.h"
@@ -84,57 +85,19 @@ private:
     bool paused{false};
     bool ended{true};
     
+    u64 steps{0};
+    decltype(std::chrono::high_resolution_clock::now()) start_time{};
+    decltype(std::chrono::high_resolution_clock::now()) end_time{};
+    
+    u64 loading{0};
+    u64 executing{0};
+    
+    
     template <typename T>
-    T read_from_pc() {
+    inline T read_from_pc() {
         T r;
         std::memcpy(&r, memory + pc.u, sizeof(T));
         pc.u += sizeof(T);
-        return r;
-    }
-    
-    template <typename T>
-    T read(u64 pos) {
-        if (pos + sizeof(T) > allocated) {
-            trap(vmtraps::illegal_read);
-            return T(0);
-        }
-        T r;
-        std::memcpy(&r, memory + pos, sizeof(T));
-        return r;
-    }
-    
-    template <typename T>
-    void write(T t, u64 pos) {
-        if (pos + sizeof(T) > allocated) {
-            trap(vmtraps::illegal_write);
-            return;
-        }
-        if (pos < read_only_end) {
-            trap(vmtraps::illegal_write);
-            return;
-        }
-        std::memcpy(memory + pos, &t, sizeof(T));
-    }
-    
-    template <typename T>
-    void push(T t) {
-        if (sp.u - sizeof(T) > allocated - stack_size) {
-            trap(vmtraps::stack_overflow);
-            return;
-        }
-        sp.u -= sizeof(T);
-        std::memcpy(memory + sp.u, &t, sizeof(T));
-    }
-    
-    template <typename T>
-    T pop() {
-        if (sp.u + sizeof(T) > allocated) {
-            trap(vmtraps::stack_underflow);
-            return T(0);
-        }
-        T r;
-        std::memcpy(&r, memory + sp.u, sizeof(T));
-        sp.u += sizeof(T);
         return r;
     }
 };
