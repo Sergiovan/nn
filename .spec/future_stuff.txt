@@ -7,6 +7,9 @@ Typeof:
 Sizeof: 
 "sizeof <iden>" or "sizeof <type>", returns the number of bytes the type takes, sans extras (like type info, etc)
 
+any type:
+"any <iden>", an object that can be assigned any value. Needs to be cast before use. 
+
 any array:
 "any[] <iden>", gives an array of arbitrary types. Values need to be converted before use.
 
@@ -19,8 +22,5 @@ Generic struct:
 Combination type casting:
 "<{typename or number; colon}>" allows reordering or ditching of combination types' types
 "<let>" allows for automatic reordering based on context clues (only for assignments)
-
-Multicasting:
-"<a -> b>" casts to a, then to b. Chainable
 
 C++-like "move" semantics. Currently everything is copied.

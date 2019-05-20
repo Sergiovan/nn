@@ -8,20 +8,22 @@ Check other for syntax highlighting for N++ and VS Code.
 
 Check examples for .nn and .nna examples.
 
+Check ROADMAP.md to see what's coming.
+
 ## Progress
 * Spec: Ongoing.
-  * Syntax: Mostly done.
-  * Semantics (Casting, Name resolution, Operator precedence): Mostly done.
-  * Parser (Mangling): Mostly done.
-  * ASM: Mostly done.
+  * Syntax: Done for v0.1.
+  * Semantics (Casting, Name resolution, Operator precedence): Done for v0.1.
+  * Parser (Mangling): Done for v0.1.
+  * ASM: Who knows.
   * Data structure (Objects in memory, Program memory): Ongoing. 
   * Execution (Allocator, Function calls): Ongoing.
   * Other (TODOs, pitfalls, previous attempts): Ongoing forever.
-* Lexer: Mostly done.
+* Lexer: Almost done.
 * Parser: Mostly done.
 * AST Optimizer: Stub.
-* IR Generator: Mostly done.
+* IR Generator: Needs work, basics done.
 * IR Optimizer: Stub.
 * IR-to-ASM compiler: Not started.
-* Assembler: Ongoing.
-* VM: Fuck.
+* Assembler: Needs alignment, otherwise mostly done.
+* VM: Needs testing.
