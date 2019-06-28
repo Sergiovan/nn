@@ -2,13 +2,15 @@
 ## Introduction
 Interpreter/Compiler for a madeup language.
 
-Check .spec for a raw overview of how the language looks like.
+Check [src](src/) to check out the source code.
 
-Check other for syntax highlighting for N++ and VS Code.
+Check [.spec](.spec/) for a raw overview of how the language looks like.
 
-Check examples for .nn and .nna examples.
+Check [other](other/) for syntax highlighting for N++ and VS Code.
 
-Check ROADMAP.md to see what's coming.
+Check [examples](examples/) for .nn and .nna examples.
+
+Check [ROADMAP.md](ROADMAP.md) to see what's coming.
 
 ## Progress
 * Spec: Ongoing.
@@ -19,11 +21,11 @@ Check ROADMAP.md to see what's coming.
   * Data structure (Objects in memory, Program memory): Ongoing. 
   * Execution (Allocator, Function calls): Ongoing.
   * Other (TODOs, pitfalls, previous attempts): Ongoing forever.
-* Lexer: Almost done.
-* Parser: Mostly done.
-* AST Optimizer: Stub.
-* IR Generator: Needs work, basics done.
-* IR Optimizer: Stub.
-* IR-to-ASM compiler: Not started.
-* Assembler: Needs alignment, otherwise mostly done.
-* VM: Needs testing.
+* [Lexer](src/frontend/lexer.cpp): Almost done.
+* [Parser](src/frontend/parser.cpp): Mostly done.
+* [AST Optimizer](src/frontend/ast_optimizer.cpp): Stub.
+* [IR Generator](src/frontend/ast_to_ir.cpp): Needs work, basics done.
+* [IR Optimizer](src/frontend/ast_to_ir.cpp): Stub. 
+* [IR-to-nnASM compiler](src/backend/ir_compiler.cpp): Not started.
+* [Assembler](src/frontend/nnasm_compiler.cpp): One more rework. Last one, I promise.
+* [VM](src/vm/machine.cpp): Needs testing and retouching.
