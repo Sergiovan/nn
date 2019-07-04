@@ -3,7 +3,7 @@
 #include <stack>
 #include "common/grammar.h"
 #include "common/ir.h"
-#include "frontend/parser.h"
+#include "frontend/nn/parser.h"
 
 
 struct ast;

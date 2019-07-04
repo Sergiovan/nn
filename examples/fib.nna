@@ -10,7 +10,7 @@
 ; rc --> fib i+1
 ; rd --> temp
 
-VAL num 10000000
+VAL num 100000000
 
 LBL fib
 MOV 0 $r1

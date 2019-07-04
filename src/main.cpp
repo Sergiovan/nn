@@ -5,17 +5,17 @@
 #include <chrono>
 
 #include "common/grammar.h"
-#include "frontend/reader.h"
-#include "frontend/lexer.h"
+#include "frontend/nn/reader.h"
+#include "frontend/nn/lexer.h"
 #include "common/utils.h"
 
 #include "common/ast.h"
-#include "frontend/parser.h"
+#include "frontend/nn/parser.h"
 #include "common/ir.h"
-#include "frontend/ast_to_ir.h"
+#include "frontend/nn/ast_to_ir.h"
 
 #include "backend/nnasm.h"
-#include "frontend/nnasm_compiler.h"
+#include "frontend/nnasm/compiler.h"
 #include "vm/machine.h"
 
 int main(int argc, char** argv) {
@@ -34,8 +34,10 @@ int main(int argc, char** argv) {
     */
     
     auto start = std::chrono::high_resolution_clock::now();
-    nnasm_compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
+    nnasm::compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
     ac.compile();    
+    u8* program = ac.get_program();
+    u64 size = ac.get_size();
     auto end = std::chrono::high_resolution_clock::now();
     
     ac.print_errors();

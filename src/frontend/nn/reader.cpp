@@ -1,4 +1,4 @@
-#include "frontend/reader.h"
+#include "frontend/nn/reader.h"
 
 #include <filesystem>
 #include "common/utils.h"

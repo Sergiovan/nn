@@ -1,4 +1,4 @@
-#include "frontend/ast_to_ir.h"
+#include "frontend/nn/ast_to_ir.h"
 
 #include "common/ast.h"
 #include "common/symbol_table.h"

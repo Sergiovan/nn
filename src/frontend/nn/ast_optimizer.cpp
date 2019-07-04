@@ -1,4 +1,4 @@
-#include "frontend/ast_optimizer.h"
+#include "frontend/nn/ast_optimizer.h"
 
 ast_optimizer::ast_optimizer() { }
 

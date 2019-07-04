@@ -1,4 +1,4 @@
-#include "frontend/lexer.h"
+#include "frontend/nn/lexer.h"
 #include "common/utils.h"
 
 using namespace Grammar;

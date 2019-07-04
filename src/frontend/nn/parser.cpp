@@ -1,4 +1,4 @@
-#include "frontend/parser.h"
+#include "frontend/nn/parser.h"
 
 #include <algorithm>
 #include <cstring>
@@ -7,8 +7,8 @@
 #include <set>
 
 #include "common/ast.h"
-#include "frontend/lexer.h"
-#include "frontend/reader.h"
+#include "frontend/nn/lexer.h"
+#include "frontend/nn/reader.h"
 #include "common/symbol_table.h"
 #include "common/utils.h"
 

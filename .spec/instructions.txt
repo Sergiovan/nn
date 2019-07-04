@@ -1,6 +1,6 @@
 Registers:
 16 general purpose registers, r1-r16.
-16 floating point registers, f1-f16.
+16 floating point registers, f1-f16 (r20-r35).
 Program counter, pc or r17.
 Status flag register, sf or r18.
 Stack pointer register, sp or r19.
@@ -11,109 +11,130 @@ Status flags:
  0 : Zero flag. Previous arithmetic operation resulted in zero.
  1 : Check flag. Previous check operation passed.
 
-Instructions: At least 2 bytes, at most 32 bytes.
-Iden: 8 bits opcode. 2 bits operands. 6 bits operand types. 
+All instructions and operands are aligned in memory to their size.
+Instructions: At least 2 bytes, at most 62 bytes.
+Iden: 2 bytes opcode. 
 Operand: 
- - Register: 1 bit floating. 2 bits length. 5 bits register number.
- - Memory: 1 bit location type. 2 bits length. 2 bits displacement type. 2 bits displacement size. 1 bit displacement signed. 1-8 bytes location. 1-8 bytes displacement. 2-9 bytes total for displacement + location.
- - Immediate: 2 bits length. 6 bits empty. 1-8 bytes immediate.
+ - Register: 1 byte register number.
+ - Memory: 1 bit location type. 2 bits offset type. 5 bits empty. 1 or 8 bytes for location. 0, 1 or 8 bytes for offset. 2, 3, 16 or 17 bytes in total. (If two immediates are given they are optimized to a single immadiate)
+ - Immediate: 1,2, 4 or 8 bytes immediate.
 
-Registers, values and memory locations can be preceded by one of the following type specifiers: u8, u16, u32, u64, s8, s16, s32, s64, f32, f64. The default if none is specified is u64.
+Registers, values and memory locations can be preceded by one of the following type specifiers: u8, u16, u32, u64, s8, s16, s32, s64, f32, f64. The default if none is specified is u64. 
 <reg> = Any register. 1 byte. Preceeded by $.
 <val> = Any value. 8 bytes. 
         Numbers can be given in decimal, hexadecimal (0x), octal (0o) or binary (0b) form.
-Registers and values can be encased in brackets to take the value at that address w
-ith that size. These will always be taken as u64.
+Registers and values can be encased in brackets to take the value at that address.
 Registers dereferenced this way may have an offset given by (+|-)number.
 <idn> = An identifier. No quotes.
 <x,y> = x or y.
 <any> = Anything.
-<:x> = Exactly x bytes.
-<:x+> = x or more bytes.
-<:x-> = x or less bytes.
+<>? = Optional operand.
+<:x> = Of type x.
+<:!> = This op determines the type of the others.
+<:?> = This op's type is predetermined by a previous op's type.
 @opx: Memory location pointed at by opx.
+
+- Types:
+ - u: u8 | u16 | u32 | u64.
+ - s: s8 | s16 | s32 | s64.
+ - f: f32 | f64.
+ - i: u | s.
+ - a: i | f.
+ - nu: s | f.
+ - ns: u | f.
+ - nf32: i | f64.
+ - nf64: i | f32.
 
 ~~ General ~~
 General instructions.
 NOP - No operation.
-LOAD <any> <reg> - Copy value of @op1 to op2.
-STOR <reg> <any> - Copy value of op1 to @op2.
-MOV <any> <reg> - Copy value of op1 to op2.
-CPY <any> <any> <any> - Copy op3 bytes from @op1 to @op2.
-ZRO - <any> <any> - Zero op2 bytes at @op1. 
-SET - <any:1> <any> <any> - Set op3 bytes at @op2 to value op1.
+LOAD <any:u> <reg:a> - Copy value of @op1 to op2.
+STOR <reg:a> <any:u> - Copy value of op1 to @op2.
+MOV <any:a!> <reg:a?> - Copy value of op1 to op2.
+CPY <any:u> <any:u> <any:u> - Copy op3 bytes from @op1 to @op2.
+ZRO <any:u> <any:u> - Zero op2 bytes at @op1. 
+SET <any:u8> <any:u> <any:u> - Set op3 bytes at @op2 to value op1.
 BRK - Break and jump to debugger.
 HLT - Stops the program.
 
 ~~ Comparisons and checks ~~
-Comparison and check instructions. S means the comparison is signed. 
-Prefixed with [SFD] for signed, float and double versions.
-CZRO <any> - Sets check flag if op1 is zero.
-CNZR <any> - Sets check flag if op1 is not zero.
-CEQ <any> <any> - Sets check flag if op1 equals op2.
-CNEQ <any> <any> - Sets check flag if op1 does not equal op2.
-CBS <any> <any:1> - Sets check flag if bit op2 is set in op1.
-CBNS <any> <any:1> - Sets check flag if bit op2 is not set in op1.
+Comparison and check instructions. S means the comparison is signed.
+CZRO <any:a> - Sets check flag if op1 is zero.
+CNZR <any:a> - Sets check flag if op1 is not zero.
+CEQ <any:a!> <any:a?> - Sets check flag if op1 equals op2.
+CNEQ <any:a!> <any:a?> - Sets check flag if op1 does not equal op2.
+CBS <any:u> <any:u8> - Sets check flag if bit op2 is set in op1.
+CBNS <any:u> <any:u8> - Sets check flag if bit op2 is not set in op1.
 
-[SFD]CLT <any> <any> - Sets check flag if op1 is less than op2.
-[SFD]CLE <any> <any> - Sets check flag if op1 is less or equal to op2.
-[SFD]CGT <any> <any> - Sets check flag if op1 is greater than op2.
-[SFD]CGE <any> <any> - Sets check flag if op1 is greater or equal to op2.
+CLT <any:a!> <any:a?> - Sets check flag if op1 is less than op2.
+CLE <any:a!> <any:a?> - Sets check flag if op1 is less or equal to op2.
+CGT <any:a!> <any:a?> - Sets check flag if op1 is greater than op2.
+CGE <any:a!> <any:a?> - Sets check flag if op1 is greater or equal to op2.
 
 ~~ Flow control ~~
 Instructions to jump around the program.
-JMP <any> - Copy value of op1 to program counter.
-[S]JMPR <any> - Jump to pc + op1.
-JCH <any> - Jump to op1 if check flag is set.
-JNCH <any> - Jump to op1 if check flag is not set.
+JMP <any:u> - Copy value of op1 to program counter.
+JMPR <any:i> - Jump to pc + op1.
+JCH <any:u> - Jump to op1 if check flag is set.
+JNCH <any:u> - Jump to op1 if check flag is not set.
 
 ~~ Stack ~~
-PUSH <any> - Push op1 onto the stack, move the stack pointer up by size of op1.
-PUSH <any> <any> - Push op2 bytes from @op1 onto the stack, move the stack pointer up by op2.
-POP <val> - Move the stack pointer down by op1 bytes.
-POP <reg> - Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
-BTIN <any> - Call builtin function op1. Pushes call pc onto stack.
-CALL <any> - Call function at location op1. Pushes call pc onto stack.
+PUSH <any:a> - Push op1 onto the stack, move the stack pointer up by size of op1.
+PUSH <any:u> <any:u> - Push op2 bytes from @op1 onto the stack, move the stack pointer up by op2.
+POP <val:u> - Move the stack pointer down by op1 bytes.
+POP <reg:a> - Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
+BTIN <any:u> - Call builtin function op1. Pushes call pc onto stack.
+CALL <any:u> - Call function at location op1. Pushes call pc onto stack.
 RET - Return from function. Pops from the stack to pc.
 
 ~~ Casting ~~
 Instructions to perform casting.
-They all have a version with an extra parameter where the result is stored, instead of overwriting.
-CSTU <any> - Cast op1 from signed to unsigned.
-CSTF <any> - Cast op1 from signed to float.
-CSTD <any> - Cast op1 from signed to double.
-CUTS <any> - Cast op1 from unsigned to signed.
-CUTF <any> - Cast op1 from unsiged to float.
-CUTD <any> - Cast op1 from unsigned to double.
-CFTS <any> - Cast op1 from float to signed.
-CFTU <any> - Cast op1 from float to unsigned.
-CFTD <any> - Cast op1 from float to double.
-CDTS <any> - Cast op1 from double to signed.
-CDTU <any> - Cast op1 from double to unsigned.
-CDTF <any> - Cast op1 from double to float.
+CASTU <any:nu> <reg:u> - Cast op1 to unsigned and store in op2.
+CASTS <any:ns> <reg:s> - Cast op1 to signed and store in op2.
+CASTF <any:nf32> <reg:f32> - Cast op1 to float and store in op2.
+CASTD <any:nf64> <reg:f64> - Cast op1 to double and store in op2.
 
 ~~ Arithmetic and bit manip ~~
-Instructions to perform arithmetic and bit manipulation. 
-They all have a version with an extra reg parameter where the result is stored, instead of overwriting.
-Prefixed with [SFD] for signed, float and double versions.
+Instructions to perform arithmetic and bit manipulation.
 
-[SFD]ADD <any> <reg> - Add op1 and op2. Store in op2.
-[S]INC <reg> - Increment op1.
-[SFD]SUB <any> <reg> - Subtract op1 from op2. Store in op2.
-[S]DEC <reg> - Decrement op1.
-[SFD]MUL <any> <reg> - Multiply op1 and op2. Store in op2.
-[SFD]DIV <any> <reg> - Divide op2 by op1. Store in op2.
-[S]MOD <any> <reg> - Divide op2 and op1. Store remainder in op2.
-[SFD]ABS <reg> - Get absolute value of op1. Store in op1. Note that ABS does not have an unsigned version.
-[SFD]NEG <reg> - Get negative of op1. Store in op1. Note that NEG does not have an unsigned version.
-[S]SHR <any:1> <reg> - Shift op2 right by op1. Store in op2.
-[S]SHL <any:1> <reg> - Shift op2 left by op1. Store in op2.
-RTR <any:1> <reg> - Rotate op2 right by op1. Store in op2.
-RTL <any:1> <reg> - Rotate op2 left by op1. Store in op2.
-AND <any> <reg> - And op1 and op2. Store in op2.
-OR  <any> <reg> - Or op1 and op2. Store in op2.
-XOR <any> <reg> - Xor op1 and op2. Store in op2.
-NOT <reg> - Not op1. Store in op1.
+ADD <any:a!> <reg:a?> - Add op1 and op2. Store in op2.
+ADD <any:a!> <any:a?> <reg:a?> - Add op1 and op2. Store in op3.
+INC <reg:i> - Increment op1.
+INC <any:i!> <reg:i?> - Increment op1. Store in op2.
+SUB <any:a!> <reg:a?> - Subtract op1 from op2. Store in op2.
+SUB <any:a!> <any:a?> <reg:a?>- Subtract op1 from op2. Store in op2.
+DEC <reg:i> - Decrement op1.
+DEC <any:i!> <reg:i?> - Decrement op1. Store in op2.
+MUL <any:a!> <reg:a?> - Multiply op1 and op2. Store in op2.
+MUL <any:a!> <any:a!> <reg:a?> - Multiply op1 and op2. Store in op3.
+DIV <any:a!> <reg:a?> - Divide op2 by op1. Store in op2.
+DIV <any:a!> <any:a!> <reg:a?> - Divide op2 by op1. Store in op3.
+MOD <any:i!> <reg:i?> - Divide op2 and op1. Store remainder in op2.
+MOD <any:i!> <any:i?> <reg:i?> - Divide op2 and op1. Store remainder in op3.
+ABS <reg:s> - Get absolute value of op1. Store in unsigned op1.
+ABS <reg:f> - Get absolute value of op1. Store in op1.
+ABS <any:s> <reg:u> - Get absolute value of op1. Store in op2.
+ABS <any:f!> <reg:f?> - Get absolute value of op1. Store in op2.
+NEG <reg:u> - Get negative of op1. Store in signed op1.
+NEG <reg:nu> - Get negative of op1. Store in op1.
+NEG <any:u> <reg:s> - Get negative of op1. Store in op2.
+NEG <any:nu!> <reg:nu?> - Get negative of op1. Store in op2.
+SHR <any:u8> <reg:i> - Shift op2 right by op1. Store in op2.
+SHR <any:u8> <any:i!> <reg:i?> - Shift op2 right by op1. Store in op3.
+SHL <any:u8> <reg:i> - Shift op2 left by op1. Store in op2.
+SHL <any:u8> <any:i!> <reg:i?> - Shift op2 left by op1. Store in op3.
+RTR <any:u8> <reg:u> - Rotate op2 right by op1. Store in op2.
+RTR <any:u8> <any:u!> <reg:u?> - Rotate op2 right by op1. Store in op3.
+RTL <any:u8> <reg:u> - Rotate op2 left by op1. Store in op2.
+RTL <any:u8> <any:u!> <reg:u?> - Rotate op2 left by op1. Store in op3.
+AND <any:u!> <reg:u?> - And op1 and op2. Store in op2.
+AND <any:u!> <any:u?> <reg:u?> - And op1 and op2. Store in op3.
+OR  <any:u!> <reg:u?> - Or op1 and op2. Store in op2.
+OR  <any:u!> <any:u?> <reg:u?> - Or op1 and op2. Store in op2.
+XOR <any:u!> <reg:u?> - Xor op1 and op2. Store in op2.
+XOR <any:u!> <any:u?> <reg:u?> - Xor op1 and op2. Store in op2.
+NOT <reg:u> - Not op1. Store in op1.
+NOT <any:u!> <reg:u?> - Not op1. Store in op2.
 
 ~~ Pseudoinstructions ~~
 VAL <idn> <val> - Create internal value op2 with name op1. Can be used anywhere, preceded by <.

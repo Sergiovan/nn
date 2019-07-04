@@ -1,5 +1,5 @@
-#include "frontend/token.h"
-#include "frontend/reader.h"
+#include "frontend/nn/token.h"
+#include "frontend/nn/reader.h"
 
 #include <sstream>
 

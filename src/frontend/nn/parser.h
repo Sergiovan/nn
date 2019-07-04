@@ -6,7 +6,7 @@
 #include <exception>
 #include <utility>
 
-#include "frontend/token.h"
+#include "frontend/nn/token.h"
 #include "common/grammar.h"
 #include "common/type_table.h"
 #include "common/symbol_table.h"

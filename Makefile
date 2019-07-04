@@ -25,12 +25,11 @@ CXXFLAGS =-std=c++17 $(INCLUDEFLAGS)
 CXXDFLAGS=-g -O0 -DDEBUG
 CXXRFLAGS=-Ofast
 
-folders=$(sort $(dir $(wildcard src/*/)))
+folders=$(sort $(dir $(shell find .)))
 cpp=$(foreach var,$(folders),$(wildcard $(var)*.cpp))
-obj=$(cpp:.cpp=.o)
-obj:=$(patsubst %,$(objdir)/%,$(obj))
+obj=$(patsubst %,$(objdir)/%,$(cpp:.cpp=.o))
 
-.PHONY: all clean debug release print
+.PHONY: all clean debug release print generate
 
 all: debug
 
@@ -45,7 +44,7 @@ profile: CXXFLAGS += $(CXXDFLAGS)
 profile: LDFLAGS += -pg
 profile: $(target)
 
-$(target): $(obj)
+$(target): | generate $(obj)
 	@echo [$(CXX)] $@
 	@$(CXX) $(LDFLAGS) -o $@ $(obj) $(LDLIBS)
 	
@@ -54,8 +53,13 @@ $(objdir)/%.o: %.cpp
 	@$(call mkdir,$(call convert,$@))
 	@$(CXX) $(CXXFLAGS) -c $^ -o $@
 	
+generate: 
+	@echo [python3] Generating...
+	@python3 src/autogeneration/nnasm/generate.py
+	
 clean:
 	$(rm) $(call convert,$(obj)) $(target)
+	$(rm) $(shell find . -name *.generated*)
 	
 print:
 	@echo $(folders)
