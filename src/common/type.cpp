@@ -576,7 +576,7 @@ type_pfunction& type::as_pfunction() {
 }
 
 bool type::is_primitive(int type) {
-    return tt == ettype::PRIMITIVE && (type < 0 || as_primitive().t == type);
+    return tt == ettype::PRIMITIVE && (type < 0 || as_primitive().t == (unsigned) type);
 }
 
 bool type::is_numeric() {

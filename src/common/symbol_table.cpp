@@ -276,7 +276,7 @@ overload* st_function::get_overload(const std::vector<type*>& args) {
         for (auto& ov : ret) {
             auto& oparams = ov->t->as_function().params;
             bool spread = (oparams.back().flags & eparam_flags::SPREAD) != 0;
-            for (int i = 0; i < oparams.size() - (spread ? 1 : 0); ++i) {
+            for (u64 i = 0; i < oparams.size() - (spread ? 1 : 0); ++i) {
                 if (oparams[i].in_param() != args[i]) {
                     goto final_next_overload;
                 }

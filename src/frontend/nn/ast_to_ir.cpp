@@ -128,7 +128,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     }
                     auto& right = bin.right->as_block();
                     
-                    for (int i = 0; i < left.stmts.size(); ++i) {
+                    for (u64 i = 0; i < left.stmts.size(); ++i) {
                         if (i >= right.stmts.size()) {
                             break;
                         }
@@ -432,7 +432,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                         previous->param1 = else_start;
                         previous->cond   = else_start;
                     }
-                    ir_triple* else_block_start = add(NOOP);
+                    /*ir_triple* else_block_start = */add(NOOP);
                     
                     start_block();
                     
@@ -539,7 +539,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                             previous->param1 = else_start;
                             previous->cond   = else_start;
                         }
-                        ir_triple* else_block_start = add(NOOP);
+                        /*ir_triple* else_block_start = */add(NOOP);
                         
                         start_block();
                         
@@ -655,7 +655,7 @@ void ir_builder::build(ast* node, symbol_table* sym) {
             case Symbol::KWNEW: {
                 auto& lblk = bin.left->as_block();
                 auto& rblk = bin.right->as_block();
-                u64 size{0};
+//                 u64 size{0};
                 add(VALUE, (u64) 0);
                 ir_triple* value = current();
                 for (auto& stmt : lblk.stmts) {
@@ -851,10 +851,10 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     break;
                 }
                 case Symbol::KWRETURN: {
-                    u64 rets = 0;
+//                     u64 rets = 0;
                     if (un.node->is_block()) {
                         auto& blk = un.node->as_block();
-                        rets = blk.stmts.size();
+//                         rets = blk.stmts.size();
                         u64 i = 0;
                         for (; i < blk.stmts.size(); ++i) {
                             add(RETVAL, blk.st, blk.stmts[i]);
@@ -1137,7 +1137,7 @@ void ir_builder::end_block() {
             add(IF_TRUE, ctx().fun_returning, current_end());
         } else {
             ir_triple* jmp = add(IF_FALSE, prevctx.fun_returning);
-            ir_triple* ret = add(RETURN, prevctx.return_amount);
+            /*ir_triple* ret = */add(RETURN, prevctx.return_amount);
             add(NOOP);
             jmp->param2 = jmp->cond = current();
         }

@@ -59,4 +59,5 @@ nn\.kdev4
 lobj/
 
 *.generated*
+autogen.mk
 .vscode/

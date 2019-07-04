@@ -23,7 +23,7 @@ LDLIBS=-lpthread -lstdc++fs
 INCLUDEDIR=$(PWD)/src
 INCLUDEFLAGS=$(patsubst %, -I%, $(realpath $(INCLUDEDIR)))
 
-CXXFLAGS =-std=c++17 $(INCLUDEFLAGS)
+CXXFLAGS =-std=c++17 -Wall -Wextra $(INCLUDEFLAGS)
 CXXDFLAGS=-g -O0 -DDEBUG
 CXXRFLAGS=-Ofast
 
@@ -46,7 +46,7 @@ profile: CXXFLAGS += $(CXXDFLAGS)
 profile: LDFLAGS += -pg
 profile: $(target)
 
-$(target): | generate $(obj)
+$(target): $(obj)
 	@echo [$(CXX)] $@
 	@$(CXX) $(LDFLAGS) -o $@ $(obj) $(LDLIBS)
 	

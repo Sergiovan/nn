@@ -71,7 +71,7 @@
     sf.check = (op1 == op2);
 %} # Sets check flag if op1 equals op2.
 + CNEQ <any:a!> <any:a?> {%
-    sf.check = (op1 != 0);
+    sf.check = (op1 != op2);
 %} # Sets check flag if op1 does not equal op2.
 + CBS <any:u> <any:u8> {%
     sf.check = (op1 & (1 << op2));
@@ -158,6 +158,7 @@
     sp._u64 += sizeof(t1);
 %} # Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
 + BTIN <any:u> {%
+    (void) op1;
     trap(vmtraps::illegal_btin); // Oops
 %} # Call builtin function op1. Pushes call pc onto stack.
 + CALL <any:u> {%

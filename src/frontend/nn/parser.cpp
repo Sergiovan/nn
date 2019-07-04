@@ -204,6 +204,7 @@ ast* parser::error(const std::string& msg, epanic_mode mode, token* t) {
 }
 
 ast* parser::operator_error(Symbol op, type* t, bool post) {
+    (void) post;
     return error() << "Cannot use operator '" << op << "' on type \"" << t << "\"" << end_error{};
 }
 
@@ -1356,7 +1357,7 @@ ast* parser::returnstmt() {
             auto& rcomb = ret_type->as_combination();
             if (un.t->is_combination()) {
                 auto& uncomb = un.t->as_combination();
-                int i = 0, j = 0;
+                u64 i = 0, j = 0;
                 while (i < rcomb.types.size() && j < uncomb.types.size()) {
                     while (i < rcomb.types.size() && rcomb.types[i] == types.t_sig && !uncomb.types[j]->can_weak_cast(types.t_sig)) {
                         ++i;
@@ -1386,7 +1387,7 @@ ast* parser::returnstmt() {
                 }
                 
             } else {
-                int i = 0;
+                u64 i = 0;
                 while (i < rcomb.types.size() && rcomb.types[i] == types.t_sig) {
                     ++i;
                 }
@@ -1513,7 +1514,7 @@ ast* parser::labelstmt() {
         } else {
             labelast = ast::symbol(label);
         }
-        ret = ast::unary(Symbol::KWLABEL, ast::symbol(label));
+        ret = ast::unary(Symbol::KWLABEL, labelast);
         labels.insert({c.value, ret});
     }
     
@@ -1692,7 +1693,7 @@ ast* parser::importstmt() {
         st()->merge_st(mod);
         ret = ast::binary(Symbol::KWIMPORT, what, module);
     } else {
-        st_entry* sym = st()->add_module(as, mod);
+        /*st_entry* sym = */st()->add_module(as, mod);
         ret = ast::binary(Symbol::KWIMPORT, what, module);
     }
     
@@ -1705,7 +1706,7 @@ ast* parser::usingstmt() {
     
     std::vector<std::string> path{};
     std::string as{};
-    bool true_as{false};
+//     bool true_as{false};
     bool asterisk = false;
     type* primitive = nullptr;
     
@@ -1741,7 +1742,7 @@ ast* parser::usingstmt() {
         if (asterisk) {
             error() << "Cannot give name to asterisk expression" << epanic_mode::SEMICOLON;
         } else {
-            true_as = true;
+//             true_as = true;
             next(); // as
             require(TokenType::IDENTIFIER);
             as = c.value;
@@ -2845,7 +2846,7 @@ ast* parser::funcval() {
     require(Symbol::PAREN_LEFT);
     next(); // (
     
-    symbol_table* parent = st();
+//     symbol_table* parent = st();
     push_context();
     ctx().st = st()->make_child(etable_owner::FUNCTION);
     auto cg = guard();
@@ -2946,7 +2947,7 @@ ast* parser::funcval() {
     
     type* ftype = types.get_or_add(functype);
     
-    overload* ol = st()->add_function(name, ftype, nullptr, nullptr).second;
+    /*overload* ol = */st()->add_function(name, ftype, nullptr, nullptr).second;
     
     ast* scp{nullptr};
     
@@ -3035,7 +3036,7 @@ ast* parser::structdecl() {
         stype->as_struct().ste = entry;
     }
     
-    symbol_table* parent = st();
+//     symbol_table* parent = st();
     push_context();
     entry->as_type().st = ctx().st = st()->make_child(etable_owner::STRUCT);
     ctx()._struct = stype;
@@ -3117,7 +3118,7 @@ ast* parser::uniondecl() {
         utype->as_union().ste = entry;
     }
     
-    symbol_table* parent = st();
+//     symbol_table* parent = st();
     push_context();
     entry->as_type().st = ctx().st = st()->make_child(etable_owner::UNION);
     ctx()._struct = utype;
@@ -3194,7 +3195,7 @@ ast* parser::enumdecl() {
         etype->as_enum().ste = entry;
     }
     
-    symbol_table* parent = st();
+//     symbol_table* parent = st();
     push_context();
     entry->as_type().st = ctx().st = st()->make_child(etable_owner::ENUM);
     ctx()._struct = etype;
@@ -3818,7 +3819,7 @@ ast* parser::e1() {
                 ast* args = ast::block(st());
                 auto& stmts = args->as_block().stmts;
                 type* rtype{nullptr};
-                bool first_param = ctx().first_param != nullptr; // TODO Convert to pointer type
+//                 bool first_param = ctx().first_param != nullptr; // TODO Convert to pointer type
                 if (exp->get_type()->is_function(true)) {
                     auto& params = exp->get_type()->as_pfunction().params;
                     rtype = exp->get_type()->as_pfunction().rets;
@@ -3884,7 +3885,7 @@ ast* parser::e1() {
                     rtype = exp->get_type()->as_function().rets;
                     stmts = std::vector<ast*>(params.size(), nullptr);
                     std::vector<bool> passed(params.size(), false);
-                    u64 i{0}, maxi{0};
+                    u64 i{0}/*, maxi{0}*/;
                     bool named{false};
                     while (ctx().first_param != nullptr || (!is(Symbol::PAREN_RIGHT) && !is(TokenType::END_OF_FILE))) {
                         if (i >= params.size()) {
@@ -3927,7 +3928,7 @@ ast* parser::e1() {
                                     ++i;
                                 }
                             }
-                            maxi = i;
+//                             maxi = i;
                         } else {
                             if (name.empty()) {
                                 error() << "Cannot have non-named parameters after named parameters";
@@ -4139,6 +4140,9 @@ ast* parser::e1() {
                                 }
                             }
                             break;
+                        case est_entry_type::OVERLOAD:
+                            error() << "Currently not possible, what?" << epanic_mode::ULTRA_PANIC;
+                            break;
                         case est_entry_type::LABEL:
                             error() << "I thought colons could not be part of names... " << symbol->name << epanic_mode::ULTRA_PANIC;
                             break;
@@ -4316,7 +4320,7 @@ ast* parser::aexpression() {
 
 bool parser::is_type() {
     if (c.type == TokenType::IDENTIFIER) {
-        auto& tok = c;
+//         auto& tok = c;
         bool ret = false;
         u64 pos = 0;
         symbol_table* cst{st()};

@@ -99,7 +99,7 @@ char reader::peek(int i) {
     } else if(type == ReaderType::STRING) {
         std::string& s = std::get<std::string>(stream);
         int pos = i + index;
-        if (pos < 0 || pos >= s.length()) {
+        if (pos < 0 || (unsigned) pos >= s.length()) {
             return EOF;
         } else {
             return s[pos];
@@ -144,6 +144,9 @@ u64 reader::get_prev_column() {
 
 std::string reader::get_file_line(int context_back, int context_forward, int max_chars) {
     // TODO
+    (void) context_back;
+    (void) context_forward;
+    (void) max_chars;
     return "";
 }
 

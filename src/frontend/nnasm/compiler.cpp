@@ -750,7 +750,7 @@ u64 compiler::get_size() {
 }
 
 void compiler::store_to_file(const std::string& filename) {
-    
+    (void) filename;
 }
 
 namespace {
@@ -860,7 +860,7 @@ token compiler::next(bool nested) {
             stream.get();
             file_pos++;
             
-            return token{token_type::MEMORY, token_memory{{}, pos.type, token_type::END, false, pos_mv}};
+            return token{token_type::MEMORY, token_memory{{}, pos.type, token_type::END, false, pos_mv, memory_variant{}}};
         } else if (c == '+' || c == '-') {
             bool negated = c == '-';
             if(!skip_whitespace()) return token{token_type::ERROR, token_end{}};
@@ -1014,7 +1014,7 @@ token compiler::next(bool nested) {
         bool floating = signless.find_first_of('.') != std::string::npos;
         if (floating) {
             char* after;
-            float d = std::strtod(tok.data(), &after);
+            double d = std::strtod(tok.data(), &after);
             if (*after) {
                 std::stringstream ss{};
                 ss << "Found \"" << *after << "\" after valid number: " << tok;
@@ -1022,7 +1022,7 @@ token compiler::next(bool nested) {
                 return token{token_type::ERROR, token_end{}};
             }
             u64 imm{};
-            std::memcpy(&imm, &d, sizeof(u64));
+            std::memcpy(&imm, &d, sizeof(double));
             return token{token_type::IMMEDIATE, token_immediate{data_type::F64, imm}};
         } else {
             if (tok[0] == '-') {

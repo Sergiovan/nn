@@ -38,6 +38,10 @@ int main(int argc, char** argv) {
     ac.compile();    
     u8* program = ac.get_program();
     u64 size = ac.get_size();
+    
+    (void) program;
+    (void) size; // Only for debugging for now
+    
     auto end = std::chrono::high_resolution_clock::now();
     
     ac.print_errors();
