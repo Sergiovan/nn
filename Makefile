@@ -16,6 +16,8 @@ else
 	suppress=> /dev/null
 endif
 
+include autogen.mk
+
 LDLIBS=-lpthread -lstdc++fs
 
 INCLUDEDIR=$(PWD)/src
@@ -53,13 +55,15 @@ $(objdir)/%.o: %.cpp
 	@$(call mkdir,$(call convert,$@))
 	@$(CXX) $(CXXFLAGS) -c $^ -o $@
 	
-generate: 
+autogen.mk: $(shell find . -name *.template*) 
 	@echo [python3] Generating...
 	@python3 src/autogeneration/nnasm/generate.py
+	@touch autogen.mk
 	
 clean:
 	$(rm) $(call convert,$(obj)) $(target)
 	$(rm) $(shell find . -name *.generated*)
+	$(rm) autogen.mk
 	
 print:
 	@echo $(folders)
