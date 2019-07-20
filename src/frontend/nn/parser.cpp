@@ -11,6 +11,7 @@
 #include "frontend/nn/reader.h"
 #include "common/symbol_table.h"
 #include "common/utils.h"
+#include "common/compiler_note.h"
 
 using namespace Grammar;
 
@@ -531,21 +532,55 @@ ast* parser::iden(bool withthis, type** thistype) {
     return ast::symbol(sym);
 }
 
-ast* parser::compileriden() {
-    next(); // Skip
-    if (is(Symbol::PAREN_LEFT)) {
-        skip_until(Symbol::PAREN_RIGHT);
-        next(); // )
+ast* parser::compileriden(bool in_opts) {
+    using namespace CompilerNote;
+    
+    token tok = next(); // $
+    std::string iden = tok.value.substr(in_opts ? 0 : 1);
+    auto note = string_to_note.find(iden);
+    if (note == string_to_note.end()) {
+        if (is(Symbol::PAREN_LEFT)) {
+            skip_until(Symbol::PAREN_RIGHT);
+            next(); // )
+        }
+    } else {
+        switch (note->second) {
+            case enote_type::BUILTIN: {
+                if (!require(Symbol::PAREN_LEFT, epanic_mode::ESCAPE_PAREN)) {
+                    error() << "$builtin(x): requires 1 parameter";
+                    return nullptr;
+                }
+                next(); // (
+                if (!require(TokenType::NUMBER, epanic_mode::ESCAPE_PAREN)) {
+                    error() << "$builtin(x): x is a number";
+                    return nullptr;
+                }
+                token num = next(); // Number
+                if(require(Symbol::PAREN_RIGHT, epanic_mode::ESCAPE_PAREN)) {
+                    next(); // )
+                }
+                
+                notes.push({enote_type::BUILTIN, note_builtin{num.as_integer()}});
+                break;
+            }
+            default:
+                error() << "Note not implemented: " << note->second << epanic_mode::ULTRA_PANIC;
+        }
     }
-    return nullptr; // TODO
+    return nullptr;
 }
 
 ast* parser::compileropts() {
     next(); // $
     require(Symbol::BRACKET_LEFT);
-    skip_until(Symbol::BRACKET_RIGHT);
-    next(); // ]
-    return nullptr; // TODO
+    do {
+        next(); // [ ,
+        compileriden(true);
+    } while (is(Symbol::COMMA));
+    if(require(Symbol::BRACKET_RIGHT, epanic_mode::ESCAPE_BRACKET)) {
+        next(); // ]
+    }
+    return nullptr;
 }
 
 ast* parser::compilernote() {
@@ -554,7 +589,7 @@ ast* parser::compilernote() {
     } else if (is(Symbol::COMPILER)) {
         return compileropts();
     }
-    return nullptr;
+    return error() << "Compiler not is illegal, written in euro" << epanic_mode::ULTRA_PANIC << end_error{};
 }
 
 ast* parser::number() {

@@ -9,6 +9,7 @@ token::token() {
     line = 0;
     column = 0;
     source = std::string{};
+    value.reserve(16);
 }
 
 token::token(reader* r) : r(r) {
@@ -16,6 +17,7 @@ token::token(reader* r) : r(r) {
     line  = r->get_line();
     column = r->get_column();
     source = r->get_source();
+    value.reserve(16);
 }
 
 u64 token::as_integer() {

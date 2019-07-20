@@ -789,7 +789,7 @@ ast* ast::function(ast* block, type* t) {
     r->t = east_type::FUNCTION;
     ast_function fs{};
     fs.block = block;
-    fs.t = t ? t : type_table::t_void;;
+    fs.t = t ? t : type_table::t_void;
     r->n = std::move(fs);
     return r;
 }

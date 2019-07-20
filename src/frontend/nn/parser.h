@@ -8,8 +8,10 @@
 
 #include "frontend/nn/token.h"
 #include "common/grammar.h"
+#include "common/compiler_note.h"
 #include "common/type_table.h"
 #include "common/symbol_table.h"
+
 
 struct ast;
 class reader;
@@ -154,7 +156,7 @@ private:
     token skip_until(Grammar::Keyword kw, bool skip_groups = true);
     
     ast* iden(bool withthis = false, type** thistype = nullptr);
-    ast* compileriden();
+    ast* compileriden(bool in_opts = false);
     ast* compileropts();
     ast* compilernote();
     
@@ -288,6 +290,7 @@ private:
     lexer* l{nullptr};
     
     std::stack<parser_context> contexts{};
+    std::stack<CompilerNote::note> notes{};
     symbol_table* root_st{nullptr};
     type_table& types;
     
@@ -301,6 +304,6 @@ private:
     std::filesystem::path file_path{std::filesystem::current_path()};
     
     friend struct parser_ctx_guard;
-    friend struct error_message_manager;
+    friend class error_message_manager;
 };
 

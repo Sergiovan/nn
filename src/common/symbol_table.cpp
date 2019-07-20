@@ -43,6 +43,7 @@ overload::overload(const overload& o) {
         st = nullptr;
     }
     oid = o.oid;
+    builtin = o.builtin;
 }
 
 overload::overload(overload&& o) {
@@ -51,6 +52,7 @@ overload::overload(overload&& o) {
     defined = o.defined;
     std::swap(st, o.st);
     oid = o.oid;
+    builtin = o.builtin;
 }
 
 overload& overload::operator=(const overload& o) {
@@ -75,6 +77,7 @@ overload& overload::operator=(const overload& o) {
             st = nullptr;
         }
         oid = o.oid;
+        builtin = o.builtin;
     }
     return *this;
 }
@@ -86,6 +89,7 @@ overload& overload::operator=(overload&& o) {
         defined = o.defined;
         std::swap(st, o.st);
         oid = o.oid;
+        builtin = o.builtin;
     }
     return *this;
 }

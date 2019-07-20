@@ -28,6 +28,8 @@ struct overload {
     symbol_table* st{nullptr}; // Owned
     u64 oid{0};
     
+    u64 builtin{0};
+    
     overload(type* t, ast* value = nullptr, bool defined = false, symbol_table* st = nullptr, u64 oid = 0);
     ~overload();
     overload(const overload& o);
