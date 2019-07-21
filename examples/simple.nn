@@ -150,11 +150,11 @@ int main(string[] arg) {
 	}
 	
 	name sname = {<float> 1, <float> 2, 5, "Hello!"};
-	float two = sname.a;
+	float three = sname.a;
 	
 	uname un;
 	un.a = 4;
-	two = un.b;
+	three = un.b;
 
 	int nothing = ---;
 	int namefoo = sname.foo();

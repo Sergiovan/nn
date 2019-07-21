@@ -103,18 +103,10 @@ struct pfield {
 
 struct field {
     type* t;
-    ast* value{nullptr}; // Owned
+    ast* value{nullptr}; // Not owned
     u8 bits{64};
     std::string name{""};
     bool bitfield{false};
-    
-    field() = default;
-    ~field();
-    
-    field(const field& o);
-    field(field&& o);
-    field& operator=(const field& o);
-    field& operator=(field&& o);
 };
 
 struct ufield {
@@ -131,7 +123,7 @@ struct parameter {
     type* t;
     param_flags flags;
     std::string name{""};
-    ast* value{nullptr};
+    ast* value{nullptr}; // Owned. Deleted in ~type_table
     // std::string type_same_as{""}
     
     type* in_param();
@@ -162,17 +154,8 @@ struct type_union {
     std::vector<ufield> fields{};
     st_entry* ste{nullptr};
     u64 def_type{0};
-    ast* def_value{nullptr}; // Owned
+    ast* def_value{nullptr}; // Not owned
     u64 size{0};
-    
-    type_union(const std::vector<ufield> fields = {}, st_entry* ste = nullptr, u64 def_type = 0,
-               ast* def_value = nullptr, u64 size = 0);
-    ~type_union();
-    
-    type_union(const type_union& o);
-    type_union(type_union&& o);
-    type_union& operator=(const type_union& o);
-    type_union& operator=(type_union&& o);
 };
 
 struct type_enum {

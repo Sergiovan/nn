@@ -53,7 +53,7 @@ char reader::next() {
     if(type == ReaderType::FILE) {
         std::ifstream& s = std::get<std::ifstream>(stream);
         s.get(c);
-        if(c == EOF || s.eof()) {
+        if(s.eof() || c == EOF) {
             done = true;
             c = EOF;
         }

@@ -28,6 +28,14 @@ type_table::~type_table() {
     // Do not delete the basic types, they go when the program goes
     for (u64 i = etype_ids::LAST + 1; i < types.size(); ++i) {
         if (types[i]) {
+            // Delete param.value here to make parameter struct simpler
+            if (types[i]->is_function(false)) {
+                for (auto& param : types[i]->as_function().params) {
+                    if (param.value) {
+                        delete param.value;
+                    }
+                }
+            }
             delete types[i];
         }
     }

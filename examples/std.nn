@@ -1,25 +1,25 @@
 namespace io {
 
-void print(char);
-void print(string);
-void print(byte);
-void print(short);
-void print(int);
-void print(long);
-void print(float);
-void print(double);
+$builtin(1) void print(string);
+$builtin(2) void print(char);
+$builtin(3) void print(byte);
+$builtin(4) void print(short);
+$builtin(5) void print(int);
+$builtin(6) void print(long);
+$builtin(7) void print(float);
+$builtin(8) void print(double);
 
-string read();
+$builtin(9) string read();
 
 }
 
 namespace math {
 
-long max(long, long);
-long min(long, long);
+$builtin(100) long max(long, long);
+$builtin(101) long min(long, long);
 
-long floor(double);
-long ceil(double);
-long round(double);
+$builtin(102) long floor(double);
+$builtin(103) long ceil(double);
+$builtin(104) long round(double);
 
 }

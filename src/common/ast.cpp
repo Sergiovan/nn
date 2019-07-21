@@ -61,10 +61,9 @@ ast_string& ast_string::operator=(ast_string&& o) {
 }
 
 std::string ast_string::preview() {
-    char nchars[21];
-    nchars[20] = '\0';
+    char nchars[21] {};
     for (u8 i = 0; i < 21; ++i) {
-        if (i > length) {
+        if (i >= length) {
             nchars[i] = '\0';
             continue;
         }
@@ -102,7 +101,7 @@ std::string ast_string::preview() {
     if (length >= 20) {
         nchars[19] = nchars[18] = nchars[17] = '.';
     }
-    return std::string{&nchars[0], 21};
+    return std::string{&nchars[0], std::min(length, 20ul)};
 }
 
 ast_array::~ast_array() {
@@ -726,7 +725,7 @@ ast* ast::array(ast** elems, u64 length, type* t) {
     ast_array as{};
     as.elems = elems;
     as.length = length;
-    as.t = t ? t : type_table::t_void;;
+    as.t = t ? t : type_table::t_void;
     r->n = std::move(as);
     return r;
 }
@@ -1098,7 +1097,11 @@ std::string ast::print(u64 depth, const std::string& prev) {
                     ss << "NAMESPACE\n"; 
                     break;
                 case est_entry_type::OVERLOAD:
-                    ss << "OVERLOAD\n";
+                    ss << "OVERLOAD";
+                    if (sym.symbol->as_overload().ol->builtin) {
+                        ss << " BUILTIN(" << sym.symbol->as_overload().ol->builtin << ")";
+                    }
+                    ss << "\n";
                     break;
                 case est_entry_type::LABEL:
                     ss << "LABEL\n";

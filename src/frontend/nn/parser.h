@@ -60,6 +60,7 @@ struct parse_info {
 
 struct end_error {};
 
+template <bool warning = false>
 class error_message_manager {
 public:
     error_message_manager(parser& p);
@@ -102,6 +103,9 @@ public:
     
     bool has_errors();
     void print_errors();
+    bool has_warnings();
+    void print_warnings();
+    
     void print_info();
     void print_st();
     void print_modules();
@@ -110,18 +114,21 @@ private:
     ast* _parse();
     void finish();
     
-        parser_context& ctx();
+    parser_context& ctx();
     symbol_table* st();
     
-        parser_context& push_context(bool clear = false);
-        parser_context pop_context();
-        parser_ctx_guard guard();
+    parser_context& push_context(bool clear = false);
+    parser_context pop_context();
+    parser_ctx_guard guard();
     
-    error_message_manager error();
-    ast* error(const std::string& msg, epanic_mode mode = epanic_mode::NO_PANIC, token* t = nullptr);
+    error_message_manager<> error();
+    void error(const std::string& msg, epanic_mode mode = epanic_mode::NO_PANIC, token* t = nullptr);
     ast* operator_error(Grammar::Symbol op, type* t, bool post = true);
     ast* operator_error(Grammar::Symbol op, type* l, type* r);
     void panic(epanic_mode mode);
+    
+    error_message_manager<true> warning();
+    void warning(const std::string& msg, token* t = nullptr);
     
     token next();
     
@@ -289,13 +296,17 @@ private:
     token c;
     lexer* l{nullptr};
     
-    std::stack<parser_context> contexts{};
-    std::stack<CompilerNote::note> notes{};
+    using context_stack = std::stack<parser_context>;
+    using note_stack = std::stack<CompilerNote::note>;
+    
+    context_stack contexts{};
+    note_stack notes{};
     symbol_table* root_st{nullptr};
     type_table& types;
     
     dict<symbol_table*> modules{};
     std::vector<std::pair<token, std::string>> errors{};
+    std::vector<std::pair<token, std::string>> warnings{};
     
     std::vector<std::pair<ast*, parser_context>> unfinished{};
     dict<ast*> labels{};
@@ -304,6 +315,8 @@ private:
     std::filesystem::path file_path{std::filesystem::current_path()};
     
     friend struct parser_ctx_guard;
+    
+    template <bool warning>
     friend class error_message_manager;
 };
 

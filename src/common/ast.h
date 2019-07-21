@@ -143,7 +143,7 @@ struct ast_binary {
 
 struct ast_block {
     std::vector<ast*> stmts{}; // Owned
-    symbol_table* st{nullptr};
+    symbol_table* st{nullptr}; // Not owned
     
     ast_block() = default;
     ~ast_block();

@@ -23,19 +23,12 @@ enum class est_entry_type {
 
 struct overload {
     type* t;
-    ast* value{nullptr}; // Owned
+    ast* value{nullptr}; // Not owned
     bool defined{false};
-    symbol_table* st{nullptr}; // Owned
+    symbol_table* st{nullptr}; // Not owned
     u64 oid{0};
     
     u64 builtin{0};
-    
-    overload(type* t, ast* value = nullptr, bool defined = false, symbol_table* st = nullptr, u64 oid = 0);
-    ~overload();
-    overload(const overload& o);
-    overload(overload&& o);
-    overload& operator=(const overload& o);
-    overload& operator=(overload&& o);
     
     std::string unique_name();
 };
@@ -43,53 +36,25 @@ struct overload {
 struct st_type {
     type* t;
     bool defined{false};
-    symbol_table* st{nullptr}; // Owned
-    
-    st_type(type* t, bool defined = false, symbol_table* st = nullptr);
-    ~st_type();
-    st_type(const st_type& o);
-    st_type(st_type&& o);
-    st_type& operator=(const st_type& o);
-    st_type& operator=(st_type&& o);
+    symbol_table* st{nullptr}; // Not owned
 };
 
 struct st_variable {
     type* t;
-    ast* value{nullptr}; // Owned
+    ast* value{nullptr}; // Not Owned
     bool defined{false};
-    
-    st_variable(type* t, ast* value = nullptr, bool defined = false);
-    ~st_variable();
-    st_variable(const st_variable& o);
-    st_variable(st_variable&& o);
-    st_variable& operator=(const st_variable& o);
-    st_variable& operator=(st_variable&& o);
 };
 
 struct st_function {
-    std::vector<overload*> overloads{}; // Owned
+    std::vector<overload*> overloads{}; // Not owned
     // TODO Borrowed overloads, for inner functions with the same name as outer functions
-    symbol_table* st{nullptr}; // Owned, for sigs and overloads
+    symbol_table* st{nullptr}; // Not owned, for sigs and overloads
     
     overload* get_overload(const std::vector<type*>& args);
-    
-    st_function(const std::vector<overload*> overloads = {}, symbol_table* st = nullptr);
-    ~st_function();
-    st_function(const st_function& o);
-    st_function(st_function&& o);
-    st_function& operator=(const st_function& o);
-    st_function& operator=(st_function&& o);
 };
 
 struct st_namespace {
-    symbol_table* st{nullptr}; // Owned
-    
-    st_namespace(symbol_table* st = nullptr);
-    ~st_namespace();
-    st_namespace(const st_namespace& o);
-    st_namespace(st_namespace&& o);
-    st_namespace& operator=(const st_namespace& o);
-    st_namespace& operator=(st_namespace&& o);
+    symbol_table* st{nullptr}; // Not owned
 };
 
 struct st_field {
@@ -98,8 +63,15 @@ struct st_field {
 };
 
 struct st_overload {
-    overload* ol{nullptr}; // Not owned
+    overload* ol{nullptr}; // Owned
     st_function* function{nullptr}; // Not owned
+    
+    st_overload(overload* ol = nullptr, st_function* function = nullptr);
+    ~st_overload();
+    st_overload(const st_overload& o);
+    st_overload(st_overload&& o);
+    st_overload& operator=(const st_overload& o);
+    st_overload& operator=(st_overload&& o);
 };
 
 struct st_label {};
@@ -179,6 +151,7 @@ public:
 
     symbol_table* parent;
     etable_owner owner;
+    std::vector<symbol_table*> children;
     dict<st_entry*> entries{}; // Owned
     dict<st_entry*> borrowed_entries{}; // NOT Owned
 };

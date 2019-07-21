@@ -5,11 +5,19 @@
 #include "common/utils.h"
 #include "common/type.h"
 
-ir_builder::ir_builder::ir_builder(parse_info& p) : p(p) {
+ir_builder::ir_builder(parse_info& p) : p(p) {
     ir_triple* start = new ir_triple{ir_op::NOOP};
     triples.push_back(start);
     blocks.emplace(ir_triple_range{start, start});
     start_context();
+}
+
+ir_builder::~ir_builder() {
+    for (auto triple : triples) {
+        if (triple) {
+            delete triple;
+        }
+    }
 }
 
 void ir_builder::build(ast* node, symbol_table* sym) {    
@@ -577,7 +585,12 @@ void ir_builder::build(ast* node, symbol_table* sym) {
                     if (func_loc == labeled.end()) {
                         res = add(CALL_CLOSURE, bin.left, params.stmts.size());
                     } else {
-                        res = add(CALL, func_loc->second, params.stmts.size());
+                        auto& ol = bin.left->as_symbol().symbol->as_overload();
+                        if (ol.ol->builtin) {
+                            res = add(CALL, ol.ol->builtin, params.stmts.size());
+                        } else {
+                            res = add(CALL, func_loc->second, params.stmts.size());
+                        }
                     }
                 } else {
                     build(bin.left, sym); // Build closure

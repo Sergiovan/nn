@@ -7,93 +7,6 @@
 #include "common/type_table.h"
 #include "common/utils.h"
 
-overload::overload(type* t, ast* value, bool defined, symbol_table* st, u64 oid) 
- : t(t), value(value), defined(defined), st(st), oid(oid) {
-    
-}
-
-
-overload::~overload() {
-    if (value) {
-        delete value;
-    }
-    if (st) {
-        delete st;
-    }
-}
-
-overload::overload(const overload& o) {
-    if (value) {
-        delete value;
-    }
-    if (st) {
-        delete st;
-    }
-    
-    t = o.t;
-    if (o.value) {
-        value = new ast{*o.value};
-    } else {
-        value = nullptr;
-    }
-    defined = o.defined;
-    if (o.st) {
-        st = new symbol_table{*o.st};
-    } else {
-        st = nullptr;
-    }
-    oid = o.oid;
-    builtin = o.builtin;
-}
-
-overload::overload(overload&& o) {
-    t = o.t;
-    std::swap(value, o.value);
-    defined = o.defined;
-    std::swap(st, o.st);
-    oid = o.oid;
-    builtin = o.builtin;
-}
-
-overload& overload::operator=(const overload& o) {
-    if (this != &o) {
-        if (value) {
-            delete value;
-        }
-        if (st) {
-            delete st;
-        }
-        
-        t = o.t;
-        if (o.value) {
-            value = new ast{*o.value};
-        } else {
-            value = nullptr;
-        }
-        defined = o.defined;
-        if (o.st) {
-            st = new symbol_table{*o.st};
-        } else {
-            st = nullptr;
-        }
-        oid = o.oid;
-        builtin = o.builtin;
-    }
-    return *this;
-}
-
-overload& overload::operator=(overload&& o) {
-    if (this != &o) {
-        t = o.t;
-        std::swap(value, o.value);
-        defined = o.defined;
-        std::swap(st, o.st);
-        oid = o.oid;
-        builtin = o.builtin;
-    }
-    return *this;
-}
-
 std::string overload::unique_name() {
     using namespace std::string_literals;
     std::stringstream ss{};
@@ -122,122 +35,6 @@ std::string overload::unique_name() {
     }
     ss << ")";
     return ss.str();
-}
-
-st_type::st_type(type* t, bool defined, symbol_table* st) :t(t), defined(defined), st(st) {
-    
-}
-
-st_type::~st_type() {
-    if (st) {
-        delete st;
-    }
-}
-
-st_type::st_type(const st_type& o) {
-    if (st) {
-        delete st;
-    }
-    
-    t = o.t;
-    defined = o.defined;
-    if (o.st) {
-        st = new symbol_table{*o.st};
-    } else {
-        st = nullptr;
-    }
-}
-
-st_type::st_type(st_type&& o) {
-    t = o.t;
-    defined = o.defined;
-    std::swap(st, o.st);
-}
-
-st_type& st_type::operator=(const st_type& o) {
-    if (this != &o) {
-        if (st) {
-            delete st;
-        }
-        
-        t = o.t;
-        defined = o.defined;
-        if (o.st) {
-            st = new symbol_table{*o.st};
-        } else {
-            st = nullptr;
-        }
-    }
-    return *this;
-}
-
-st_type& st_type::operator=(st_type&& o) {
-    if (this != &o) {
-        t = o.t;
-        defined = o.defined;
-        std::swap(st, o.st);
-    }
-    return *this;
-}
-
-st_variable::st_variable(type* t, ast* value, bool defined) : t(t), value(value), defined(defined) {
-
-}
-
-st_variable::~st_variable() {
-    if (value) {
-        delete value;
-    }
-}
-
-st_variable::st_variable(const st_variable& o) {
-    if (value) {
-        delete value;
-    }
-    
-    t = o.t;
-    if (o.value) {
-        value = new ast{*o.value};
-    } else {
-        value = nullptr;
-    }
-    defined = o.defined;
-}
-
-st_variable::st_variable(st_variable&& o) {
-    t = o.t;
-    std::swap(value, o.value);
-    defined = o.defined;
-}
-
-st_variable& st_variable::operator=(const st_variable& o) {
-    if (this != &o) {
-        if (value) {
-            delete value;
-        }
-        
-        t = o.t;
-        if (o.value) {
-            value = new ast{*o.value};
-        } else {
-            value = nullptr;
-        }
-        defined = o.defined;
-    }
-    return *this;
-}
-
-st_variable& st_variable::operator=(st_variable&& o) {
-    if (this != &o) {
-        t = o.t;
-        std::swap(value, o.value);
-        defined = o.defined;
-    }
-    return *this;
-}
-
-st_function::st_function(const std::vector<overload*> overloads, symbol_table* st) : overloads(overloads), st(st ? st : new symbol_table{etable_owner::FUNCTION, nullptr}) {
-    
 }
 
 overload* st_function::get_overload(const std::vector<type*>& args) {
@@ -296,116 +93,47 @@ overload* st_function::get_overload(const std::vector<type*>& args) {
     }
 }
 
-st_function::~st_function() {
-    if (st) {
-        delete st;
-    }
-    for (auto& ov : overloads) {
-        if (ov) {
-            delete ov;
-        }
+st_overload::st_overload(overload* ol, st_function* function) : ol(ol), function(function) { }
+
+st_overload::~st_overload() {
+    if (ol) {
+        delete ol;
     }
 }
 
-st_function::st_function(const st_function& o) {
-    if (st) {
-        delete st;
+st_overload::st_overload(const st_overload& o) {
+    if (o.ol) {
+        ol = new overload{*o.ol};
+    } else {
+        ol = nullptr;
+    }
+    function = o.function;
+}
+
+st_overload::st_overload(st_overload&& o) {
+    std::swap(ol, o.ol);
+    function = o.function;
+}
+
+st_overload& st_overload::operator=(const st_overload& o) {
+    if (this != &o) {
+        if (o.ol) {
+            ol = new overload{*o.ol};
+        } else {
+            ol = nullptr;
+        }
+        function = o.function;
     }
     
-    overloads.resize(o.overloads.size());
-    for (u64 i = 0; i < o.overloads.size(); ++i) {
-        if (o.overloads[i]) {
-            overloads[i] = new overload{*o.overloads[i]};
-        } else {
-            overloads[i] = nullptr;
-        }
+    return *this;
+}
+
+st_overload& st_overload::operator=(st_overload&& o) {
+    if (this != &o) {
+        std::swap(ol, o.ol);
+        function = o.function;
     }
     
-    if (o.st) {
-        st = new symbol_table{*o.st};
-    } else {
-        st = nullptr;
-    }
-}
-
-st_function::st_function(st_function&& o) {
-    std::swap(overloads, o.overloads);
-    std::swap(st, o.st);
-}
-
-st_function& st_function::operator=(const st_function& o) {
-    if (this != &o) {
-        if (st) {
-            delete st;
-        }
-        
-        overloads.resize(o.overloads.size());
-        for (u64 i = 0; i < o.overloads.size(); ++i) {
-            if (o.overloads[i]) {
-                overloads[i] = new overload{*o.overloads[i]};
-            } else {
-                overloads[i] = nullptr;
-            }
-        }
-        
-        if (o.st) {
-            st = new symbol_table{*o.st};
-        } else {
-            st = nullptr;
-        }
-    }
-    return *this;
-}
-
-st_function& st_function::operator=(st_function&& o) {
-    if (this != &o) {
-        std::swap(overloads, o.overloads);
-        std::swap(st, o.st);
-    }
-    return *this;
-}
-
-st_namespace::st_namespace(symbol_table* st) : st(st) {
-
-}
-
-st_namespace::~st_namespace() {
-    if (st) {
-        delete st;
-    }
-}
-
-st_namespace::st_namespace(const st_namespace& o) {
-    if (o.st) {
-        st = new symbol_table{*o.st};
-    } else {
-        st = nullptr;
-    }
-}
-
-st_namespace::st_namespace(st_namespace&& o) {
-    std::swap(st, o.st);
-}
-
-st_namespace& st_namespace::operator=(const st_namespace& o) {
-    if (this != &o) {
-        if (st) {
-            delete st;
-        }
-        
-        if (o.st) {
-            st = new symbol_table{*o.st};
-        } else {
-            st = nullptr;
-        }
-    }
-    return *this;
-}
-
-st_namespace& st_namespace::operator=(st_namespace&& o) {
-    if (this != &o) {
-        std::swap(st, o.st);
-    }
     return *this;
 }
 
@@ -415,7 +143,15 @@ symbol_table::symbol_table(etable_owner owner, symbol_table* parent) : parent(pa
 
 symbol_table::~symbol_table() {
     for (auto& entry : entries) {
-        delete entry.second;
+        if (entry.second) {
+            delete entry.second;
+        }
+    }
+    
+    for (auto child : children) {
+        if (child) {
+            delete child;
+        }
     }
 }
 
@@ -570,11 +306,11 @@ type* st_entry::get_type() {
 std::string st_entry::print(u64 depth) {
     std::string sep(depth * 2, ' ');
     std::stringstream ss{};
-    ss << sep;
+    ss << sep << std::hex;
     switch (t) {
         case est_entry_type::FIELD:  {
             type* ftype = as_field().ptype;
-            ss << "FIELD " << name << " (";
+            ss << "FIELD " << name << " " << (u64) this << " (";
             switch (ftype->tt) {
                 case ettype::FUNCTION:
                     ss << type_table::t_sig->print(true);
@@ -596,7 +332,7 @@ std::string st_entry::print(u64 depth) {
             break;
         }
         case est_entry_type::FUNCTION:
-            ss << "FUNCTION " << name << "[" << as_function().overloads.size() << "]\n";
+            ss << "FUNCTION " << name << " " << (u64) this << "[" << as_function().overloads.size() << "]\n";
             for (auto& ol : as_function().overloads) {
                 ss << sep << "  " << ol->t->print(true) << "\n";
                 if (ol->defined) {
@@ -606,22 +342,23 @@ std::string st_entry::print(u64 depth) {
                     ss << (ol->st ? ol->st->print(depth + 2) : "NULLPTR") << "\n";
                 }
             }
+            as_function().st->print(depth + 2);
             break;
         case est_entry_type::TYPE:
-            ss << "TYPE " << name << "\n";
+            ss << "TYPE " << name << " " << (u64) this << "\n";
             if (as_type().defined) {
                 ss << sep << "  " << as_type().t->print() << "\n";
                 ss << as_type().st->print(depth + 1);
             }
             break;
         case est_entry_type::VARIABLE:
-            ss << "VARIABLE " << name << "(" << as_variable().t << ")\n";
+            ss << "VARIABLE " << name << " " << (u64) this << "(" << as_variable().t << ")\n";
             if (as_variable().defined) {
                 ss << as_variable().value->print(depth + 1);
             }
             break;
         case est_entry_type::MODULE: 
-            ss << "MODULE " << name << "\n";
+            ss << "MODULE " << name << " " << (u64) this << "\n";
             ss << as_module().st->print(depth + 1);
             break;
         case est_entry_type::NAMESPACE: 
@@ -629,10 +366,14 @@ std::string st_entry::print(u64 depth) {
             ss << as_module().st->print(depth + 1);
             break;
         case est_entry_type::OVERLOAD:
-            ss << "OVERLOAD " << name << "\n";
+            ss << "OVERLOAD " << name << " " << (u64) this;
+            if (as_overload().ol->builtin) {
+                ss << " BUILTIN(" << as_overload().ol->builtin << ")";
+            }
+            ss << "\n";
             break;
         case est_entry_type::LABEL: 
-            ss << "LABEL " << name << "\n";
+            ss << "LABEL " << name << " " << (u64) this << "\n";
             break;;
     }
     return ss.str();
@@ -698,7 +439,7 @@ st_entry* symbol_table::add_type(const std::string& name, type* t, bool defined)
     
     st_type nt{t, defined};
     if (t->is_struct() || t->is_union()) {
-        nt.st = new symbol_table(etable_owner::STRUCT, this);
+        nt.st = make_child(etable_owner::STRUCT);
     }
     st_entry* ne = new st_entry{std::move(nt), est_entry_type::TYPE, name};
     entries.insert({name, ne});
@@ -721,7 +462,7 @@ st_entry* symbol_table::add_or_get_empty_function(const std::string& name) {
     if (f && !f->is_function()) {
         return nullptr;
     } else if (!f) {
-        f = new st_entry{st_function{}, est_entry_type::FUNCTION, name};
+        f = new st_entry{st_function{{}, make_child(etable_owner::FUNCTION)}, est_entry_type::FUNCTION, name};
         entries.insert({name, f});
     }
     
@@ -733,11 +474,11 @@ std::pair<st_entry*, overload*> symbol_table::add_function(const std::string& na
     if (f && !f->is_function()) {
         return {nullptr, nullptr};
     } else if (!f) {
-        f = new st_entry{st_function{}, est_entry_type::FUNCTION, name};
+        f = new st_entry{st_function{{}, make_child(etable_owner::FUNCTION)}, est_entry_type::FUNCTION, name};
         entries.insert({name, f});
     }
     
-    overload* nol = new overload{function, value, value != nullptr, st ? st : new symbol_table{etable_owner::FUNCTION, this}, f->as_function().overloads.size()};
+    overload* nol = new overload{function, value, value != nullptr, st ? st : make_child(etable_owner::FUNCTION), f->as_function().overloads.size()};
     f->as_function().overloads.push_back(nol);
     
     std::string unique_name = nol->unique_name();
@@ -820,8 +561,9 @@ bool symbol_table::owned_by(etable_owner owner) {
 }
 
 symbol_table* symbol_table::make_child(etable_owner new_owner) {
-    symbol_table* self = this;
-    return new symbol_table{new_owner == etable_owner::COPY ? owner : new_owner, self};
+    symbol_table* child = new symbol_table{new_owner == etable_owner::COPY ? owner : new_owner, this};
+    children.push_back(child);
+    return child;
 }
 
 std::string symbol_table::print(u64 depth) {

@@ -27,6 +27,8 @@ struct ir_builder_context {
 class ir_builder {
 public:
     ir_builder(parse_info& p);
+    ~ir_builder();
+    
     void build(ast* ast = nullptr, symbol_table* sym = nullptr);
     void optimize();
     ir_triple* get();

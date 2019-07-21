@@ -31,31 +31,56 @@ void parser_ctx_guard::deactivate() {
     }
 }
 
-error_message_manager::error_message_manager(parser& p) : p(p) { }
+template<bool warning>
+error_message_manager<warning>::error_message_manager(parser& p) : p(p) { }
 
-error_message_manager::~error_message_manager() {
+template<>
+error_message_manager<false>::~error_message_manager() {
     if (!done) {
         p.error(ss.str(), mode, t);
     }
 }
 
-error_message_manager& error_message_manager::operator<<(epanic_mode p) {
+template<>
+error_message_manager<true>::~error_message_manager() {
+    if (!done) {
+        p.warning(ss.str(), t);
+    }
+}
+
+template<bool warning>
+error_message_manager<warning>& error_message_manager<warning>::operator<<(epanic_mode p) {
+    static_assert(warning == false, "Warnings cannot panic");
+    return *this;
+}
+
+template<>
+error_message_manager<false>& error_message_manager<false>::operator<<(epanic_mode p) {
     mode = p;
     return *this;
 }
 
-error_message_manager& error_message_manager::operator<<(token* t) {
+template<bool warning>
+error_message_manager<warning>& error_message_manager<warning>::operator<<(token* t) {
     error_message_manager::t = t;
     return *this;
 }
 
-ast* error_message_manager::operator<<(end_error) {
+template<bool warning>
+ast* error_message_manager<warning>::operator<<(end_error) {
+    static_assert(warning == false, "Warnings cannot be ended");
+    return nullptr;
+}
+
+template<>
+ast* error_message_manager<false>::operator<<(end_error) {
     if (!done) {
         done = true;
-        return p.error(ss.str(), mode, t);
+        p.error(ss.str(), mode, t);
     } else {
-        return p.error("Tried to end error more than once", epanic_mode::ULTRA_PANIC);
+        p.error("Tried to end error more than once", epanic_mode::ULTRA_PANIC);
     }
+    return ast::none();
 }
 
 parser::parser() : types(*(new type_table{})) {
@@ -71,6 +96,9 @@ parser::~parser() {
     if (!forked) {
         delete root_st;
         delete &types; // Oofies
+        for (auto [name, module] : modules) {
+            delete module;
+        }
     }
 }
 
@@ -107,8 +135,24 @@ bool parser::has_errors() {
 }
 
 void parser::print_errors() {
+    if (errors.empty()) {
+        logger::info() << "No errors" << logger::nend;
+    }
     for (auto& [t, e] : errors) {
         logger::error() << t.get_info() << " - " << e << logger::nend; 
+    }
+}
+
+bool parser::has_warnings() {
+    return !warnings.empty();
+}
+
+void parser::print_warnings() {
+    if (errors.empty()) {
+        logger::info() << "No warnings" << logger::nend;
+    }
+    for (auto& [t, w] : warnings) {
+        logger::warn() << t.get_info() << " - " << w << logger::nend; 
     }
 }
 
@@ -160,6 +204,7 @@ void parser::finish() {
             if (auto label = labels.find(labelname); label != labels.end()) {
                 delete unn.node;
                 unn.node = label->second;
+                unn.owned = false;
             } else {
                 error() << "Unable to finish GOTO element: " << labelname; // TODO Store token in ast?
             }
@@ -192,16 +237,15 @@ parser_ctx_guard parser::guard() {
     return {*this};
 }
 
-error_message_manager parser::error() {
-    return error_message_manager{*this};
+error_message_manager<> parser::error() {
+    return {*this};
 }
 
-ast* parser::error(const std::string& msg, epanic_mode mode, token* t) {
+void parser::error(const std::string& msg, epanic_mode mode, token* t) {
     errors.emplace_back(t ? *t : c, msg);
     if (mode != epanic_mode::NO_PANIC) {
         parser::panic(mode);
     }
-    return ast::none(); // In case we want to make an error AST or stub
 }
 
 ast* parser::operator_error(Symbol op, type* t, bool post) {
@@ -249,6 +293,14 @@ void parser::panic(epanic_mode mode) {
         default:
             throw parser_exception{};
     } 
+}
+
+error_message_manager<true> parser::warning() {
+    return {*this};
+}
+
+void parser::warning(const std::string& msg, token* t) {
+    warnings.emplace_back(t ? *t : c, msg);
 }
 
 token parser::next() {
@@ -546,21 +598,27 @@ ast* parser::compileriden(bool in_opts) {
     } else {
         switch (note->second) {
             case enote_type::BUILTIN: {
-                if (!require(Symbol::PAREN_LEFT, epanic_mode::ESCAPE_PAREN)) {
+                if (!require(Symbol::PAREN_LEFT, epanic_mode::NO_PANIC)) {
                     error() << "$builtin(x): requires 1 parameter";
                     return nullptr;
                 }
                 next(); // (
                 if (!require(TokenType::NUMBER, epanic_mode::ESCAPE_PAREN)) {
-                    error() << "$builtin(x): x is a number";
+                    error() << "$builtin(x): x is an unsigned integer";
                     return nullptr;
                 }
                 token num = next(); // Number
                 if(require(Symbol::PAREN_RIGHT, epanic_mode::ESCAPE_PAREN)) {
                     next(); // )
                 }
-                
-                notes.push({enote_type::BUILTIN, note_builtin{num.as_integer()}});
+                u64 val = num.as_integer();
+                if (val != num.as_real()) {
+                    error() << "$builtin(x): x is an unsigned integer" << epanic_mode::NO_PANIC;
+                } else if (val == 0) {
+                    error() << "$builtin(x): x cannot be 0" << epanic_mode::NO_PANIC;
+                } else {
+                    notes.push({enote_type::BUILTIN, note_builtin{val}});
+                }
                 break;
             }
             default:
@@ -1525,6 +1583,7 @@ ast* parser::gotostmt() {
         unfinished.push_back({ret, ctx()});
     } else {
         ret->as_unary().node = label->second;
+        ret->as_unary().owned = false;
     }
     
     next(); // iden
@@ -1759,7 +1818,9 @@ ast* parser::usingstmt() {
         } else if (is(TokenType::IDENTIFIER)){
             path.push_back(c.value);
         } else if (is(TokenType::KEYWORD) && is_type() && first) {
-            primitive = nntype()->get_type();
+            ast* typ = nntype();
+            primitive = typ->as_nntype().t;
+            delete typ;
             require(Keyword::AS);
             break;
         } else {
@@ -2025,6 +2086,7 @@ ast* parser::nntype(bool* endswitharray) {
             case Keyword::FUN: {
                 ast* ft = functype();
                 t = ft->as_nntype().t;
+                delete ft;
                 break;
             }
             default:
@@ -2130,7 +2192,7 @@ ast* parser::functype() {
                 error() << "Function type arrays cannot have expression sizes: " << t->as_nntype().t;
             }
             frtype.as_combination().types.push_back(t->as_nntype().t);
-            
+            delete t;
             if (is(Symbol::COLON)) {
                 next(); // :
             } else {
@@ -2158,6 +2220,7 @@ ast* parser::functype() {
             error() << "Function type arrays cannot have expression sizes: " << t->as_nntype().t;
         }
         type* pt = t->as_nntype().t;
+        delete t;
         param_flags pf{0};
         if (is(Symbol::SPREAD)) {
             next(); // ...
@@ -2392,7 +2455,7 @@ ast* parser::freevardecliden(ast* t1) {
     next(); // iden
     
     type* expected = typ->as_nntype().t;
-    st_entry* entry{st_entry::variable(name, expected)};
+    st_entry* entry = st_entry::variable(name, expected);
     
     stmts.push_back(ast::symbol(entry));
     
@@ -2459,9 +2522,12 @@ ast* parser::freevardecl(ast* t1) {
         
         for (u64 i = 0; i < stmts.size(); ++i) {
             auto& sym = stmts[i]->as_symbol();
-            st()->add(sym.get_name(), sym.symbol);
-            
-            if (i < value_types.size()) {
+            if(!st()->add(sym.get_name(), sym.symbol)) {
+                error() << "Variable '" << sym.get_name() << "' already exists";
+                delete sym.symbol;
+                delete stmts[i];
+                stmts[i] = ast::none();
+            } else if (i < value_types.size()) {
                 auto& [val, typ] = value_types[i];
                 auto& var = sym.symbol->as_variable();
                 var.value = val;
@@ -2479,8 +2545,11 @@ ast* parser::freevardecl(ast* t1) {
         auto& stmts = iden->as_binary().left->as_block().stmts;
         for (auto& stmt : stmts) {
             auto& sym = stmt->as_symbol();
-            st()->add(sym.get_name(), sym.symbol);
-            if (sym.symbol->as_variable().t == types.t_let) {
+            if(!st()->add(sym.get_name(), sym.symbol)) {
+                error() << "Variable '" << sym.get_name() << "' already exists";
+                delete stmt;
+                stmt = ast::none();
+            } else if (sym.symbol->as_variable().t == types.t_let) {
                 error() << "Variable '" << sym.get_name() << "' has uninferrable type";
             }
         }
@@ -2724,6 +2793,7 @@ type* parser::funcreturns(ast* t1) {
     if (is_infer()) {
         typ = infer();
         rettype = typ->as_nntype().t;
+        delete typ;
     } else if (is(Keyword::VOID)) {
         next(); // void
         rettype = types.t_void;
@@ -2763,6 +2833,20 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
     auto& func = functype.as_function();
     func.rets = funcreturns(t1);
     
+    u64 builtin{0};
+    
+    while (!notes.empty()) {
+        using namespace CompilerNote;
+        
+        auto top = notes.top();
+        notes.pop();
+        
+        switch (top.t) {
+            case enote_type::BUILTIN: builtin = top.as_builtin().value; break;
+            default: warning() << "Invalid compiler note for function declaration: " << top.t;
+        }
+    }
+    
     require(TokenType::IDENTIFIER);
     
     std::string name = c.value;
@@ -2775,7 +2859,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
     
     symbol_table* parent = st();
     push_context();
-    ctx().st = parent->make_child(etable_owner::FUNCTION);
+    ctx().st = entry->as_function().st->make_child(etable_owner::FUNCTION);
     auto cg = guard();
     
     if (thistype) {
@@ -2839,13 +2923,15 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
     }
     
     if (is(Symbol::BRACE_LEFT)) {
+        if (builtin) {
+            error() << "Definitions may not be annotated with $builtin(x)" << epanic_mode::NO_PANIC;
+        }
         push_context();
         ctx().function = ftype;
         auto cg = guard();
         
         ol->defined = true;
         ol->value = scope(etable_owner::FUNCTION);
-        delete ol->st;
         ol->st = st();
         if (entry->is_function()) {
             entry = entry->as_function().st->get(ol->unique_name());
@@ -2857,6 +2943,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
             next(); // ;
             return error() << "Function '" << ol->t << "' already declared" << end_error{};
         }
+        ol->builtin = builtin;
         require(Symbol::SEMICOLON);
         next(); // ;
     }
@@ -3011,6 +3098,7 @@ parameter parser::nnparameter() {
     ast* typ = nntype();
     
     ret.t = typ->as_nntype().t;
+    delete typ;
     
     if (is(Symbol::SPREAD)) {
         next(); // ...
