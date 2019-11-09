@@ -161,12 +161,14 @@ std::string token::print() {
             if (reg.floating) {
                 ss << "$f" << (u16) reg.number;
             } else {
-                if (reg.number == 17) {
+                if (reg.number == 32) {
                     ss << "$pc";
-                } else if (reg.number == 18) {
+                } else if (reg.number == 33) {
                     ss << "$sf";
-                } else if (reg.number == 19) {
+                } else if (reg.number == 34) {
                     ss << "$sp";
+                } else if (reg.number == 35) {
+                    ss << "$fp";
                 } else {
                     ss << "$r" << (u16) reg.number;
                 }
@@ -536,7 +538,7 @@ void compiler::first_pass() {
             } else if (op.is_immediate()) {
                 insert_p((u8*) &op.as_immediate().data, data_type_size(op.as_immediate().type));
             } else if (op.is_register()) {
-                u8 rval = op.as_register().number + (op.as_register().floating * 19);
+                u8 rval = op.as_register().number + (op.as_register().floating * 16);
                 insert_p(&rval, 1);
             } else if (op.is_memory()) {
                 auto& mem = op.as_memory();
@@ -554,7 +556,7 @@ void compiler::first_pass() {
                 u64 pos = 0;
                 token unfinished_token;
                 if (hdr.reg) {
-                    u8 rval = std::get<token_register>(mem.location_data).number + (std::get<token_register>(mem.location_data).floating * 19);
+                    u8 rval = std::get<token_register>(mem.location_data).number + (std::get<token_register>(mem.location_data).floating * 16);
                     insert_p(&rval, 1);
                 } else if (mem.location == token_type::IMMEDIATE) {
                     val = std::get<token_immediate>(mem.location_data).data;
@@ -567,7 +569,7 @@ void compiler::first_pass() {
                     unfinished_token = token{token_type::IDEN, std::get<token_iden>(mem.location_data)};
                 }
                 if (hdr.off_type == 1 || hdr.off_type == 2) { // Register or negated register
-                    u8 rval = std::get<token_register>(mem.offset_data).number + (std::get<token_register>(mem.offset_data).floating * 19);
+                    u8 rval = std::get<token_register>(mem.offset_data).number + (std::get<token_register>(mem.offset_data).floating * 16);
                     insert_p(&rval, 1);
                 } else if (hdr.off_type == 3) { // Immediate
                     if (hdr.reg) {
@@ -1073,7 +1075,7 @@ token compiler::next(bool nested) {
                 error(ss.str());
                 return token{token_type::ERROR, token_end{}};
             }
-            if (n == 0 || (reg.floating && n > 16) || (!reg.floating && n > 19)) {
+            if ((reg.floating && n >= 16) || (!reg.floating && n >= 16)) {
                 std::stringstream ss{};
                 ss << tok.substr(1) << " is not a valid register name";
                 error(ss.str());
@@ -1083,11 +1085,13 @@ token compiler::next(bool nested) {
             return token{token_type::REGISTER, reg};
         } else if (tok.length() == 3) {
             if (tok[1] == 'p' && tok[2] == 'c') {
-                return token{token_type::REGISTER, token_register{data_type::U64, false, 17}};
+                return token{token_type::REGISTER, token_register{data_type::U64, false, 32}};
             } else if (tok[1] == 's' && tok[2] == 'f') {
-                return token{token_type::REGISTER, token_register{data_type::U64, false, 18}};
+                return token{token_type::REGISTER, token_register{data_type::U64, false, 33}};
             } else if (tok[1] == 's' && tok[2] == 'p') {
-                return token{token_type::REGISTER, token_register{data_type::U64, false, 19}};
+                return token{token_type::REGISTER, token_register{data_type::U64, false, 34}};
+            } else if (tok[1] == 'f' && tok[2] == 'p') {
+                return token{token_type::REGISTER, token_register{data_type::U64, false, 35}};
             }
         }
         

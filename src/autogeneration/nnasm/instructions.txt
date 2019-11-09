@@ -166,21 +166,23 @@
         trap(vmtraps::illegal_jump);
         return;
     }
-    if (sp._u64 - sizeof(u64) < allocated - stack_size) {
+    if (sp._u64 - sizeof(u64) * 2 < allocated - stack_size) {
         trap(vmtraps::stack_overflow);
         return;
     }
-    sp._u64 -= sizeof(u64);
-    *reinterpret_cast<u64*>(memory + sp._u64) = pc._u64;
+    *reinterpret_cast<u64*>(memory + sp._u64 - sizeof(u64)) = fp._u64;
+    *reinterpret_cast<u64*>(memory + sp._u64 - sizeof(u64) * 2) = pc._u64;
+    sp._u64 -= sizeof(u64) * 2;
     pc._u64 = op1;
 %} # Call function at location op1. Pushes call pc onto stack.
 + RET {%
-    if (sp._u64 + sizeof(u64) > allocated) {
+    if (sp._u64 + sizeof(u64) * 2 > allocated) {
         trap(vmtraps::stack_underflow);
         return;
     }
     pc._u64 = *reinterpret_cast<u64*>(memory + sp._u64);
-    sp._u64 += sizeof(u64);
+    fp._u64 = *reinterpret_cast<u64*>(memory + sp._u64 + sizeof(u64));
+    sp._u64 += sizeof(u64) * 2;
 %} # Return from function. Pops from the stack to pc.
 + CASTU <any:nu> <reg:u> {%
     op2 = (t2) op1;
@@ -276,16 +278,16 @@
     sf.zero = !(op2 = -op1);
 %} # Get negative of op1. Store in op2.
 + SHR <any:u8> <reg:i> {%
-    sf.zero = !(op2 <<= op1);
+    sf.zero = !(op2 >>= op1);
 %} # Shift op2 right by op1. Store in op2.
 + SHR <any:u8> <any:i!> <reg:i?> {%
-    sf.zero = !(op3 = op2 << op1);
+    sf.zero = !(op3 = op2 >> op1);
 %} # Shift op2 right by op1. Store in op3.
 + SHL <any:u8> <reg:i> {%
-    sf.zero = !(op2 >>= op1);
+    sf.zero = !(op2 <<= op1);
 %} # Shift op2 left by op1. Store in op2.
 + SHL <any:u8> <any:i!> <reg:i?> {%
-    sf.zero = !(op3 = op2 >> op1);
+    sf.zero = !(op3 = op2 << op1);
 %} # Shift op2 left by op1. Store in op3.
 + RTR <any:u8> <reg:u> {%
     sf.zero = !(op2 = ((op2 >> op1) | (op2 << (sizeof(t2) - op1))));

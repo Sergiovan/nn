@@ -8,6 +8,9 @@
 struct st_entry;
 struct ast;
 
+/* TODO 
+    Simplify: CONCATENATE
+ */
 namespace ir_op {
     enum code {
         ADD, SUBTRACT, MULTIPLY, DIVIDE,

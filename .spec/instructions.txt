@@ -1,9 +1,10 @@
 Registers:
-16 general purpose registers, r1-r16.
-16 floating point registers, f1-f16 (r20-r35).
-Program counter, pc or r17.
-Status flag register, sf or r18.
-Stack pointer register, sp or r19.
+16 general purpose registers, r0-r15.
+16 floating point registers, f0-f15.
+Program counter, pc.
+Status flag register, sf.
+Stack pointer register, sp.
+Stack frame pointer, fp.
 Each register is 64 bits long.
 
 Program counter is updated before each instruction is run.

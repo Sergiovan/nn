@@ -42,6 +42,7 @@ void virtualmachine::run() {
     if (ended) {
         pc._u64 = code - memory; // Start of code
         sp._u64 = allocated;
+        fp._u64 = allocated;
         ended = false;
         steps = 0;
         start_time = std::chrono::high_resolution_clock::now();
@@ -97,24 +98,30 @@ std::string virtualmachine::print_info() {
 
 std::string virtualmachine::print_registers() {
     std::stringstream ss{};
-    static const char* general_names[] {
-        "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8",
-        "r9", "r10", "r11", "r12", "r13", "r14", "r15", "r16",
-        "pc", "sf", "sp"
+    static const char* general_names[general_register_amount] {
+        "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8",
+        "r9", "r10", "r11", "r12", "r13", "r14", "r15"
     };
-    static const char* floating_names[] {
-        "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8",
-        "f9", "f10", "f11", "f12", "f13", "f14", "f15", "f16"
+    static const char* floating_names[floating_register_amount] {
+        "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8",
+        "f9", "f10", "f11", "f12", "f13", "f14", "f15"
     };
-    for (int i = 0; i < 19; ++i) {
+    static const char* special_names[special_register_amount] {
+        "pc", "sf", "sp", "fp"
+    };
+    for (int i = 0; i < general_register_amount; ++i) {
         ss << general_names[i] << ": \n";
         ss << "   u: " << std::hex << general_registers[i]._u64 << "\n";
         ss << "   s: " << std::dec << general_registers[i]._s64 << "\n";
     }
-    for (int i = 0; i < 16; ++i) {
+    for (int i = 0; i < floating_register_amount; ++i) {
         ss << floating_names[i] << ": \n";
         ss << "   f: " << floating_registers[i]._f32 << "\n";
         ss << "   d: " << floating_registers[i]._f64 << "\n";
+    }
+    for (int i = 0; i < special_register_amount; ++i) {
+        ss << special_names[i] << ": \n";
+        ss << "   u: " << std::hex << special_registers[i]._u64 << "\n";
     }
     
     return ss.str();
@@ -131,7 +138,7 @@ void virtualmachine::allocate(u64 amount) {
         std::memcpy((buff + allocated + amount) - stack_size, memory + allocated - stack_size, stack_size);
         delete [] memory;
         memory = buff;
-        sp._u64 += amount;
+//         sp._u64 += amount;
         allocated += amount;
         
         code = memory + code_start;
@@ -161,7 +168,7 @@ void virtualmachine::resize(u64 amount) {
         std::memcpy((buff + amount) - stack_size, memory + allocated - stack_size, stack_size);
         delete [] memory;
         memory = buff;
-        sp._u64 += (amount - allocated);
+//         sp._u64 += (amount - allocated);
         allocated = amount;
         
         code = memory + code_start;

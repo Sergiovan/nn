@@ -69,12 +69,19 @@ public:
     std::string print_info();
     std::string print_registers();
 private:
-    vmregister general_registers[19 + 16]{};
-    vmregister& pc = general_registers[16];
-    vmregister& sfr = general_registers[17];
-    vmflagsregister& sf = *reinterpret_cast<vmflagsregister*>(&general_registers[17]);
-    vmregister& sp = general_registers[18];
-    vmregister* floating_registers = &general_registers[19];
+    static constexpr u16 general_register_amount = 16;
+    static constexpr u16 floating_register_amount = 16;
+    static constexpr u16 special_register_amount = 4;
+    static constexpr u16 register_amount = 
+        general_register_amount + floating_register_amount + special_register_amount;
+    vmregister general_registers[register_amount]{};
+    vmregister* floating_registers = &general_registers[general_register_amount];
+    vmregister* special_registers = &general_registers[general_register_amount + floating_register_amount];
+    vmregister& pc = special_registers[0];
+    vmregister& sfr = special_registers[1];
+    vmflagsregister& sf = *reinterpret_cast<vmflagsregister*>(&special_registers[1]);
+    vmregister& sp = special_registers[2];
+    vmregister& fp = special_registers[3];
     
     void allocate(u64 amount);
     void resize(u64 amount);

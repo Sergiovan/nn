@@ -19,42 +19,42 @@
 #include "vm/machine.h"
 
 int main(int argc, char** argv) {
-//     auto start = std::chrono::high_resolution_clock::now();
-//     nnasm::compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
-//     ac.compile();    
-//     u8* program = ac.get_program();
-//     u64 size = ac.get_size();
-//     
-//     (void) program;
-//     (void) size; // Only for debugging for now
-//     
-//     auto end = std::chrono::high_resolution_clock::now();
-//     
-//     ac.print_errors();
-//     logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
-//     
-//     virtualmachine vm{};
-//     vm.load(ac.get_program(), ac.get_size());
-//     vm.run();
-//     
-//     logger::debug() << "\n" << vm.print_info() << logger::nend;
-    // logger::debug() << "\n" << vm.print_registers() << logger::nend;
-    
-    parser p{};
-    
     auto start = std::chrono::high_resolution_clock::now();
-    parse_info res = p.parse(argc > 1 ? argv[1] : "examples/morse.nn", true);
+    nnasm::compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
+    ac.compile();    
+    u8* program = ac.get_program();
+    u64 size = ac.get_size();
+    
+    (void) program;
+    (void) size; // Only for debugging for now
     
     auto end = std::chrono::high_resolution_clock::now();
     
-    p.print_warnings();
-    if (p.has_errors()) {
-        p.print_errors();
-    } else {
-        // p.print_info();
-        logger::log() << res.result->print() << logger::nend;
-        logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
-        
+    ac.print_errors();
+    logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
+    
+    virtualmachine vm{};
+    vm.load(ac.get_program(), ac.get_size());
+    vm.run();
+    
+    logger::debug() << "\n" << vm.print_info() << logger::nend;
+    logger::debug() << "\n" << vm.print_registers() << logger::nend;
+    
+//     parser p{};
+//     
+//     auto start = std::chrono::high_resolution_clock::now();
+//     parse_info res = p.parse(argc > 1 ? argv[1] : "examples/morse.nn", true);
+//     
+//     auto end = std::chrono::high_resolution_clock::now();
+//     
+//     p.print_warnings();
+//     if (p.has_errors()) {
+//         p.print_errors();
+//     } else {
+//         p.print_info();
+//         logger::log() << res.result->print() << logger::nend;
+//         logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
+//         
 //         start = std::chrono::high_resolution_clock::now();
 //         ir_builder b{res};
 //         b.build();
@@ -62,11 +62,11 @@ int main(int argc, char** argv) {
 //         
 //         logger::log() << '\n' << print_sequence(b.get()) << logger::nend;
 //         logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
-    } 
-    
-    if (res.result) {
-        delete res.result;
-    }
+//     } 
+//     
+//     if (res.result) {
+//         delete res.result;
+//     }
     
     /*
     reader* r = reader::from_file("examples/mastermind2.nn");
