@@ -99,6 +99,8 @@ struct pfield {
     type* t;
     u8 bits{64};
     bool bitfield{false};
+    u64 offset{0};
+    u8 offset_bits{0};
 };
 
 struct field {
@@ -255,6 +257,8 @@ struct type {
     bool has_special_flags();
     
     type* get_function_returns();
+    u64 get_function_param_offset(s64 param = -1);
+    u64 get_function_param_size(u32 param);
     
     std::string print(bool simple = false);
 };

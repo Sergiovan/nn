@@ -352,7 +352,7 @@ std::string st_entry::print(u64 depth) {
             }
             break;
         case est_entry_type::VARIABLE:
-            ss << "VARIABLE " << name << " " << (u64) this << "(" << as_variable().t << ")\n";
+            ss << "VARIABLE " << name << " " << (u64) this << "(" << as_variable().t << ") : " << as_variable().offset << "\n";
             if (as_variable().defined) {
                 ss << as_variable().value->print(depth + 1);
             }
@@ -428,6 +428,11 @@ st_entry* symbol_table::add(const std::string& name, st_entry* entry) {
     } else {
         entry->name = name;
         entries.insert({name, entry});
+        if (entry->is_variable()) {
+            u64 offs = last_offset;
+            last_offset += entry->get_type()->get_size();
+            entry->as_variable().offset = offs;
+        }
         return entry;
     }
 }
@@ -446,12 +451,13 @@ st_entry* symbol_table::add_type(const std::string& name, type* t, bool defined)
     return ne;
 }
 
-st_entry* symbol_table::add_variable(const std::string& name, type* t, ast* value) {
+st_entry* symbol_table::add_variable(const std::string& name, type* t, ast* value, bool param) {
     if (has(name, false)) {
         return nullptr;
     }
     
-    st_variable nv{t, value, value != nullptr};
+    st_variable nv{t, value, value != nullptr, param, last_offset};
+    last_offset += t->get_size();
     st_entry* ne = new st_entry{std::move(nv), est_entry_type::VARIABLE, name};
     entries.insert({name, ne});
     return ne;
@@ -552,6 +558,10 @@ u64 symbol_table::get_size(bool borrowed) {
     return entries.size() + (borrowed ? borrowed_entries.size() : 0);
 }
 
+u64 symbol_table::get_offset() {
+    return last_offset;
+}
+
 void symbol_table::set_owner(etable_owner owner) {
     symbol_table::owner = owner;
 }
@@ -621,6 +631,8 @@ std::string symbol_table::print(u64 depth) {
             ss << sep << "  " << entry.first << "\n";
         }
     }
+    ss << sep << "Size: " << get_size() << ". Total size: " << get_size(true) 
+       << ". Size in bytes: " << last_offset << "\n";
     return ss.str();
 }
 

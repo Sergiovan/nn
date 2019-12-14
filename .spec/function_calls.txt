@@ -1,11 +1,9 @@
-Everything done by caller, basically.
-
 0. r14:r15 should not contain anything that can't be replaced.
-2. Load parameters left-to-right, first parameter is at the bottom.
-3. Load stack, usually empty. In case of closures or coroutines, things may be added here. When calling a function normally, this is known at compile time. If not, closure objects have the required information. This can be a no-op.
-4. Call function. This also automatically puts the frame pointer and return address at the very bottom of the stack. This also means the parameters are below the frame pointer.
-5. Function happens, who knows what magical things are achieved.
-6. Returns always in r14:r15. If data is bigger than 16 bytes, r14 is a pointer to the data (stored above the stack) and r15 is the size of the data. The data is formatted as if it were a struct of the return types.
-6. Stack is "cleaned up" by callee. Once again, this is automatically done for normal functions, but requires some help with closures. Might be a no-op.
-7. RET instruction pops return address and frame pointer from stack.
-8. Control is back to caller. Stack is as it was before 0, returns are in r14:r15.
+1. If function return more than 16 bytes or 2 values, caller makes space and passes a pointer to it in r14.
+2. Load parameters left to right onto stack. First parameter is at the bottom, at fp[-sizeof(param0)]
+3. Call function. This pushes the return address and frame pointer onto the stack, in that order. It also sets the current frame pointer to right below parameter 0. If calling a function pointer, the closure data goes in r15.
+4. Function happens.
+5. Returns come in r14:r15. If more than 16 bytes or 2 values, they're placed in the memory pointed at by r14 at the call of the function. The data is formatted as if it were a struct of the return types (That is, it has padding)
+6. Stack is cleaned by callee. This may involve saving data to some location in case of closures and coroutines.
+7. RET instruction pops frame pointer and return address from stack. Stack pointer becomes current frame pointer, frame pointer becomes popped frame pointer, address pointer becomes popped address pointer.
+8. Control is back to caller. Stack is as it was before 0, returns are in r14:r15 as described.

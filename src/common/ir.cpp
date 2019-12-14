@@ -5,163 +5,6 @@
 #include "type.h"
 #include <iomanip>
 
-ir_triple::ir_triple_param::ir_triple_param(ast* node) {
-    if (node && node->is_symbol()) {
-        iden = node->as_symbol().symbol;
-        type = IDEN;
-    } else {
-        value = node;
-        type = LITERAL;
-    }
-}
-ir_triple::ir_triple_param::ir_triple_param(st_entry* entry) 
-    : iden(entry), type(IDEN) {};
-ir_triple::ir_triple_param::ir_triple_param(ir_triple* triple)
-    : triple(triple), type(TRIPLE) {};
-ir_triple::ir_triple_param::ir_triple_param(u64 immediate)
-    : immediate(immediate), type(IMMEDIATE) {};
-    
-void ir_triple::set_label(const std::string& str) {
-#ifdef DEBUG
-    label = str;
-#endif
-}
-    
-std::string ir_triple::print() {
-    std::stringstream ss{};
-    ss << op;
-    if (param1.value || param1.type == ir_triple_param::IMMEDIATE) {
-        ss << " | ";
-        if (param1.type == ir_triple_param::LITERAL) {
-            ss << param1.value->print_value();
-        } else if (param1.type == ir_triple_param::IDEN) {
-            ss << "IDEN " << param1.iden->name << " (" << param1.iden->get_type() << ")";
-        } else if (param1.type == ir_triple_param::TRIPLE) {
-            ss << "TRIPLE ()";
-        } else {
-            ss << "IMMEDIATE " << param1.immediate;
-        }
-    }
-    if (param2.value || param2.type == ir_triple_param::IMMEDIATE) {
-        ss << " | ";
-        if (param2.type == ir_triple_param::LITERAL) {
-            ss << param2.value->print_value();
-        } else if (param2.type == ir_triple_param::IDEN) {
-            ss << "IDEN " << param2.iden->name << " (" << param2.iden->get_type() << ")";
-        } else if (param2.type == ir_triple_param::TRIPLE) {
-            ss << "TRIPLE ()";
-        } else {
-            ss << "IMMEDIATE " << param2.immediate;
-        }
-    }
-    return ss.str();
-}
-
-std::string ir_triple::print(const std::map<ir_triple*, u64>& triples) {
-    std::stringstream ss{};
-    ss << op;
-    if (param1.value || param1.type == ir_triple_param::IMMEDIATE) {
-        ss << " | ";
-        if (param1.type == ir_triple_param::LITERAL) {
-            ss << param1.value->print_value();
-        } else if (param1.type == ir_triple_param::IDEN) {
-            ss << "IDEN " << param1.iden->name << " (" << param1.iden->get_type() << ")";
-        } else if (param1.type == ir_triple_param::TRIPLE) {
-            ss << "TRIPLE ";
-            if (auto id = triples.find(param1.triple); id != triples.end()) {
-                ss << id->second;
-#ifdef DEBUG
-                if (!id->first->label.empty()) {
-                    ss << " \"" << id->first->label << "\"";
-                }
-#endif
-            } else {
-                ss << "???";
-            }
-        } else {
-            ss << "IMMEDIATE " << param1.immediate;
-        }
-    }
-    if (param2.value || param2.type == ir_triple_param::IMMEDIATE) {
-        ss << " | ";
-        if (param2.type == ir_triple_param::LITERAL) {
-            ss << param2.value->print_value();
-        } else if (param2.type == ir_triple_param::IDEN) {
-            ss << "IDEN " << param2.iden->name << " (" << param2.iden->get_type() << ")";
-        } else if (param2.type == ir_triple_param::TRIPLE) {
-            ss << "TRIPLE ";
-            if (auto id = triples.find(param2.triple); id != triples.end()) {
-                ss << id->second;
-#ifdef DEBUG
-                if (!id->first->label.empty()) {
-                    ss << " \"" << id->first->label << "\"";
-                }
-#endif
-            } else {
-                ss << "???";
-            }
-        } else {
-            ss << "IMMEDIATE " << param2.immediate;
-        }
-    }
-#ifdef DEBUG
-    if (!label.empty()) {
-        ss << " -> \"" << label << "\"";
-    }
-#endif
-    return ss.str();
-}
-
-void ir_triple_range::append(ir_triple* triple) {
-    end->next = triple;
-    end = triple;
-}
-
-void ir_triple_range::prepend(ir_triple* triple) {
-    triple->next = start;
-    start = triple;
-}
-
-block::block(ir_triple_range begin) {
-    start = begin;
-}
-
-void block::add(ir_triple_range begin) {
-    start.end->next = begin.start;
-    start.end = begin.end;
-}
-
-void block::add(ir_triple* triple) {
-    start.append(triple);
-}
-
-void block::add_end(ir_triple_range finish) {
-    if (end.start) {
-        finish.end->next = end.start;
-        end.start = finish.start;
-    } else {
-        end = finish;
-    }
-}
-
-void block::add_end(ir_triple* triple) {
-    if (end.start) {
-        end.prepend(triple);
-    } else {
-        end = {triple, triple};
-    }
-}
-
-void block::finish() {
-    if (end.start) {
-        start.end->next = end.start;
-        start.end = end.end;
-        end = start;
-    } else {
-        end = start;
-    }
-}
-
 std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
     using namespace ir_op;
     switch (code) {
@@ -263,6 +106,8 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "RETURN";
         case RETVAL:
             return os << "RETVAL";
+        case RETPUSH:
+            return os << "RETPUSH";
         case NEW:
             return os << "NEW";
         case DELETE:
@@ -279,13 +124,15 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "DEREFERENCE";
         case LENGTH:
             return os << "LENGTH";
+        case ZERO:
+            return os << "ZERO";
         case NOOP:
             return os << "NOOP";
         default:
             return os << "INVALID";
     }
 }
-
+/*
 std::string print_sequence(ir_triple* start) {
     ir_triple* cur = start;
     std::stringstream ss{};
@@ -303,4 +150,4 @@ std::string print_sequence(ir_triple* start) {
         cur = cur->next;
     }
     return ss.str();
-}
+}*/

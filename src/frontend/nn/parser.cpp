@@ -2864,7 +2864,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
     
     if (thistype) {
         func.params.push_back({thistype, 0, "this"});
-        st()->add_variable("this", thistype);
+        st()->add_variable("this", thistype, nullptr, true);
     }
     
     bool defaulted{false};
@@ -2877,7 +2877,7 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
         
         auto p = nnparameter();
         func.params.push_back(p);
-        st()->add_variable(p.name, p.t);
+        st()->add_variable(p.name, p.t, nullptr, true);
         
         if (p.flags & eparam_flags::DEFAULTABLE) {
             defaulted = true;
@@ -2990,7 +2990,7 @@ ast* parser::funcval() {
         
         auto p = nnparameter();
         func.params.push_back(p);
-        st()->add_variable(p.name, p.t);
+        st()->add_variable(p.name, p.t, nullptr, true);
         
         if (p.flags & eparam_flags::DEFAULTABLE) {
             defaulted = true;
@@ -3069,7 +3069,8 @@ ast* parser::funcval() {
     
     type* ftype = types.get_or_add(functype);
     
-    /*overload* ol = */st()->add_function(name, ftype, nullptr, nullptr).second;
+    overload* ol = st()->add_function(name, ftype, nullptr, nullptr).second;
+    ol->closure = jailed.size() > 0;
     
     ast* scp{nullptr};
     

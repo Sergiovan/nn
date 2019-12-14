@@ -29,6 +29,8 @@ struct overload {
     u64 oid{0};
     
     u64 builtin{0};
+    bool closure{false};
+    // bool coroutine{false};
     
     std::string unique_name();
 };
@@ -43,6 +45,10 @@ struct st_variable {
     type* t;
     ast* value{nullptr}; // Not Owned
     bool defined{false};
+    
+    bool is_param{false};
+    u64 offset{0};
+    ast* last_use{nullptr}; // Not Owned
 };
 
 struct st_function {
@@ -59,6 +65,7 @@ struct st_namespace {
 
 struct st_field {
     u64 field;
+    
     type* ptype{nullptr};
 };
 
@@ -95,7 +102,6 @@ struct st_entry {
     st_overload& as_overload();
     st_namespace& as_module();
     
-    
     bool is_type();
     bool is_variable();
     bool is_function();
@@ -129,7 +135,7 @@ public:
     
     st_entry* add(const std::string& name, st_entry* entry);
     st_entry* add_type(const std::string& name, type* t, bool defined = true);
-    st_entry* add_variable(const std::string& name, type* t, ast* value = nullptr);
+    st_entry* add_variable(const std::string& name, type* t, ast* value = nullptr, bool param = false);
     st_entry* add_or_get_empty_function(const std::string& name);
     std::pair<st_entry*, overload*> add_function(const std::string& name, type* function, ast* value = nullptr, symbol_table* st = nullptr);
     st_entry* add_namespace(const std::string& name, symbol_table* st = nullptr);
@@ -141,6 +147,7 @@ public:
     bool merge_st(symbol_table* st); // TODO Errors and merge conflicts
     
     u64 get_size(bool borrowed = true);
+    u64 get_offset();
     
     void set_owner(etable_owner owner);
     bool owned_by(etable_owner owner);
@@ -154,6 +161,7 @@ public:
     std::vector<symbol_table*> children;
     dict<st_entry*> entries{}; // Owned
     dict<st_entry*> borrowed_entries{}; // NOT Owned
+    u64 last_offset{0};
 };
 
 std::ostream& operator<<(std::ostream& os, const est_entry_type& st_entry_type);

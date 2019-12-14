@@ -161,13 +161,13 @@ std::string token::print() {
             if (reg.floating) {
                 ss << "$f" << (u16) reg.number;
             } else {
-                if (reg.number == 32) {
+                if (reg.number == nnasm::registers::pc) {
                     ss << "$pc";
-                } else if (reg.number == 33) {
+                } else if (reg.number == nnasm::registers::sf) {
                     ss << "$sf";
-                } else if (reg.number == 34) {
+                } else if (reg.number == nnasm::registers::sp) {
                     ss << "$sp";
-                } else if (reg.number == 35) {
+                } else if (reg.number == nnasm::registers::fp) {
                     ss << "$fp";
                 } else {
                     ss << "$r" << (u16) reg.number;
@@ -1085,13 +1085,13 @@ token compiler::next(bool nested) {
             return token{token_type::REGISTER, reg};
         } else if (tok.length() == 3) {
             if (tok[1] == 'p' && tok[2] == 'c') {
-                return token{token_type::REGISTER, token_register{data_type::U64, false, 32}};
+                return token{token_type::REGISTER, token_register{data_type::U64, false, nnasm::registers::pc}};
             } else if (tok[1] == 's' && tok[2] == 'f') {
-                return token{token_type::REGISTER, token_register{data_type::U64, false, 33}};
+                return token{token_type::REGISTER, token_register{data_type::U64, false, nnasm::registers::sf}};
             } else if (tok[1] == 's' && tok[2] == 'p') {
-                return token{token_type::REGISTER, token_register{data_type::U64, false, 34}};
+                return token{token_type::REGISTER, token_register{data_type::U64, false, nnasm::registers::sp}};
             } else if (tok[1] == 'f' && tok[2] == 'p') {
-                return token{token_type::REGISTER, token_register{data_type::U64, false, 35}};
+                return token{token_type::REGISTER, token_register{data_type::U64, false, nnasm::registers::fp}};
             }
         }
         

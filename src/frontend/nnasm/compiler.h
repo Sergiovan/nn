@@ -14,30 +14,7 @@ enum class token_type {
     INVALID, OPCODE, REGISTER, MEMORY, IMMEDIATE,
     STRING, IDEN, TYPE, END, ERROR
 };
-
-enum class data_type {
-    U8, U16, U32, U64,
-    S8, S16, S32, S64,
-    F32, F64, NONE
-};
-
-constexpr u8 data_type_size(data_type type) {
-    switch (type) {
-        case data_type::U8:  return 1;
-        case data_type::U16: return 2;
-        case data_type::U32: return 4;
-        case data_type::U64: return 8;
-        case data_type::S8:  return 1;
-        case data_type::S16: return 2;
-        case data_type::S32: return 4;
-        case data_type::S64: return 8;
-        case data_type::F32: return 4;
-        case data_type::F64: return 8;
-        case data_type::NONE: return 0;
-        default: return 0;
-    }
-}
-
+    
 struct token;
 
 struct token_opcode {

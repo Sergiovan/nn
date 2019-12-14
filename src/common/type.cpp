@@ -96,6 +96,8 @@ u64 type::get_size() {
                 u64 bfsum = 0;
                 for (pfield f : ps.fields) {
                     if (f.bitfield) {
+                        f.offset_bits = bfsum;
+                        f.offset = ps.size;
                         bfsum += f.bits;
                         if (bfsum > 8) {
                             int bytes = std::floor(bfsum / 8);
@@ -107,6 +109,7 @@ u64 type::get_size() {
                             ps.size++;
                             bfsum = 0;
                         }
+                        f.offset = ps.size;
                         u64 tsize = f.t->get_size();
                         u8 align = std::min(tsize, 8ul);
                         if (u8 remainder = tsize % align; remainder) {
@@ -163,7 +166,14 @@ u64 type::get_size() {
         }
         case ettype::FUNCTION:
             return 8;
-        case ettype::COMBINATION:
+        case ettype::COMBINATION: {
+            type_combination& c = as_combination();
+            u64 total{0};
+            for (auto t : c.types) {
+                total += t->get_size();
+            }
+            return total;
+        }
         case ettype::PFUNCTION: [[fallthrough]];
         default:
             return 0;
@@ -529,6 +539,33 @@ type* type::get_function_returns() {
         return as_function().rets;
     } else {
         return as_pfunction().rets;
+    }
+}
+
+u64 type::get_function_param_offset(s64 param) {
+    u64 size{0};
+    if (is_function(false)) {
+        auto& f = as_function();
+        param = param == -1 ? f.params.size() : param;
+        for (u32 i = 0; i < param; ++i) {
+            size += f.params[i].t->get_size();
+        }
+    } else {
+        auto& f = as_pfunction();
+        param = param == -1 ? f.params.size() : param;
+        for (u32 i = 0; i < param; ++i) {
+            size += f.params[i].t->get_size();
+        }
+    }
+    
+    return size;
+}
+
+u64 type::get_function_param_size(u32 param) {
+    if (is_function(false)) {
+        return as_function().params[param].t->get_size();
+    } else {
+        return as_pfunction().params[param].t->get_size();
     }
 }
 

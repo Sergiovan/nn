@@ -98,28 +98,28 @@ std::string virtualmachine::print_info() {
 
 std::string virtualmachine::print_registers() {
     std::stringstream ss{};
-    static const char* general_names[general_register_amount] {
+    static const char* general_names[nnasm::registers::general_amount] {
         "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8",
         "r9", "r10", "r11", "r12", "r13", "r14", "r15"
     };
-    static const char* floating_names[floating_register_amount] {
+    static const char* floating_names[nnasm::registers::floating_amount] {
         "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8",
         "f9", "f10", "f11", "f12", "f13", "f14", "f15"
     };
-    static const char* special_names[special_register_amount] {
+    static const char* special_names[nnasm::registers::special_amount] {
         "pc", "sf", "sp", "fp"
     };
-    for (int i = 0; i < general_register_amount; ++i) {
+    for (int i = 0; i < nnasm::registers::general_amount; ++i) {
         ss << general_names[i] << ": \n";
         ss << "   u: " << std::hex << general_registers[i]._u64 << "\n";
         ss << "   s: " << std::dec << general_registers[i]._s64 << "\n";
     }
-    for (int i = 0; i < floating_register_amount; ++i) {
+    for (int i = 0; i < nnasm::registers::floating_amount; ++i) {
         ss << floating_names[i] << ": \n";
         ss << "   f: " << floating_registers[i]._f32 << "\n";
         ss << "   d: " << floating_registers[i]._f64 << "\n";
     }
-    for (int i = 0; i < special_register_amount; ++i) {
+    for (int i = 0; i < nnasm::registers::special_amount; ++i) {
         ss << special_names[i] << ": \n";
         ss << "   u: " << std::hex << special_registers[i]._u64 << "\n";
     }

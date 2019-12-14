@@ -4,9 +4,7 @@
 #include <list>
 #include <vector>
 #include <iostream>
-
-struct st_entry;
-struct ast;
+#include <type_traits>
 
 /* TODO 
     Simplify: CONCATENATE
@@ -31,68 +29,16 @@ namespace ir_op {
         JUMP, IF_FALSE, IF_TRUE, 
         IF_ZERO = IF_FALSE, IF_NOT_ZERO = IF_TRUE,
         SYMBOL, VALUE, TEMP, 
-        CALL, CALL_CLOSURE, PARAM, RETURN, RETVAL, 
+        CALL, CALL_CLOSURE, PARAM, RETURN, 
+        RETVAL, RETPUSH, 
         
         NEW, DELETE, 
         COPY, INDEX, OFFSET, ADDRESS, DEREFERENCE, LENGTH,
+        ZERO, 
         
         NOOP
     };
 }
 
-struct ir_triple {
-    struct ir_triple_param {
-        union {
-            ast* value;
-            st_entry* iden;
-            ir_triple* triple;
-            u64 immediate;
-        };
-        enum {LITERAL, IDEN, TRIPLE, IMMEDIATE} type{LITERAL};
-        
-        ir_triple_param(ast* node);
-        ir_triple_param(st_entry* entry);
-        ir_triple_param(ir_triple* triple);
-        ir_triple_param(u64 immediate);
-    };
-    
-    ir_op::code op{ir_op::COPY};
-    ir_triple_param param1{(ast*) nullptr};
-    ir_triple_param param2{(ast*) nullptr};
-    
-    ir_triple* next{nullptr};
-    ir_triple* cond{nullptr};
-    
-#ifdef DEBUG
-    std::string label{};
-#endif
-    
-    void set_label(const std::string& str);
-    
-    std::string print();
-    std::string print(const std::map<ir_triple*, u64>& triples);
-};
-
-struct ir_triple_range {
-    ir_triple* start;
-    ir_triple* end;
-    
-    void append(ir_triple* triple);
-    void prepend(ir_triple* triple);
-};
-
-struct block {
-    block(ir_triple_range begin);
-    
-    void add(ir_triple_range begin);
-    void add(ir_triple* triple);
-    void add_end(ir_triple_range end);
-    void add_end(ir_triple* triple);
-    void finish();
-    
-    ir_triple_range start;
-    ir_triple_range end{nullptr, nullptr};
-};
-
-std::ostream& operator<<(std::ostream& os, const ir_op::code& code);
-std::string print_sequence(ir_triple* start);
+// std::ostream& operator<<(std::ostream& os, const ir_op::code& code);
+// std::string print_sequence(ir_triple* start);
