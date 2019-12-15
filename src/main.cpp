@@ -18,6 +18,8 @@
 #include "frontend/nnasm/compiler.h"
 #include "vm/machine.h"
 
+#include "common/ast_walker.h"
+
 int main(int argc, char** argv) {
 //     auto start = std::chrono::high_resolution_clock::now();
 //     nnasm::compiler ac{argc > 1 ? argv[1] : "examples/pithagoras.nna"};
@@ -54,6 +56,12 @@ int main(int argc, char** argv) {
         p.print_info();
         logger::log() << res.result->print() << logger::nend;
         logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
+        
+        ast_walker walker {res.result};
+        ast* c{nullptr};
+        while ((c = walker.next()) != nullptr) {
+            logger::log() << c->t << " " << c->print_value() << "\n";
+        }
         
 //         start = std::chrono::high_resolution_clock::now();
 //         ir_builder b{res};

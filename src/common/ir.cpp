@@ -5,6 +5,64 @@
 #include "type.h"
 #include <iomanip>
 
+ir_triple_param::ir_triple_param(u64 immediate) : immediate(immediate), type(IMMEDIATE) {}
+ir_triple_param::ir_triple_param(ast* value) : value(value), type(VALUE) {}
+ir_triple_param::ir_triple_param(st_entry* iden) : iden(iden), type(IDEN) {}
+ir_triple_param::ir_triple_param(ir_triple* triple) : triple(triple), type(TRIPLE) {}
+ir_triple_param::ir_triple_param(std::nullptr_t) : ir_triple_param((ast*) nullptr) {}
+
+ir_triple_param::operator ast*() const {
+    if (type == VALUE) return value;
+    return nullptr;
+}
+
+ir_triple_param::operator st_entry*() const {
+    if (type == IDEN) return iden;
+    return nullptr;
+}
+
+ir_triple_param::operator ir_triple*() const {
+    if (type == TRIPLE) return triple;
+    return nullptr;
+}
+
+ir_triple_param::operator u64() const {
+    if (type == IMMEDIATE) return immediate;
+    return 0;
+}
+
+void ir_triple_param::set(u64 immediate) {
+    ir_triple_param::immediate = immediate;
+    type = IMMEDIATE;
+}
+
+void ir_triple_param::set(ast* value) {
+    ir_triple_param::value = value;
+    type = VALUE;
+}
+
+void ir_triple_param::set(st_entry* iden) {
+    ir_triple_param::iden = iden;
+    type = IDEN;
+}
+
+void ir_triple_param::set(ir_triple* triple) {
+    ir_triple_param::triple = triple;
+    type = TRIPLE;
+}
+
+void ir_triple_param::set(std::nullptr_t) {
+    set((ast*) nullptr);
+}
+
+std::string ir_triple_param::print() {
+    return {}; // Maybe later
+}
+
+std::string ir_triple::print() {
+    return {}; // Do nothing for now...
+}
+
 std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
     using namespace ir_op;
     switch (code) {
@@ -106,8 +164,6 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "RETURN";
         case RETVAL:
             return os << "RETVAL";
-        case RETPUSH:
-            return os << "RETPUSH";
         case NEW:
             return os << "NEW";
         case DELETE:
@@ -132,22 +188,22 @@ std::ostream& operator<<(std::ostream& os, const ir_op::code& code) {
             return os << "INVALID";
     }
 }
-/*
+
 std::string print_sequence(ir_triple* start) {
     ir_triple* cur = start;
     std::stringstream ss{};
     std::map<ir_triple*, u64> triples{};
     u64 i = 0;
     while (cur) {
-        triples.insert({cur, i++});
+        cur->id = i++;
         cur = cur->next;
     }
     
     cur = start;
     i = 0;
     while (cur) {
-        ss << std::setw(10) << i++ << ": " << cur->print(triples) << '\n';
+        ss << std::setw(10) << i++ << ": " << cur->print() << '\n';
         cur = cur->next;
     }
     return ss.str();
-}*/
+}
