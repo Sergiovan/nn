@@ -1,3 +1,10 @@
+# void example() {
+# 	int laster, sig err = foo(2, 
+# 		(let wee(){
+# 			return 1, 2, 3, 4, 5;
+# 		})());
+# }
+
 int foo();
 int foo() {
 	return 1;
@@ -6,12 +13,14 @@ int foo() {
 int foo(int a) {
 	return a;
 }
+
 int:sig foo(int a, int... b) {
 	if a > ~b {
 		raise NO_WAY;
 	}
 	return b[~b - a];
 }
+
 
 void baz(int a, int... b) {
 	return void;
@@ -82,7 +91,7 @@ int main(string[] arg) {
 	try:
 		int in_try = 69;
 		bar();
-	catch (sig b) {
+	catch sig b {
 		case bar.X_2 {
 			;
 		}
@@ -127,7 +136,7 @@ int main(string[] arg) {
 		delete b;
 		leave;
 		int* c = new int{10};
-		int* d, int[] e = new int{1}, int[5]{[2, 3, 4, 5, 6]};
+		int* d, int[] e = new int{1}, int[]{[2, 3, 4, 5, 6]};
 	}
 	
 	# leave;
@@ -156,7 +165,7 @@ int main(string[] arg) {
 	un.a = 4;
 	three = un.b;
 
-	int nothing = ---;
+	int nothing = ---; # Not working
 	int namefoo = sname.foo();
 	namefoo.foo();
 	
@@ -204,4 +213,5 @@ int main(string[] arg) {
 	} else {
 		raise WHAT_THE_FUCK;
 	}
+	return 0;
 }

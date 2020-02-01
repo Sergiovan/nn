@@ -295,7 +295,7 @@ switchstmt = cswitch, {fexpression, semicolon}, expression, switchscope
 switchscope = obrace, {{compilernote}, casestmt}, cbrace
 casestmt = (kwcase, {{expression; comma}} | celse), (ccontinue | scope | cdo, scopestatement)
 
-trystmt = ctry, colon, {{statement}}, ccatch, (oparen, [tsig], iden, cparen, switchscope | craise, semicolon)
+trystmt = ctry, colon, {{statement}}, ccatch, (tsig, iden, switchscope | craise, semicolon)
 
 returnstmt = creturn, [{{aexpression; comma}} | tvoid], semicolon
 

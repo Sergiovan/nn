@@ -157,8 +157,9 @@
     op1 = *reinterpret_cast<t1*>(memory + sp._u64);
     sp._u64 += sizeof(t1);
 %} # Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
-+ BTIN <any:u> {%
++ BTIN <any:u> <any:u> {%
     (void) op1;
+    (void) op2;
     trap(vmtraps::illegal_btin); // Oops
 %} # Call builtin function op1. Pushes call pc onto stack.
 + CALL <any:u> {%

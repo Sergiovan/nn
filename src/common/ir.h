@@ -24,6 +24,7 @@ namespace ir_op {
         ROTATE_LEFT, ROTATE_RIGHT,
         AND, OR, XOR, NOT,
         CONCATENATE,
+        SET_BIT, CLEAR_BIT, TOGGLE_BIT,
         
         CAST_FTD, CAST_DTF, CAST_STU, CAST_UTS,
         CAST_UTF, CAST_STF, CAST_UTD, CAST_STD,
@@ -32,16 +33,22 @@ namespace ir_op {
         LESS, LESS_EQUALS, GREATER, GREATER_EQUALS,
         EQUALS, NOT_EQUALS, BIT_SET, BIT_NOT_SET,
         
-        JUMP, IF_FALSE, IF_TRUE, 
+        JUMP, JUMP_RELATIVE, IF_FALSE, IF_TRUE, 
         IF_ZERO = IF_FALSE, IF_NOT_ZERO = IF_TRUE,
+        
         SYMBOL, VALUE, TEMP, 
-        CALL, CALL_CLOSURE, PARAM, RETURN, RETVAL,
+        CALL, CALL_CLOSURE, CALL_BTIN, PARAM, RETURN, RETVAL,
         
         NEW, DELETE, 
-        COPY, INDEX, OFFSET, ADDRESS, DEREFERENCE, LENGTH,
+        COPY, // COPY VALUE TARGET 
+        INDEX, // INDEX TAGET INDEX || NOT BYTES
+        OFFSET, // OFFSET TARGET OFFSET || BYTES
+        ADDRESS, DEREFERENCE, LENGTH,
         ZERO, 
         
-        NOOP
+        NOOP, 
+        
+        FUNCTION_START, FUNCTION_END, BLOCK_START, BLOCK_END
     };
 }
 
@@ -55,12 +62,14 @@ struct ir_triple_param {
     enum {VALUE, IDEN, TRIPLE, IMMEDIATE} type {VALUE};
     
     ir_triple_param(u64 immediate);
+    ir_triple_param(s32 immediate);
     ir_triple_param(ast* value);
     ir_triple_param(st_entry* iden);
     ir_triple_param(ir_triple* triple);
     ir_triple_param(std::nullptr_t);
     
     void set(u64 immediate);
+    void set(s32 immediate);
     void set(ast* value);
     void set(st_entry* iden);
     void set(ir_triple* triple);
@@ -79,16 +88,17 @@ struct ir_triple {
     ir_triple_param op1{nullptr};
     ir_triple_param op2{nullptr};
     
-    ir_triple* next{nullptr};
-    ir_triple* cond{nullptr};
-    
     type* res_type{nullptr};
     
     std::string label{};
+    
+    ir_triple* next{nullptr};
+    ir_triple* cond{nullptr};
+    
     u64 id{0};
     
     std::string print();
 };
 
-// std::ostream& operator<<(std::ostream& os, const ir_op::code& code);
-// std::string print_sequence(ir_triple* start);
+std::ostream& operator<<(std::ostream& os, const ir_op::code& code);
+std::string print_sequence(ir_triple* start);

@@ -94,7 +94,7 @@ u64 type::get_size() {
             } else {
                 bool prev_was_bitfield = false;
                 u64 bfsum = 0;
-                for (pfield f : ps.fields) {
+                for (pfield& f : ps.fields) {
                     if (f.bitfield) {
                         f.offset_bits = bfsum;
                         f.offset = ps.size;
@@ -136,7 +136,7 @@ u64 type::get_size() {
                 return u.size;
             } else {
                 u64 max = 0;
-                for (ufield f : u.fields) {
+                for (ufield& f : u.fields) {
                     u64 fsize = f.t->get_size();
                     if (fsize > max) {
                         max = fsize;

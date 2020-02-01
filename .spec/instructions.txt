@@ -84,7 +84,7 @@ PUSH <any:a> - Push op1 onto the stack, move the stack pointer up by size of op1
 PUSH <any:u> <any:u> - Push op2 bytes from @op1 onto the stack, move the stack pointer up by op2.
 POP <val:u> - Move the stack pointer down by op1 bytes.
 POP <reg:a> - Pop size of op1 bytes to op1. Move stack pointer size of op1 bytes.
-BTIN <any:u> - Call builtin function op1. Pushes call pc onto stack.
+BTIN <any:u> <any:u> - Call builtin function op1 with op2 bytes of parameters. Pushes call pc onto stack.
 CALL <any:u> - Call function at location op1. Pushes call pc onto stack.
 CALL <any:u> <any:u> - Call function at location op1 with op2 bytes of parameters.
 RET - Return from function. Pops from the stack to pc.

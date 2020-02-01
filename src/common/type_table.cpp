@@ -343,6 +343,7 @@ type* type_table::update_type(type_id id, type& nvalue) {
         if (!ptp) {
             ptp = add_type(manglp);
         }
+        ptp->get_size(); // Updates size and shit
         if (toup->tt == ettype::STRUCT) {
             toup->as_struct().pure = &ptp->as_pstruct();
         } else {
@@ -353,6 +354,7 @@ type* type_table::update_type(type_id id, type& nvalue) {
     }
     
     mangle_table.insert({mangl, toup->id});
+    toup->get_size();
     return toup;
 }
 

@@ -12,7 +12,7 @@
 #include "common/ast.h"
 #include "frontend/nn/parser.h"
 #include "common/ir.h"
-#include "frontend/nn/ast_to_ir.h"
+#include "frontend/nn/ast_compiler.h"
 
 #include "backend/nnasm.h"
 #include "frontend/nnasm/compiler.h"
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     parser p{};
     
     auto start = std::chrono::high_resolution_clock::now();
-    parse_info res = p.parse(argc > 1 ? argv[1] : "examples/morse.nn", true);
+    parse_info res = p.parse(argc > 1 ? argv[1] : "examples/students.nn", true);
     
     auto end = std::chrono::high_resolution_clock::now();
     
@@ -53,23 +53,17 @@ int main(int argc, char** argv) {
     if (p.has_errors()) {
         p.print_errors();
     } else {
-        p.print_info();
-        logger::log() << res.result->print() << logger::nend;
+//         p.print_info();
+//         logger::log() << res.result->print() << logger::nend;
         logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
         
-        ast_walker walker {res.result};
-        ast* c{nullptr};
-        while ((c = walker.next()) != nullptr) {
-            logger::log() << c->t << " " << c->print_value() << "\n";
-        }
+        start = std::chrono::high_resolution_clock::now();
+        ast_compiler b{res.result, res.root_st, *res.types};
+        b.compile();
+        end = std::chrono::high_resolution_clock::now();
         
-//         start = std::chrono::high_resolution_clock::now();
-//         ir_builder b{res};
-//         b.build();
-//         end = std::chrono::high_resolution_clock::now();
-        
-//         logger::log() << '\n' << print_sequence(b.get()) << logger::nend;
-//         logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
+        logger::log() << '\n' << print_sequence(b.get()) << logger::nend;
+        logger::info() << "Took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us" << logger::nend;
     } 
     
     if (res.result) {

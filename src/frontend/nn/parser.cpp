@@ -570,12 +570,21 @@ ast* parser::iden(bool withthis, type** thistype) {
                         error() << "Method access \"" << sym->name << "\" must be used as function call";
                     }
                 } else if (sym->is_field()) {
-                    return ast::binary(Symbol::ACCESS, ast::symbol(self), ast::symbol(sym));
+                    return ast::binary(Symbol::ACCESS, ast::symbol(self), ast::symbol(sym), sym->get_type(), true);
                 }
             }
         } else {
             sym = nullptr;
         }
+    } else if (sym->is_field() && withthis) {
+        auto self = ctx().st->get("this");
+        if (!self) {
+            sym = nullptr;
+        } else {
+            return ast::binary(Symbol::ACCESS, ast::symbol(self), ast::symbol(sym), sym->get_type(), true);
+        }
+    } else if (sym->is_field()) { // enum?
+        return ast::qword(sym->as_field().field, sym->get_type());
     }
     
     if (!sym) {
@@ -1161,7 +1170,12 @@ ast* parser::forcond() {
             }
             
             if (start->is_binary() && start->as_binary().op == Symbol::SYMDECL) {
-                for (auto& stmt : start->as_binary().left->as_block().stmts) {
+                auto& startbin = start->as_binary();
+                // TODO Remove
+                if (startbin.left->as_block().stmts.size() != 1) {
+                    colon = error() << "Cannot have more than one declaration in a for-each" << end_error{};
+                }
+                for (auto& stmt : startbin.left->as_block().stmts) {
                     auto& sym = stmt->as_symbol();
                     st()->add(sym.get_name(), sym.symbol);
                 }
@@ -1174,10 +1188,13 @@ ast* parser::forcond() {
         }
         case fortype::LUA: { // for x = y, z, w { }
             auto& luablock = start->as_binary();
+            if (luablock.left->as_block().stmts.size() != 1) {
+                error() << "Cannot have more than one declaration in a for-lua" << end_error{};
+            }
             auto& commas   = luablock.right->as_block();
             auto len = commas.stmts.size();
             if (len < 2 || len > 3) {
-                error() << "Lua for had " << len << " values, when it can only be 2 or 3";
+                error() << "For-lua had " << len << " values, when it can only be 2 or 3";
             }
             ret = ast::unary(Symbol::KWFORLUA, start);
             break;
@@ -1360,41 +1377,38 @@ ast* parser::trystmt() {
     
     next(); // catch
     
-    ast* consequence = ast::unary();
-    auto& un = consequence->as_unary();
+    ast* consequence{nullptr};
     
-    if (is(Symbol::PAREN_LEFT)) {
-        
+    if (is(Keyword::SIG)) {
+        consequence = ast::binary();
+        auto& bin = consequence->as_binary();
         push_context();
         ctx().st = st()->make_child();
         auto cg = guard();
         
-        next(); // (
-        un.op = Symbol::KWCATCH;
-        if (is(Keyword::SIG)) {
-            next(); // sig
-        }
+        next(); // sig
+        bin.op = Symbol::KWCATCH;
         
         if (require(TokenType::IDENTIFIER, epanic_mode::ESCAPE_PAREN)) {
-            st()->add_variable(c.value, types.t_sig);
+            bin.left = ast::symbol();
+            bin.left->as_symbol().symbol = st()->add_variable(c.value, types.t_sig);
             next(); // iden
         }
-        
-        require(Symbol::PAREN_RIGHT, epanic_mode::ESCAPE_BRACE);
-        next(); // (
         
         require(Symbol::BRACE_LEFT, epanic_mode::ESCAPE_BRACE);
         
         ctx().aux = types.t_sig;
-        un.node = switchscope();
+        bin.right = switchscope();
     } else if (is(Keyword::RAISE)) {
+        consequence = ast::unary(Symbol::KWRAISE);
         next(); // raise
-        un.op = Symbol::KWRAISE;
         require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
         next(); // ;
     } else {
+        consequence = ast::unary(Symbol::KWRAISE);
+        auto& un = consequence->as_unary();
         un.op = Symbol::SYMBOL_INVALID;
-        un.node = error() << "Expected parenthesis or raise after catch, found " << c.value << " instead" << end_error{};
+        un.node = error() << "Expected sig or raise after catch, found " << c.value << " instead" << end_error{};
     }
     
     return ast::binary(Symbol::KWTRY, tryblock, consequence);
@@ -1547,6 +1561,7 @@ ast* parser::raisestmt() {
     
     type*& ret_type = ctx().function->as_function().rets;
     
+    // TODO Delete this. sig must be explicit
     if (ret_type == types.t_void) {
         ret_type = types.t_sig;
     } else if (ret_type == types.t_let) { // TODO Allow this
@@ -1649,7 +1664,7 @@ ast* parser::breakstmt() {
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
-    return ast::unary(Symbol::KWBREAK);
+    return ast::unary(Symbol::KWBREAK, ast::none());
 }
 
 ast* parser::continuestmt() {
@@ -1688,7 +1703,7 @@ ast* parser::leavestmt() {
     
     require(Symbol::SEMICOLON, epanic_mode::SEMICOLON);
     next(); // ;
-    return ast::unary(Symbol::KWLEAVE);
+    return ast::unary(Symbol::KWLEAVE, ast::none());
 }
 
 ast* parser::importstmt() {
@@ -2931,7 +2946,8 @@ ast* parser::funcdecl(ast* t1, type* thistype) {
         auto cg = guard();
         
         ol->defined = true;
-        ol->value = scope(etable_owner::FUNCTION);
+        ol->value = ast::function(scope(etable_owner::FUNCTION), ftype);
+        types.update_type(ftype->id, *ftype);
         ol->st = st();
         if (entry->is_function()) {
             entry = entry->as_function().st->get(ol->unique_name());
@@ -3080,6 +3096,7 @@ ast* parser::funcval() {
         auto cg = guard();
         
         scp = scope(etable_owner::FUNCTION);
+        types.update_type(ftype->id, *ftype);
     } else {
         error() << "Function values must be defined" << epanic_mode::SEMICOLON;
         scp = ast::none();
@@ -3090,7 +3107,9 @@ ast* parser::funcval() {
     ast** rj = new ast*[jailed.size()];
     std::memcpy(rj, jailed.data(), jailed.size() * sizeof(ast*));
     
-    return ast::closure(ast::function(scp, ftype), rj, jailed.size());
+    type* pfunc = types.get(types.mangle_pure(ftype));
+    
+    return ast::closure(ast::function(scp, pfunc), rj, jailed.size());
 }
 
 parameter parser::nnparameter() {
@@ -3164,6 +3183,7 @@ ast* parser::structdecl() {
     push_context();
     entry->as_type().st = ctx().st = st()->make_child(etable_owner::STRUCT);
     ctx()._struct = stype;
+    st()->add_variable("this", pointer_to(stype));
     auto cg = guard();
     
     ast* scontent{nullptr};
@@ -3246,6 +3266,7 @@ ast* parser::uniondecl() {
     push_context();
     entry->as_type().st = ctx().st = st()->make_child(etable_owner::UNION);
     ctx()._struct = utype;
+    st()->add_variable("this", pointer_to(utype));
     auto cg = guard();
     
     ast* ucontent{nullptr};
@@ -3323,6 +3344,7 @@ ast* parser::enumdecl() {
     push_context();
     entry->as_type().st = ctx().st = st()->make_child(etable_owner::ENUM);
     ctx()._struct = etype;
+//     st()->add_variable("this", pointer_to(etype));
     auto cg = guard();
     
     ast* econtent{nullptr};
@@ -3542,6 +3564,14 @@ ast* parser::newinit() {
             if(require(Symbol::BRACE_RIGHT, epanic_mode::ESCAPE_BRACE)) {
                 next(); // }
             }
+            
+            if (array && !sized) {
+                if (!value->is_array()) {
+                    error() << "Un-sized new[] expression requires array value";
+                }
+                nntyp.array_sizes.push_back(ast::qword(value->as_array().length));
+            }
+            
         } else {
             value = ast::byte(0, nntyp.t);
         } 
@@ -3937,7 +3967,7 @@ ast* parser::e1() {
                     operator_error(sym, exp->get_type());
                     restype = exp->get_type();
                 }
-                exp = ast::unary(sym, exp, restype);
+                exp = ast::unary(sym, exp, restype, false, true);
                 break;
             case Symbol::PAREN_LEFT: {
                 ast* args = ast::block(st());
@@ -4342,7 +4372,7 @@ ast* parser::ee() {
         ret = compound_literal();
         ctx().expected = nullptr;
     } else if (is(TokenType::IDENTIFIER)) {
-        ret = iden(true);
+        ret = iden(ctx()._struct && !ctx()._struct->is_enum());
     } else {
         ret = safe_literal();
     }

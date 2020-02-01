@@ -200,7 +200,7 @@ struct ast {
     static ast* array(ast** elems = nullptr, u64 length = 0, type* t = nullptr);
     static ast* _struct(type* t = nullptr, ast** elems = nullptr);
     static ast* closure(ast* function = nullptr, ast** elems = nullptr, u64 size = 0);
-    static ast* unary(Grammar::Symbol op = Grammar::Symbol::SYMBOL_INVALID, ast* node = nullptr, type* t = nullptr, bool assignable = false, bool post = true, bool owned = true);
+    static ast* unary(Grammar::Symbol op = Grammar::Symbol::SYMBOL_INVALID, ast* node = nullptr, type* t = nullptr, bool assignable = false, bool post = false, bool owned = true);
     static ast* binary(Grammar::Symbol op = Grammar::Symbol::SYMBOL_INVALID, ast* left = nullptr, ast* right = nullptr, type* t = nullptr, bool assignable = false, bool lowned = true, bool rowned = true);
     static ast* block(symbol_table* st = nullptr);
     static ast* function(ast* block = nullptr, type* t = nullptr);
