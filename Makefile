@@ -1,31 +1,13 @@
-ifeq ($(OS),Windows_NT)
-	rm=del /f /q
-	target=nn.exe
-	objdir=wobj
-	PWD=$(shell cd)
-	mkdir=if not exist "$1" mkdir "$1"
-	convert=$(dir $(subst /,\,$1))
-	suppress=> nul
-else
-	rm=rm -rf
-	target=nn
-	objdir=lobj
-	PWD=$(shell pwd)
-	mkdir=mkdir -p $1
-	convert=$(dir $1)
-	suppress=> /dev/null
-endif
-
 include autogen.mk
 
 LDLIBS=-lpthread -lstdc++fs
 
-INCLUDEDIR=$(PWD)/src
+INCLUDEDIR=$(shell pwd)/src
 INCLUDEFLAGS=$(patsubst %, -I%, $(realpath $(INCLUDEDIR)))
 
 CXXFLAGS =-std=c++17 -Wall -Wextra $(INCLUDEFLAGS)
 CXXDFLAGS=-g -O0 -DDEBUG
-CXXRFLAGS=-Ofast
+CXXRFLAGS=-O2
 
 folders=$(sort $(dir $(shell find .)))
 cpp=$(foreach var,$(folders),$(wildcard $(var)*.cpp))
@@ -61,9 +43,9 @@ autogen.mk: $(shell find . -name *.template*)
 	@touch autogen.mk
 	
 clean:
-	$(rm) $(call convert,$(obj)) $(target)
-	$(rm) $(shell find . -name *.generated*)
-	$(rm) autogen.mk
+	rm $(call convert,$(obj)) $(target)
+	rm $(shell find . -name *.generated*)
+	rm autogen.mk
 	
 print:
 	@echo $(folders)
