@@ -71,8 +71,6 @@ tuple = "tuple" ;
 
 infer = "infer" ;
 
-dyn = "dyn" ;
-
 var = "var" ;
 let = "let" ;
 def = "def" ;
@@ -123,6 +121,11 @@ placeholder = "_" ;
 sizeof = "sizeof" ;
 typeof = "typeof" ;
 typeinfo = "typeinfo" ;
+
+dynamic = "dynamic" ;
+static = "static" ;
+and = "and" ;
+or = "or" ;
 
 operator = (symbol, symbol?, symbol?, symbol? | sizeof | typeof | const | volat) ;
 prefix_operator = [[ Operators that function as pre-unary ]] ;
@@ -239,7 +242,7 @@ declarator = (var | let) ;
 type = cexpression ; # Just a nicety
 inferrable_type = (cexpression | infer) ;
 
-paramtype = (colon, (type | dyn) | doublecolon, type) ;
+paramtype = ((colon | doublecolon), type) ;
 rettype = colon, inferrable_type ;
 
 declstmt = (vardecl, semicolon | defstmt) ;

@@ -1,0 +1,5 @@
+# Infix operators cannot be post-fix operators and vice-versa
+# Add static and dynamic overloading
+# Unicode letters and numbers?
+# Goto gotchas
+# C++ concepts
