@@ -1,4 +1,7 @@
-include autogen.mk
+# include autogen.mk
+
+target=nn
+objdir=lobj
 
 LDLIBS=-lpthread -lstdc++fs
 
@@ -9,7 +12,7 @@ CXXFLAGS =-std=c++17 -Wall -Wextra $(INCLUDEFLAGS)
 CXXDFLAGS=-g -O0 -DDEBUG
 CXXRFLAGS=-O2
 
-folders=$(sort $(dir $(shell find .)))
+folders=$(sort $(dir $(shell find src/)))
 cpp=$(foreach var,$(folders),$(wildcard $(var)*.cpp))
 obj=$(patsubst %,$(objdir)/%,$(cpp:.cpp=.o))
 
@@ -34,18 +37,18 @@ $(target): $(obj)
 	
 $(objdir)/%.o: %.cpp
 	@echo [$(CXX)] $^
-	@$(call mkdir,$(call convert,$@))
+	@mkdir -p $(dir $@)
 	@$(CXX) $(CXXFLAGS) -c $^ -o $@
 	
-autogen.mk: $(shell find . -name *.template*) 
-	@echo [python3] Generating...
-	@python3 src/autogeneration/nnasm/generate.py
-	@touch autogen.mk
+# autogen.mk: $(shell find . -name *.template*) 
+# 	@echo [python3] Generating...
+# 	@python3 src/autogeneration/nnasm/generate.py
+# 	@touch autogen.mk
 	
 clean:
-	rm $(call convert,$(obj)) $(target)
-	rm $(shell find . -name *.generated*)
-	rm autogen.mk
+	@rm -rf $(obj) $(target)
+# 	@rm $(shell find . -name *.generated*)
+# 	@rm autogen.mk
 	
 print:
 	@echo $(folders)

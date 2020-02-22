@@ -242,7 +242,7 @@ declarator = (var | let) ;
 type = cexpression ; # Just a nicety
 inferrable_type = (cexpression | infer) ;
 
-paramtype = ((colon | doublecolon), type) ;
+paramtype = (colon | doublecolon), type ;
 rettype = colon, inferrable_type ;
 
 declstmt = (vardecl, semicolon | defstmt) ;
