@@ -1,20 +1,65 @@
-# void example() {
-# 	int laster, sig err = foo(2, 
-# 		(let wee(){
-# 			return 1, 2, 3, 4, 5;
-# 		})());
-# }
+def fun example() {
+	1;
+	10;
+	10.0;
+	10e+23;
+	10f;
+	10.0f;
+	10e+23f;
+	1_0;
+	1'0;
+	0b;
+	0b0;
+	0b1;
+	0b12;
+	0o;
+	0o1;
+	0o01234567;
+	0o789;
+	0x1;
+	0x;
+	0x1234567890ABCDEFabcdef;
+	0xfghi;
+	'1;
+	_1;
+	a;
+	aa;
+	a_a;
+	a';
+	a1;
+	_;
+	_a;
+	'a;
+	# \
+	asd;
+	a+a;
+	a++a;
+	a+;!@%$^%^*;a;
+	a+";"+a;
+	"hello\"";
+	''\'';
+	'c32"Do more thing";
+	'c"Dothing";
+	'stongth;
+	'();
+	'a();
+	'{};
+	'a{};
+	'[];
+	'a[];
+	'[({"'"})];
+}
 
-int foo();
-int foo() {
+let foo: fun(-> :s32);
+def fun foo(-> :s32) {
 	return 1;
 }
 
-int foo(int a) {
+def fun foo(a: s32 -> :s32) {
 	return a;
 }
 
-int:sig foo(int a, int... b) {
+def fun foo(a: s32, b :s32... -> :s32, :e64) {
 	if a > ~b {
 		raise NO_WAY;
 	}
@@ -22,37 +67,40 @@ int:sig foo(int a, int... b) {
 }
 
 
-void baz(int a, int... b) {
-	return void;
+def fun baz(a: s32, b: s32...) {
+	return;
 }
 
-int fooo(int a) {
+def fun fooo(a: s32 -> :s32) {
 	return a;
 }
 
-struct name;
+let name: struct;
+def struct name {
+	a: f32;
+	b: f64;
+	c : s32;
+	d: []c64;
 
-struct name {
-	float a;
-	double b;
-	int c : 8;
-	string d;
-	$constructor int foo() {
+	$constructor 
+	def fun foo() {
 		return 0;
 	}
 }
 
-union uname {
-	int a = 3;
-	float b;
+def union uname {
+	a: s32 = 3;
+	b: f32;
 }
 
-enum cutlery {FORK, SPOON, SPORK, TINY_ONE_POINT_FORK}
+def enum cutlery {
+	FORK, SPOON, SPORK, TINY_ONE_POINT_FORK
+}
 
 $main
 #> #> Yay, comments! <# <#
-int main(string[] arg) { 
-	int[] arr = [1, 2, 3, 4, 5, 6];
+main(arg: [][]u8 -> :s32) { 
+	var arr: []s32 = '[1, 2, 3, 4, 5, 6];
 	
 	defer if ~arg > 2 {
 		arr[2] = 7;
@@ -60,22 +108,23 @@ int main(string[] arg) {
 		arr[2] = 36;
 	}
 
-	enum not_cutlery {WHAT, IS, THIS}
+	def enum not_cutlery {WHAT, IS, THIS}
 	
-	cutlery c = cutlery.SPOON;
+	var c: cutlery = cutlery.SPOON;
 	
 	using cutlery as _c;
 
 	c = _c.SPORK;
 
-	$fake using int as i32;
-	using int*[] as api32;
-	using fun<int(int)> as fun_foo;
+	$fake using s32 as i32;
+	using []*s32 as api32;
+	using fun(:s32 -> :s32) as fun_foo;
 
-	i32 huh = 1;
-	int okay = 2;
-	api32 nyeom = [null, null, null];
-	$unreal fun_foo a = fooo;
+	var huh: i32 = 1;
+	var okay: s32 = 2;
+	var nyeom: api32 = '[null, null, null];
+	$unreal 
+	var a: fun_foo = fooo;
 
 	a(2);
 
@@ -84,12 +133,12 @@ int main(string[] arg) {
 	using _c.*;
 	c = TINY_ONE_POINT_FORK;
 
-	int bar() {
+	def fun bar(-> :s32) {
 		raise X_2;
 	}
 	
-	try:
-		int in_try = 69;
+	try
+		var in_try: s32 = 69;
 		bar();
 	catch sig b {
 		case bar.X_2 {
@@ -112,36 +161,33 @@ int main(string[] arg) {
 		else do break;
 	} 
 	
-	int sol = <int> -~arr;
-	for int i : arr {
+	var sol: s32 = -~arr as s32;
+	for var i: s32 in arr {
 		sol += i;
 	}
 	
-	while int i = 5; --i < 0 {
+	while var i: s32 = 5; --i < 0 {
 		;
 	}
 
-	for int i = 1, 4 {
-		sol -= i;
-	}
-
-	for int i = 0; i < 5; ++i; i += 1 {
+	while var i: s32 = 0; i < 5; ++i; i += 1 {
 		sol *= i;
 	}
 	
 	{
-		int* a = new int;
-		int[] b = new int[10];
+		var a: *s32 = new *s32;
+		var b: []s32 = new [10]s32;
 		delete a;
 		delete b;
-		leave;
-		int* c = new int{10};
-		int* d, int[] e = new int{1}, int[]{[2, 3, 4, 5, 6]};
+		goto leave;
+		var c: *s32 = new s32 10;
+		var d: *s32, e: []s32 = new *s32 1, new [5]s32 '[2, 3, 4, 5, 6];
+		delete c, d;
 	}
-	
+	label leave;
 	# leave;
 	
-	int gone = 0;
+	var gone: s32 = 0;
 	label whoops;
 	gone++;
 	if gone < 2 {
@@ -152,38 +198,38 @@ int main(string[] arg) {
 	
 	label better;
 	
-	int one, float two = 1, <float> 2;
+	var one: s32, two: f32 = 1, 2 as f32;
 	
-	while int itwo = <int> two; one > 0 {
+	while var itwo: s32 = two as s32; one > 0 {
 		one -= itwo;
 	}
 	
-	name sname = {<float> 1, <float> 2, 5, "Hello!"};
-	float three = sname.a;
+	var sname: name = {1.0f, 2f, 5, "Hello!"};
+	var three: f32 = sname.a;
 	
-	uname un;
+	var un: uname;
 	un.a = 4;
 	three = un.b;
 
-	int nothing = ---; # Not working
-	int namefoo = sname.foo();
+	var nothing: s32 = ---;
+	var namefoo: s32 = sname.foo();
 	namefoo.foo();
 	
-	bool boolean = false;
+	var boolean: u1 = false;
 
-	int laster, sig err = foo(2, 1, 2, 3, 4, 5);
-	laster, err = foo(2, (let wee(){return 1, 2, 3, 4, 5;})());
+	var laster: s32, err: e64 = foo(2, 1, 2, 3, 4, 5);
+	laster, err = foo(2, (fun [] wee(){return 1, 2, 3, 4, 5;})());
 	baz(a = 2, b = [1, 2, 3, 4, 5]);
 
-	int ca = 1;
-	int cb = 2;
+	var ca: s32 = 1;
+	var cb: s32 = 2;
 
-	let pc = (void sum() [*ca, *cb] {@cb = @ca + @cb;});
+	var pc = (fun [*ca, *cb] sum() {@cb = @ca + @cb;});
 	pc();
 	pc();
 
-	fun<void()> func1 = (void func(){});
-	fun<void(int)> func2 = (void func(int a){});
+	var func1: fun(-> :u0) = (fun [] func(){});
+	var func2: fun(:s32 -> u0) = (fun [] func(a: s32){});
 
 	func2(2);
 
@@ -191,18 +237,18 @@ int main(string[] arg) {
 		return -69;
 	}
 	
-	char some_char = 'b';
-	string some_string = "Do me this favor";
+	var some_char: c32 = ''b';
+	var some_string: []c8 = "Do me this favor";
 	
-	struct nested {
-		int a;
+	def struct nested {
+		var a: s32;
 	}
 
-	struct nest {
-		nested b;
+	def struct nest {
+		var b: nested;
 	}
 
-	nest d;
+	var d: nest;
 	d.b.a = 1;
 
 	if true {

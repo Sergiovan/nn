@@ -136,6 +136,7 @@ binary(op=namespace, l=scope, r=name)
 declaration => Declares a name, and may also define it. var is used for variables, and let is used for compile-time constants. Additionally def can be used for syntactic sugar. Compile-time constants may be declared somewhere with a type and defined somewhere else. Multiple declarations in one statement are possible, then one ast node exists per declaration. Names can shadow other names in higher scopes.
 binary(op=decl, l=iden, r=value|empty)
     general declaration => All names before a type modifier (: type) are of that type. If no type modifier is given then all types will be inferred from the assignment expression (which must be present)
+    pure declaration => Only valid for types and functions. Must be a let declaration, must be typed, and the type must be incomplete. This allows referencing this name.
     type declarations => Type declarations are generally the type type (fun, struct, union, enum, tuple) followed optionally by a name (only used to reference itself) and then the type signature (differs per type) or the content of the type. Type declarations are always compile-time.
         function declarations => Function type signatures can have spread parameters and default parameters. Returns can be named. -> indicates a normal function, => indicates a compile-time function. # This should be changed?
         def declarations => def declarations are required to have a type name and require no semicolon at the end of the declaration, but also cannot have anything else following it.
@@ -177,7 +178,7 @@ value()
 char_lit => c32. Single character, utf32.
 value()
 
-string_lit => []u8. String of characters, in utf-8 format.
+string_lit => []c8. String of characters, in utf-8 format.
     With 'u8 => []c8. String of characters, in utf-8 format.
     With 'u16 => []c16. String of characters, in utf-16 format.
     With 'u32 => []c32. String of characters, in utf-32 format.

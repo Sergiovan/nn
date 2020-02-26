@@ -21,7 +21,8 @@ bindigit = r"[01]" ;
 octdigit = r"[0-7]" ; 
 hexdigit = r"[0-9a-fA-F]" ;
 whitespace = r"[ \n\t]" ; # TODO Extend with unicode whitespace
-symbol = r"[`~!@#%^&*()-+[]{}\\|<>/?]" ; # Not to be extended
+symbol = r"[`~!@#%^&*()-+\[\]{}\\|<>/?]" ; # Not to be extended
+symbol_extended = r"[`~!@#$%^&*()-+=\[\]{}\\|:;\"\',.<>/?]" # Actually all symbols
 
 underscore = "_" ;
 dollar = "$" ;
@@ -58,6 +59,8 @@ f64 = "f64" ;
 
 u1  = "u1" ;
 
+c8 = "c8" ;
+c16 = "c16" ;
 c32 = "c32" ;
 
 type = "type" ;
@@ -157,16 +160,16 @@ simple_octal = octdigit, (dseparator?, octdigit)* ;
 simple_hex = hexdigit, (dseparator?, hexdigit)* ;
 simple_any = (digit | letter), (dseparator?, (digit | letter))* ;
 
-decimal_number = simple_number, (dot, simple_number)?, ("e", r"[+-]", digit+)?, r"[fF]"? ;
+decimal_number = simple_number, (dot, simple_number)?, (r"[eE]", r"[+-]", digit+)?, r"[fF]"? ;
 binary_number = "0", r"[bB]", simple_binary ;
 octal_number = "0", r"[oO]", simple_octal ;
 hexadecimal_number = "0", r"[xX]", simple_hex ;
-any_number = simple_number, r"[lL]", simple_any ;
+# any_number = simple_number, r"[lL]", simple_any ;
 
 identifier_literal = identifier_start, identifier_legal+ ; # This is just a name
 
 number_lit = (decimal_number | binary_number | octal_number | hexadecimal_number | any_number) ;
-char_lit = apostrophe, identifier_literal?, apostrophe, any, apostrophe, apostrophe ;
+char_lit = apostrophe, apostrophe, any, apostrophe, apostrophe ;
 string_lit = (apostrophe, identifier_literal)?, quote, any*, quote ;
 marked_brack = apostrophe, obrack ;
 marked_brace = apostrophe, obrace ;
@@ -256,10 +259,10 @@ funclit = fun, capture_group, (identifier_literal | placeholder)?, functypesig, 
 funclitdef = fun, capture_group?, identifier_literal, functypesig, scope ;
 capture_group = obrack, (pointer, identifier_literal | identifier_literal, (assignment)?; comma) , cbrack ;
 
-functypesig = oparen, (param; comma)*, ((rarrow | srarrow), (return; comma)?, cparen ; 
+functypesig = oparen, (param; comma)*, ((rarrow | srarrow), (return; comma))?, cparen ; 
 
 param = declarator?, (identifier_literal | placeholder)?, paramtype, spread?, (assign, cexpression)? ;
-return = (declarator?, (identifier_literal | placeholder)?, rettype)* | infer) ;
+return = ((declarator?, (identifier_literal | placeholder)?, rettype)* | infer) ;
 
 structlit = struct, (identifier_literal | placeholder)?, structscope? ;
 structlitdef = struct, identifier_literal, structscope ;
@@ -281,8 +284,8 @@ tuplelit = tuple, (identifier_literal | placeholder)?, tupletypes? ;
 tuplelitdef = tuple, identifier_literal, tupletypes ;
 tupletypes = oparen, (type*; comma), cparen ;
 
-typeliteral = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c32 | type | any | funclit | structlit | unionlit | enumlit | tuplelit) ;
-typeliteral_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c32 | type | any | structlit | unionlit | enumlit | tuplelit) ;
+typeliteral = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | funclit | structlit | unionlit | enumlit | tuplelit) ;
+typeliteral_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | structlit | unionlit | enumlit | tuplelit) ;
 
 assignment = assign, (expression; comma)+ ;
 assstmt = (expression; comma)+, assignment, semicolon ;

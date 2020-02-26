@@ -75,10 +75,7 @@
 		"invalid": {
 			"patterns": [{
 				"name": "invalid.illegal",
-				"match": "\\b(and|or|typeof|sizeof|yield|any)\\b"
-			}, {
-				"name": "invalid.illegal",
-				"match": "<-|->"
+				"match": "\\b(and|or|match|yield|dynamic|static)\\b"
 			}]
 		},
 		"constant": {
@@ -88,11 +85,11 @@
 			},
 			{
 				"name": "constant.numeric.nn",
-				"match": "\\b((0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+))|[0-9][lL][0-9a-zA-Z]+|[0-9]+(\\.[0-9]+)?(e[+-]?[0-9]+)?)"
+				"match": "\\b((0([xX][0-9a-fA-F'_]+|[oO][0-7'_]+|[bB][01'_]+))|[0-9][lL][0-9a-zA-Z'_]+|[0-9'_]+(\\.[0-9'_]+)?(e[+-]?[0-9'_]+)?[fF]?)"
 			},
 			{
 				"name": "constant.character.nn",
-				"begin": "'",
+				"begin": "''",
 				"beginCaptures": {
 					"0": {
 						"name": "punctuation.definition.character.begin.nn"
@@ -113,7 +110,7 @@
 		},
 		"meta": {
 			"patterns": [{
-				"begin": "\\b(enum)(?: +([A-Za-z_][A-Za-z_0-9]*))(?: *({))?",
+				"begin": "\\b(enum)(?: +([A-Za-z_][A-Za-z_0-9']*))(?: *({))?",
 				"beginCaptures": {
 					"1": {
 						"name": "storage.type.enum.nn"
@@ -128,7 +125,7 @@
 				"name": "meta.enum.nn",
 				"patterns": [{
 					"name": "entity.name.type.enum.element.nn",
-					"match": "[a-zA-Z_][a-zA-Z_0-9]*"
+					"match": "[a-zA-Z_][a-zA-Z_'0-9]*"
 				}],
 				"end": "(})|(;)",
 				"endCaptures": {
@@ -142,7 +139,7 @@
 			}, 
 			{
 				"name": "meta.struct.decl.nn",
-				"match": "\\b(struct)(?: +([A-Za-z_][A-Za-z_0-9]*))(?: *(?:({)|(;)))",
+				"match": "\\b(struct)(?: +([A-Za-z_][A-Za-z_0-9']*))(?: *(?:({)|(;)))",
 				"captures": {
 					"1": {
 						"name": "storage.type.struct.nn"
@@ -160,7 +157,7 @@
 			},
 			{
 				"name": "meta.union.decl.nn",
-				"match": "\\b(union)(?: +([A-Za-z_][A-Za-z_0-9]*))(?: *(?:({)|(;)))",
+				"match": "\\b(union)(?: +([A-Za-z_][A-Za-z_0-9']*))(?: *(?:({)|(;)))",
 				"captures": {
 					"1": {
 						"name": "storage.type.union.nn"
@@ -180,19 +177,23 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.$0.nn",
-				"match": "\\b(if|else|for|while|do|switch|return|raise|break|continue|leave|goto|try|catch)\\b"
+				"match": "\\b(if|else|for|while|loop|do|switch|return|raise|break|continue|goto|try|catch)\\b"
 			},
 			{
 				"name": "keyword.other.$0.nn",
-				"match": "\\b(label|defer|import|using|namespace|case|as)\\b"
+				"match": "\\b(label|defer|import|using|namespace|case|as|in)\\b"
+			},
+			{
+				"name": "keyword.declarator.$0.nn",
+				"match": "\\b(var|let|def)\\b"
 			},
 			{
 				"name": "storage.type.$0.nn",
-				"match": "\\b(void|byte|short|int|long|sig|float|double|bool|struct|union|enum|char|string|fun|let)\\b"
+				"match": "\\b(u0|u8|u16|u32|u64|s8|s16|s32|s64|e64|f32|f64|u1|c8|c16|c32|struct|union|enum|tuple|fun|type|any|infer)\\b"
 			}, 
 			{
-				"name": "variable.language.this.nn",
-				"match": "\\bthis\\b"
+				"name": "variable.language.$0.nn",
+				"match": "\\b(this|_)\\b"
 			},
 			{
 				"name": "storage.modifier.$0.nn",
@@ -217,6 +218,14 @@
 				"match": "\\bdelete\\b"
 			},
 			{
+				"name": "keyword.operator.const.nn keyword.other",
+				"match": "\\bconst\\b"
+			},
+			{
+				"name": "keyword.operator.volat.nn keyword.other",
+				"match": "\\bvolat\\b"
+			},
+			{
 				"name": "keyword.operator.decrement.nn",
 				"match": "--"
 			},
@@ -226,11 +235,11 @@
 			},
 			{
 				"name": "keyword.operator.assignment.compound.nn",
-				"match": "(\\+|-|\\*|\\*\\*|/|&|\\||\\^|<<|>>|<<<|>>>|\\.\\.|@\\||@&|@\\^)="
+				"match": "(\\+|-|\\*|//|/|&|\\||\\^|<<|>>|<<<|>>>|\\.\\.|<<\\||<<&|<<\\^)="
 			},
 			{
 				"name": "keyword.operator.bitwise.nn",
-				"match": "@\\||@&|@\\?|@\\^"
+				"match": "<<\\||<<&|<<\\?|<<\\^"
 			},
 			{
 				"name": "keyword.operator.pointer.nn",
@@ -238,7 +247,7 @@
 			},
 			{
 				"name": "keyword.operator.arithmetic.nn",
-				"match": "\\+|-|\\*|\\*\\*|/|%"
+				"match": "\\+|-|\\*|/|//|%"
 			}, 
 			{
 				"name": "keyword.operator.bitwise.rotate.nn",
@@ -277,7 +286,7 @@
 				"match": "\\."
 			}, 
 			{
-				"begin": "\\?",
+				"begin": "<>",
 				"beginCaptures": {
 					"0": {
 						"name": "keyword.operator.ternary.begin.nn"
@@ -298,13 +307,13 @@
 			},
 			{
 				"name": "punctuation.separator.delimiter.nn",
-				"match": "[,:]"
+				"match": "(,|->|=>)"
 			}]
 		},
 		"strings": {
 			"patterns": [{
 				"name": "string.quoted.double.nn",
-				"begin": "\"",
+				"begin": "('[a-zA-Z0-9'])?\"",
 				"beginCaptures": {
 					"0": {
 						"name": "punctuation.definition.string.begin.nn"
@@ -326,7 +335,7 @@
 		"entity": {
 			"patterns": [{
 				"name": "entity.name.function.nn",
-				"match": "[a-zA-Z_]\\w*(?= *\\()"
+				"match": "[a-zA-Z_][a-zA-Z0-9_']*(?= *\\()"
 			}]
 		}
 	},

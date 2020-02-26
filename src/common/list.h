@@ -5,8 +5,8 @@
 
 template <typename T>
 struct list_node {
-    list_node<T>* prev;
-    list_node<T>* next;
+    T* prev {nullptr};
+    T* next {nullptr};
 };
 
 // Lists do not circle around
@@ -210,7 +210,6 @@ public:
         return back_iterator{nullptr};
     }
     
-private:
     T* head{nullptr};
     T* tail{nullptr};
     u64 count{0};

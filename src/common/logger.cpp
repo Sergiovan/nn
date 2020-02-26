@@ -5,6 +5,7 @@
 
 using namespace logger;
 
+alignas(_logger)
 _logger logger::default_logger{};
 
 _logger::_logger() 
