@@ -10,7 +10,7 @@ struct list_node {
 };
 
 // Lists do not circle around
-template <typename T, typename = std::enable_if_t<std::is_base_of_v<list_node<T>, T>>>
+template <typename T>
 class list {
 public:
     class fwd_iterator {

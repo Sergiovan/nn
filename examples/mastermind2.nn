@@ -45,7 +45,7 @@ struct linked_list {
     }
 }
 
-let print: fun(any...);
+let print: fun(:any...);
 
 def fun printll(list: linked_list) {
     #> C-style for loop <#

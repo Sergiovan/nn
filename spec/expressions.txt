@@ -12,7 +12,7 @@
 # After all operators
 
 1: new x z
-2: x <> y : z
+2: x ?? y <> z
 
 # Operators, in order of precedence
 

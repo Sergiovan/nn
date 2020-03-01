@@ -3,7 +3,7 @@
 
 using namespace grammar;
 
-std::map<std::string, u64> grammar::string_to_symbol {
+dict<std::string, u64> grammar::string_to_symbol {
     {"u0", (u64) symbol::KW_U0},
     {"u8", (u64) symbol::KW_U8},
     {"u16", (u64) symbol::KW_U16},
@@ -141,7 +141,7 @@ std::map<std::string, u64> grammar::string_to_symbol {
     {"<#", (u64) symbol::COMMENT_CLOSE}
 };
 
-std::map<u64, std::string> grammar::symbol_to_string {swap_map(string_to_symbol)};
+dict<u64, std::string> grammar::symbol_to_string {swap_map(string_to_symbol)};
 
 std::ostream& operator<<(std::ostream& os, const symbol& sym) {
     if (sym == SPECIAL_INVALID) {

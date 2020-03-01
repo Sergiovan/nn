@@ -1,6 +1,6 @@
 #pragma once
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <iostream>
 
@@ -65,8 +65,8 @@ namespace grammar {
         SPECIAL_LAST
     };
     
-    extern std::map<std::string, u64> string_to_symbol;
-    extern std::map<u64, std::string> symbol_to_string;
+    extern dict<std::string, u64> string_to_symbol;
+    extern dict<u64, std::string> symbol_to_string;
     
 }
 

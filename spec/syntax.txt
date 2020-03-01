@@ -151,6 +151,8 @@ rarrow = "->" ;
 srarrow = "=>" ;
 spread = "..." ;
 diamond = "<>" ;
+question = "?" ;
+dquestion = "??" ;
 nothing = "---" ;
 
 dseparator = (apostrophe | underscore) ;
@@ -295,7 +297,7 @@ deletestmt = delete, (expression; comma)+, semicolon;
 expressionstmt = expression, semicolon ;
 
 expression = ternaryexpr ;
-ternaryexpr = newexpr, (diamond, expression, colon, expression)? ;
+ternaryexpr = newexpr, (dquestion, expression, diamond, expression)? ;
 newexpr = (new, (oparen, expression, cparen)?, cexpression, expression | preunaryexpr ) ;
 
 prefixexpr = (prefix_operator*, postfixexpr) ;

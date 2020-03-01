@@ -50,12 +50,24 @@ private:
     friend class _logger;
 };
 
+class dummy_instance {
+public:
+    dummy_instance(_logger&);
+
+    template <typename T>
+    dummy_instance& operator<<(T) {
+        return *this;
+    }
+};
+
 namespace logger {    
     alignas(_logger)
     extern _logger default_logger;
     
+    using debug_instance = std::conditional_t<debug, dummy_instance, logger_instance>;
+    
     logger_instance error();
     logger_instance warn();
     logger_instance info();
-    logger_instance debug();
+    debug_instance debug();
 }

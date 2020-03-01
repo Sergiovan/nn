@@ -1,10 +1,10 @@
 #pragma once
 
-#include <map>
+#include "common/defs.h"
 
 template <typename U, typename V>
-std::map<V, U> swap_map(std::map<U, V>& m) {
-    std::map<V, U> ret{};
+dict<V, U> swap_map(dict<U, V>& m) {
+    dict<V, U> ret{};
     
     for (auto& [k, v] : m) {
         ret.insert({v, k});

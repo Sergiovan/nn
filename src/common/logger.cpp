@@ -37,6 +37,8 @@ logger_instance::logger_instance(logger_instance && o)
     std::swap(ss, o.ss);
 }
 
+dummy_instance::dummy_instance(_logger&) { }
+
 class error_instance : public logger_instance {
 public:
     error_instance(_logger& logger) : logger_instance {logger} {
@@ -77,6 +79,6 @@ logger_instance logger::info() {
     return info_instance{default_logger};
 }
 
-logger_instance logger::debug() {
+logger::debug_instance logger::debug() {
     return debug_instance{default_logger};
 }

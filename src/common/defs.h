@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <unordered_map>
 
 #ifdef DEBUG
 #include <iostream>
@@ -30,6 +31,8 @@ constexpr bool debug = false;
 
 #endif
 
+template <typename K, typename V>
+using dict = std::unordered_map<K, V>;
 
 using u8  = uint8_t;
 using u16 = uint16_t;

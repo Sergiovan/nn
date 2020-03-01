@@ -219,7 +219,6 @@ compound_identifier_simple => Similar to dot expression but simply names somethi
 unary(op=dot, n=block(xs=identifiers))
 
 
-
 # Operators
 
 const => Fixed operator. 
@@ -255,12 +254,12 @@ unary(op=typeinfo, n=expr)
 
 new => pseudo-operator. 
 binary(op=new, l=n, r=e, t=t)
-    new <type *t> ~> <value: *t>. Allocates data for a value of type t and returns a pointer to it.
-    new <type !t> ~> <value: !t>. Allocates data for a unique pointer of type t and returns a unique pointer to it.
-    new <type +t> ~> <value: +t>. Allocates data for a shared pointer of type t and returns a shared pointer to it.
-    new <type [<expr e>]t> ~> <value: [e]t>. Allocates data for an array of values of type t and size e and returns it.
-    new (<expr n: u64>) <type t> -> <value: @t>. Allocates data for n values of type @t and returns a pointer to the first one.
-    new <type t> <expr e: @t> ~> <value: @t>. Allocates data for a value of type @t, gives it value e and returns a pointer to it.
+    new : <type *t> ~> <value: *t>. Allocates data for a value of type t and returns a pointer to it.
+    new : <type !t> ~> <value: !t>. Allocates data for a unique pointer of type t and returns a unique pointer to it.
+    new : <type +t> ~> <value: +t>. Allocates data for a shared pointer of type t and returns a shared pointer to it.
+    new : <type [<expr e>]t> ~> <value: [e]t>. Allocates data for an array of values of type t and size e and returns it.
+    new (<expr n: u64>) : <type t> -> <value: @t>. Allocates data for n values of type @t and returns a pointer to the first one.
+    new <expr e: @t> : <type t> ~> <value: @t>. Allocates data for a value of type @t, gives it value e and returns a pointer to it.
     binary(op=new, l=n|1, r=e|0, t=t)
 
 ? (weak pointer) => operator.
@@ -444,6 +443,6 @@ binary(op=new, l=n, r=e, t=t)
     ...<expr n> => <expr: t1>, <expr: t2>, <expr: t3>, ... . Spreads an expression into a comma-separated list of expressions. Valid for structs, tuples and arrays. For arrays, the length must be known at compile time or they must be spread into other arrays.
     unary(op=spread, n=n, t=t1:t2:t3:...)
 
-<> (diamond) => Fixed operator. 
-    <expr choice: u1> <> <expr e1: t> : <expr e2: t> => <reference: t>. Chooses between 2 expressions.
+?? (choice) => Fixed operator. 
+    <expr choice: u1> ?? <expr e1: t> <> <expr e2: t> => <reference: t>. Chooses between 2 expressions.
     binary(op=diamond, l=choice, r=binary(op=choice, l=e1, r=e2, t=t), t=t, assignable=true)
