@@ -1,0 +1,39 @@
+# Type mangling only applicable to type table. Symbol mangling later
+# All elements are aligned. Padding is done with 0 as required
+
+8 bytes flags (4 bits mangle length, 4 bits type type, 1 bit const, 1 bit volat, rest zeroed)
+Mangle length is the length of each field in bytes - 1
+
+PRIMITIVE (4 bytes):
+2 byte primitive type -> SIGNED, UNSIGNED, FLOATING, CHARACTER, TYPE, ANY, VOID
+2 bytes bits. 
+
+POINTER (1 byte + mangle length)
+mangle length bytes pointed at id
+1 byte pointer type -> NAKED, UNIQUE, SHARED, WEAK
+
+ARRAY (1 byte + mangle length * 2)
+mangle length array size
+mangle length bytes pointed at id
+1 byte sized
+
+COMPOUND (mangle length * (1 + n))
+mangle length compound size = n
+n * mangle length compound type id
+
+SUPERCOMPOUND (mangle length)
+mangle length compound type id
+
+FUNCTION (mangle length * (2 + n + m) bytes + (n * 4 + m) bits)
+mangle length param amount = n
+mangle length return amount = m
+n * mangle length param type id
+m * mangle length return type id
+n * 4 bits param flags
+m bits return flags
+
+SUPERFUNCTION (mangle length)
+mangle length function type id
+
+SPECIAL (1 byte)
+1 byte special type -> INFER, GENERIC, NONE

@@ -2,6 +2,31 @@
 
 #include <cstring>
 
+void delete_list(list<ast> l) {
+    ast* next{l.head};
+    while (next) {
+        ast* del = next;
+        next = next->next;
+        delete del;
+    }
+    l.count = 0;
+}
+
+list<ast> clone_list(list<ast> l) {
+    list<ast> ret;
+    ret.head = ast::make(l.head->clone());
+    ast* n = ret.head, *c = l.head;
+    while (c->next) {
+        n->next = ast::make(c->next->clone());
+        n->next->prev = n;
+        n = n->next;
+        c = c->next;
+    }
+    ret.tail = n;
+    ret.count = l.count;
+    return ret;
+}
+
 ast_none ast_none::clone() const {
     return {};
 }
@@ -46,32 +71,29 @@ ast_string ast_string::clone() const {
 }
 
 ast_compound::~ast_compound() {
-    ast* next{elems.head};
-    while (next) {
-        ast* del = next;
-        next = next->next;
-        delete del;
-    }
-    elems.count = 0;
+    delete_list(elems);
 }
 
 ast_compound ast_compound::clone() const {
     ast_compound ret{};
-    ret.elems.head = ast::make(elems.head->clone());
-    ast* n = ret.elems.head, *c = elems.head;
-    while (c->next) {
-        n->next = ast::make(c->next->clone());
-        n->next->prev = n;
-        n = n->next;
-        c = c->next;
-    }
-    ret.elems.tail = n;
-    ret.elems.count = elems.count;
+    ret.elems = clone_list(elems);
     return ret;
 }
 
 ast_nntype ast_nntype::clone() const {
     return {t}; // TBD
+}
+
+ast_block::~ast_block() {
+    delete_list(elems);
+    delete_list(at_end);
+}
+
+ast_block ast_block::clone() const {
+    ast_block ret{};
+    ret.elems = clone_list(elems);
+    ret.at_end = clone_list(at_end);
+    return ret;
 }
 
 ast_iden ast_iden::clone() const {
@@ -240,7 +262,7 @@ ast* ast::make_nntype(const ast_nntype& t, token* tok, type* typ) {
     return ret;
 }
 
-ast* ast::make_block(const ast_compound& c, token* tok, type* t) {
+ast* ast::make_block(const ast_block& c, token* tok, type* t) {
     ast* ret = new ast{ast_type::BLOCK, tok, t};
     ret->block = c;
     return ret;

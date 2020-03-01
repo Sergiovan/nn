@@ -6,6 +6,7 @@
 #include "common/list.h"
 
 struct ast;
+class type_table;
 
 enum class type_type : u8 {
     PRIMITIVE, POINTER, 
@@ -27,7 +28,7 @@ enum class pointer_type : u8 {
 };
 
 enum class special_type : u8 {
-    INFER, NONE
+    INFER, GENERIC, NONE
 };
 
 struct type;
@@ -96,8 +97,12 @@ struct type_special {
 };
 
 struct type {
-    type_type tt{type_type::SPECIAL};
+    type_table& table;
     u64 id{0xFFFFFFFF};
+    type_type tt{type_type::SPECIAL};
+    
+    u8 const_flag : 1;
+    u8 volat_flag : 1;
     
     union {
         type_primitive primitive;
@@ -131,6 +136,15 @@ struct type {
     
     type* get_underlying();
     
+    type(type_table& tt, u64 id, const type_primitive& primitive, bool _const, bool volat);
+    type(type_table& tt, u64 id, const type_pointer& pointer, bool _const, bool volat);
+    type(type_table& tt, u64 id, const type_array& array, bool _const, bool volat);
+    type(type_table& tt, u64 id, const type_compound& compound, bool _const, bool volat);
+    type(type_table& tt, u64 id, type_type ttt, const type_supercompound& scompound, bool _const, bool volat);
+    type(type_table& tt, u64 id, const type_function& function, bool _const, bool volat);
+    type(type_table& tt, u64 id, const type_superfunction& sfunction, bool _const, bool volat);
+    type(type_table& tt, u64 id, const type_special& special, bool _const, bool volat);
+    
     ~type();
+    type(type&& o);
 };
-

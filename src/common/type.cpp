@@ -103,6 +103,47 @@ type* type::get_underlying() {
     }
 }
 
+type::type(type_table& tt, u64 id, const type_primitive& primitive, bool _const, bool volat) 
+: table{tt}, id{id}, tt{type_type::PRIMITIVE}, const_flag{_const}, volat_flag{volat}, primitive{primitive} {
+    
+}
+
+type::type(type_table& tt, u64 id, const type_pointer& pointer, bool _const, bool volat) 
+: table{tt}, id{id}, tt{type_type::POINTER}, const_flag{_const}, volat_flag{volat}, pointer{pointer} {
+    
+}
+
+type::type(type_table& tt, u64 id, const type_array& array, bool _const, bool volat) 
+: table{tt}, id{id}, tt{type_type::ARRAY}, const_flag{_const}, volat_flag{volat}, array{array} {
+    
+}
+
+type::type(type_table& tt, u64 id, const type_compound& compound, bool _const, bool volat) 
+: table{tt}, id{id}, tt{type_type::COMPOUND}, const_flag{_const}, volat_flag{volat}, compound{compound} {
+    
+}
+
+type::type(type_table& tt, u64 id, type_type ttt, const type_supercompound& scompound, bool _const, bool volat) 
+: table{tt}, id{id}, tt{ttt}, const_flag{_const}, volat_flag{volat}, scompound{scompound} {
+    
+}
+
+type::type(type_table& tt, u64 id, const type_function& function, bool _const, bool volat) 
+: table{tt}, id{id}, tt{type_type::FUNCTION}, const_flag{_const}, volat_flag{volat}, function{function} {
+    
+}
+
+type::type(type_table& tt, u64 id, const type_superfunction& sfunction, bool _const, bool volat) 
+: table{tt}, id{id}, tt{type_type::SUPERFUNCTION}, const_flag{_const}, volat_flag{volat}, sfunction{sfunction} {
+    
+}
+
+type::type(type_table& tt, u64 id, const type_special& special, bool _const, bool volat) 
+: table{tt}, id{id}, tt{type_type::SPECIAL}, const_flag{_const}, volat_flag{volat}, special{special} {
+    
+}
+
+
 type::~type() {
     switch (tt) {
         case type_type::COMPOUND:
@@ -116,5 +157,49 @@ type::~type() {
             return;
         default:
             return;
+    }
+}
+
+type::type(type&& o) 
+: table{o.table}, id{o.id}, tt{o.tt}, const_flag{o.const_flag}, volat_flag{o.volat_flag} {
+    switch (tt) {
+        case type_type::PRIMITIVE: {
+            std::swap(primitive, o.primitive);
+            break;
+        }
+        case type_type::POINTER: {
+            std::swap(pointer, o.pointer);
+            break;
+        }
+        case type_type::ARRAY: {
+            std::swap(array, o.array);
+            break;
+        }
+        case type_type::COMPOUND: {
+            compound = type_compound{};
+            std::swap(compound, o.compound);
+            break;
+        }
+        case type_type::STRUCT: [[fallthrough]];
+        case type_type::UNION: [[fallthrough]];
+        case type_type::ENUM: [[fallthrough]];
+        case type_type::TUPLE: {
+            std::swap(scompound, o.scompound);
+            break;
+        }        
+        case type_type::FUNCTION: {
+            function = type_function{};
+            std::swap(function, o.function);
+            break;
+        }
+        case type_type::SUPERFUNCTION: {
+            sfunction = type_superfunction{};
+            std::swap(sfunction, o.sfunction);
+            break;
+        }
+        case type_type::SPECIAL: {
+            std::swap(special, o.special);
+            break;
+        }
     }
 }

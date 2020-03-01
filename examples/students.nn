@@ -1,22 +1,22 @@
 import std;
 using std.io;
 
-enum class {A, B, C, D}
+def enum class {A, B, C, D}
 
-struct student {
-	class group;
-	int unsigned grade;
-	string name;
+def struct student {
+	var group: class;
+	var grade: u32;
+	var name: []c8;
 }
 
-student[] sorted(student[] students, fun<byte signed(student, student)> comparison) {
+def fun sorted(students: []student, comparison: fun(:student, :student -> :s8) -> :[]student) {
 	if ~students < 2 {
 		return students;
 	}
 	
-	student[] merge(student[] a, student[] b) {
+	def fun merge(a :[]student, b :[]student -> :[]student) {
 		student[~a + ~b] ret;
-		long unsigned i, j = 0, 0;
+		var i, j: u64 = 0, 0;
 		label loop_begin;
 			if i == ~a && j == ~b {
 				goto loop_end;
@@ -27,7 +27,7 @@ student[] sorted(student[] students, fun<byte signed(student, student)> comparis
 				ret[i + j] = a[i];
 				++i;
 			} else {
-				byte signed z = comparison(a[i], b[j]);
+				var z: s8 = comparison(a[i], b[j]);
 				ret[i + j] = z <= 0 ? a[i++] : b[j++]; 
 			}
 		goto loop_begin;
@@ -37,12 +37,11 @@ student[] sorted(student[] students, fun<byte signed(student, student)> comparis
 	
 	using std.math as m;
 	
-	long pivot = m.floor(<double>(~students / 2));
-	student[] a;
-	student[] b;
-	student spivot = students[pivot];
+	var pivot: s64 = m.floor(~students / 2.0);
+	var a, b: []student;
+	var spivot: student = students[pivot];
 	
-	for student s : students {
+	for var s in students {
 		if comparison(s, spivot) <= 0 {
 			a ..= s;
 		} else {
@@ -55,26 +54,24 @@ student[] sorted(student[] students, fun<byte signed(student, student)> comparis
 	return merge(a, b);
 }
 
-int main(string[]) {
-	student[] students = [
-		{class.A, 10, "Christian"}, {class.A, 0, "Sergio"}, 
-		{class.B, 3, "Johnathan"}, {class.B, 8, "Oliver"}, 
-		{class.C, 5, "Sarah"}, {class.C, 7, "Peter"}, 
-		{class.D, 9, "Marta"}, {class.D, 2, "Maggy"}, {class.D, 1, "Francis"},
+var main(:[]c8 -> :s32) {
+	var students: []student = '[
+		'{class.A, 10, "Christian"}, '{class.A, 0, "Sergio"}, 
+		'{class.B, 3, "Johnathan"}, '{class.B, 8, "Oliver"}, 
+		'{class.C, 5, "Sarah"}, '{class.C, 7, "Peter"}, 
+		'{class.D, 9, "Marta"}, '{class.D, 2, "Maggy"}, '{class.D, 1, "Francis"},
 	];
 	
-	student[] by_grade = sorted(comparison = (byte signed(student a, student b) {
-		return <byte signed> (b.grade - a.grade); # Let's ignore the fact this might overflow
-	}), students = students);
+	var by_grade: []student = sorted(comparison = fun [] (a: student, b: student -> :s8) {
+		return (b.grade - a.grade) as s8; # Let's ignore the fact this might overflow
+	}, students = students);
 	
-	for student s : by_grade {
-		io.print("Student: ");
-		io.print(s.name);
-		io.print("\nGrade: ");
-		io.print(<int>(s.grade));
+	for var s in by_grade {
+		io.print("Student: ", s.name);
+		io.print("\nGrade: ", s.grade as s32);
 		io.print("\nGroup: ");
 		
-		string class_desc;
+		var class_desc: c32[];
 		
 		using class.*;
 		switch s.group {
@@ -92,8 +89,7 @@ int main(string[]) {
 			}
 		}
 		
-		io.print(class_desc);
-		io.print("\n\n");
+		io.print(class_desc, "\n\n");
 	}
 	
 	return 0;

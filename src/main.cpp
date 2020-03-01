@@ -16,15 +16,6 @@ int main(int argc, char** argv) {
     token_stream ts{argv[1]};
     ts.read();
     
-    for (auto tok : ts) {
-        if (tok->tt == token_type::COMMENT || tok->tt == token_type::WHITESPACE || 
-            tok->tt == token_type::NEWLINE) {
-            // Skip
-        } else {
-            logger::info() << *tok;
-        }
-    }
-    
     logger::debug() << "Program end";
     
     return 0;

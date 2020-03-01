@@ -1,11 +1,9 @@
-void print(string);
-void print(int);
+let print: fun(:any... -> u0);
 
-void fizzbuzz(int max) {
-    int count = 1;
-    while count <= max {
-        bool fizz = !!(count % 3);
-        bool buzz = !!(count % 5);
+def fun fizzbuzz(max: s32) {
+    while var count: s32 = 1; count <= max; ++count {
+        var fizz: u1 = !!(count % 3);
+        var buzz: u1 = !!(count % 5);
         if fizz && buzz {
             print("FizzBuzz");
         }
@@ -18,6 +16,5 @@ void fizzbuzz(int max) {
         else {
             print(count);
         }
-        count++;
     }
 }

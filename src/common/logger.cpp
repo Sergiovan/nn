@@ -80,5 +80,5 @@ logger_instance logger::info() {
 }
 
 logger::debug_instance logger::debug() {
-    return debug_instance{default_logger};
+    return std::conditional_t<::debug, ::debug_instance, dummy_instance>{default_logger};
 }

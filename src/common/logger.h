@@ -64,7 +64,7 @@ namespace logger {
     alignas(_logger)
     extern _logger default_logger;
     
-    using debug_instance = std::conditional_t<debug, dummy_instance, logger_instance>;
+    using debug_instance = std::conditional_t<debug, logger_instance, dummy_instance>;
     
     logger_instance error();
     logger_instance warn();

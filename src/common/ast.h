@@ -70,6 +70,13 @@ struct ast_nntype {
     ast_nntype clone() const;
 };
 
+struct ast_block {
+    list<ast> elems;
+    list<ast> at_end;
+    ~ast_block();
+    ast_block clone() const;
+};
+
 struct ast_iden {
     // Special, tbd
     symbol* s;
@@ -91,7 +98,7 @@ struct ast : public list_node<ast> {
         ast_string string;
         ast_compound compound;
         ast_nntype nntype;
-        ast_compound block;
+        ast_block block;
         ast_iden iden;
     };
     
@@ -123,6 +130,6 @@ struct ast : public list_node<ast> {
     static ast* make_string(const ast_string& s, token* tok, type* t);
     static ast* make_compound(const ast_compound& c, token* tok, type* t);
     static ast* make_nntype(const ast_nntype& t, token* tok, type* typ);
-    static ast* make_block(const ast_compound& c, token* tok, type* t);
+    static ast* make_block(const ast_block& c, token* tok, type* t);
     static ast* make_iden(const ast_iden& i, token* tok, type* t);
 };
