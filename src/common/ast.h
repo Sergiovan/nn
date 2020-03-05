@@ -50,6 +50,10 @@ struct ast_value {
 
 
 struct ast_string {
+    explicit ast_string(const char* c);
+    explicit ast_string(const std::string& s);
+    ast_string(u8* chars, u64 length);
+    
     u8* chars;
     u64 length;
     

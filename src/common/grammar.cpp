@@ -118,6 +118,7 @@ dict<std::string, u64> grammar::string_to_symbol {
 
 
     {":", (u64) symbol::COLON},
+    {";", (u64) symbol::SEMICOLON},
     {",", (u64) symbol::COMMA},
     {".", (u64) symbol::PERIOD},
     {"=", (u64) symbol::ASSIGN},

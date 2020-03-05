@@ -3,6 +3,8 @@
 
 #include "common/token_stream.h"
 
+#include "frontend/parser.h"
+
 int main(int argc, char** argv) {
     std::ios_base::sync_with_stdio(false);
     
@@ -13,8 +15,8 @@ int main(int argc, char** argv) {
     
     logger::debug() << "Program start";
     
-    token_stream ts{argv[1]};
-    ts.read();
+    parser p{};
+    p.parse(argv[1]);
     
     logger::debug() << "Program end";
     

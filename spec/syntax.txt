@@ -251,14 +251,14 @@ paramtype = (colon | doublecolon), type ;
 rettype = colon, inferrable_type ;
 
 declstmt = (vardecl, semicolon | defstmt) ;
-defstmt = def, (funclitdef | structlitdef | unionlitdef | enumlitdef | tuplelitdef) ;
+defstmt = def, (funcdef | structtypelitdef | uniontypelitdef | enumtypelitdef | tupletypelitdef) ;
 
 vardecl = declarator, simplevardecl ;
 simplevardecl = (((identifier_literal | placeholder)?; comma)+, (colon, inferrable_type)?)+, assignment ;
 
 funclit_or_type = fun, (capture_group, (identifier_literal | placeholder)?, functypesig, scope | (identifier_literal | placeholder)?, functypesig) ;
 funclit = fun, capture_group, (identifier_literal | placeholder)?, functypesig, scope ;
-funclitdef = fun, capture_group?, identifier_literal, functypesig, scope ;
+funcdef = fun, capture_group?, identifier_literal, functypesig, scope ;
 capture_group = obrack, (pointer, identifier_literal | identifier_literal, (assignment)?; comma) , cbrack ;
 
 functypesig = oparen, (param; comma)*, ((rarrow | srarrow), (return; comma))?, cparen ; 
@@ -266,28 +266,28 @@ functypesig = oparen, (param; comma)*, ((rarrow | srarrow), (return; comma))?, c
 param = declarator?, (identifier_literal | placeholder)?, paramtype, spread?, (assign, cexpression)? ;
 return = ((declarator?, (identifier_literal | placeholder)?, rettype)* | infer) ;
 
-structlit = struct, (identifier_literal | placeholder)?, structscope? ;
-structlitdef = struct, identifier_literal, structscope ;
+structtypelit = struct, (identifier_literal | placeholder)?, structscope? ;
+structtypelitdef = struct, identifier_literal, structscope ;
 
 structscope = obrace, (note*, (structvardecl, semicolon | defstmt))*, cbrace ;
 structvardecl = declarator, (((identifier_literal | placeholder)?; comma)+, ((colon, cexpression)?, assignment | (colon | doublecolon), cexpression, assignment?))+ ;
 
 # Unions should get better
 
-unionlit = union, (identifier_literal | placeholder)?, unionscope? ;
-unionlitdef = union, identifier_literal, unionscope ;
+uniontypelit = union, (identifier_literal | placeholder)?, unionscope? ;
+uniontypelitdef = union, identifier_literal, unionscope ;
 unionscope = obrace, (node*, (vardecl, semicolon | funcdecl))*, cbrace ;
 
-enumlit = enum, (identifier_literal | placeholder)?, enumscope? ;
-enumlitdef = enum, identifier_literal, enumscope ;
+enumtypelit = enum, (identifier_literal | placeholder)?, enumscope? ;
+enumtypelitdef = enum, identifier_literal, enumscope ;
 enumscope = obrace, (note*, identifier_literal, (assign, cexpression)?; comma)*, cbrace ;
 
-tuplelit = tuple, (identifier_literal | placeholder)?, tupletypes? ;
-tuplelitdef = tuple, identifier_literal, tupletypes ;
+tupletypelit = tuple, (identifier_literal | placeholder)?, tupletypes? ;
+tupletypelitdef = tuple, identifier_literal, tupletypes ;
 tupletypes = oparen, (type*; comma), cparen ;
 
-typeliteral = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | funclit | structlit | unionlit | enumlit | tuplelit) ;
-typeliteral_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | structlit | unionlit | enumlit | tuplelit) ;
+typelit = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | funclit | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
+typelit_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
 
 assignment = assign, (expression; comma)+ ;
 assstmt = (expression; comma)+, assignment, semicolon ;
@@ -311,7 +311,7 @@ reorder = doublecolon, obrack, (cexpression; comma)+, cbrack ; # ::[]
 
 dotexpr = literalexpr, (dot, expression)? ;
 
-literal = (number_lit | char_lit | string_lit | array_lit | struct_lit | tuple_lit | typeliteral_nofunc | funclit_or_type | false | true | null | nothing) ;
+literal = (number_lit | char_lit | string_lit | array_lit | struct_lit | tuple_lit | typelit_nofunc | funclit_or_type | false | true | null | nothing) ;
 
 literalexpr = (literal | identifierexpr), select? ;
 identifierexpr = (identifier_literal | parenexpr) ;

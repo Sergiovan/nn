@@ -30,7 +30,18 @@ void token_stream::read() {
         namespace fs = std::filesystem;
         
         if (!fs::exists(name)) {
-            logger::error() << "File " << name << " could not be found.";
+            std::stringstream ss{};
+            ss << "File " << name << " could not be found.";
+            push_back(new token {
+                {nullptr, nullptr},
+                .content = ss.str(),
+                .tt = token_type::ERROR,
+                .value = 0,
+                .f = *this,
+                .index = 0,
+                .line = 1,
+                .column = 1
+            });
             return;
         }
         
@@ -217,7 +228,7 @@ void token_stream::read_one() {
                 }
                 case '\'': {
                     add(c);
-                    while (contentptr < content.length() && buffptr < 6) {
+                    while (contentptr < content.length()) {
                         c = content[contentptr++];
                         switch (c) {
                             case '\\': {
@@ -650,7 +661,7 @@ void token_stream::read_one() {
             }
             
             end_identifier:
-            token* t = create(token_type::IDENTIFIER, start); // Possibly keyword
+            token* t = create(buffer[0] == '$' ? token_type::COMPILER : token_type::IDENTIFIER, start); // Possibly keyword
             push_back(t);
             return;
         }

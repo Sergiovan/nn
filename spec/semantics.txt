@@ -189,13 +189,16 @@ marked_iden => ?. Special identifier.
 identifier(marked=true)
 
 array_lit => []t. Returns a value of array type.
-compound_literal(xs=value)
+    '[<expr value1: t>, <expr value2: t>, ...]
+    compound_literal(xs=value1:value2..., t=[]t)
 
 struct_lit => struct t. Returns a value of struct type.
-compound_literal(xs=value)
+    '{<expr e1: t1>, <identifier i> = <expr e2: t2>, ...}
+    compound_literal(xs=binary(op=named, l=none, r=e1, t=t1):binary(op=named, l=i, r=e2, t=t2)..., t=?)
 
 tuple_lit => tuple t. Returns a value of tuple type.
-compound_literal(xs=value)
+    '(<expr value1: t1>, <expr value2: t2>, ...)
+    compound_literal(xs=value1:value2..., t=tuple(t1, t2, ...))
 
 function_call ~> ?. Calls a function. All parameters that don't have default values must be supplied. Parameters can be given out of order, but no in-order parameters may be given after an out-of-order one. If a spread parameter exists then it may take any number of arguments.
 binary(op=function_call, l=function, r=block(xs=binary(op=param, l=name|empty, r=value)))

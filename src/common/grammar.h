@@ -52,7 +52,7 @@ namespace grammar {
         INCREMENT, DECREMENT, OSELECT,
         LENGTH,
         
-        COLON, COMMA, PERIOD, ASSIGN,
+        COLON, SEMICOLON, COMMA, PERIOD, ASSIGN,
         
         LITERAL_TUPLE, LITERAL_ARRAY, LITERAL_STRUCT,
         
@@ -62,12 +62,15 @@ namespace grammar {
         
         COMMENT_CLOSE,
         
+        SP_NAMED, SP_PARAM,
+        
         SPECIAL_LAST
     };
     
+    [[maybe_unused]]
     extern dict<std::string, u64> string_to_symbol;
     extern dict<u64, std::string> symbol_to_string;
     
 }
 
-std::ostream& operator<<(const std::ostream& os, const grammar::symbol& sym);
+std::ostream& operator<<(std::ostream& os, const grammar::symbol& sym);

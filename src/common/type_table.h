@@ -6,6 +6,8 @@
 
 class type_table {
 public:
+    type_table();
+    
     type* add_primitive(const type_primitive& p, const bool _const, const bool volat);
     type* add_pointer(const type_pointer& p, const bool _const, const bool volat);
     type* add_array(const type_array& a, const bool _const, const bool volat);
@@ -26,6 +28,33 @@ public:
     type* get(const type_function& f, const bool _const, const bool volat);
     type* get(const type_superfunction& sf, const bool _const, const bool volat);
     type* get(const type_special& s, const bool _const, const bool volat);
+    
+    type* array_of(type* t, bool _const = false, bool volat = false);
+    type* sized_array_of(type* t, u64 size, bool _const = false, bool volat = false);
+    
+    type* U0;
+    type* U1;
+    type* U8;
+    type* U16;
+    type* U32;
+    type* U64;
+    type* S8;
+    type* S16;
+    type* S32;
+    type* S64;
+    type* F32;
+    type* F64;
+    type* C8;
+    type* C16;
+    type* C32;
+    type* TYPE;
+    type* ANY;
+    type* INFER;
+    type* NONE;
+    type* NONE_ARRAY;
+    type* NONE_STRUCT;
+    type* NONE_TUPLE;
+    type* NONE_FUNCTION;
 private:
     type* add(type* t);
     

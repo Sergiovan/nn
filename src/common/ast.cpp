@@ -59,10 +59,27 @@ ast_value ast_value::clone() const {
     return {value};
 }
 
+ast_string::ast_string(const char* c) {
+    length = std::strlen(c);
+    chars = new u8[length];
+    std::memcpy(chars, c, length);
+}
+
+ast_string::ast_string(const std::string& s) {
+    length = s.length();
+    chars = new u8[length];
+    std::memcpy(chars, s.data(), length);
+}
+
+ast_string::ast_string(u8* chars, u64 length) : chars{chars}, length{length} {
+    
+}
+
 ast_string::~ast_string() {
     ASSERT(chars, "String chars was null");
     delete [] chars;
 }
+
 
 ast_string ast_string::clone() const {
     ast_string ret{new u8[length], length};

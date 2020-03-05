@@ -2,6 +2,32 @@
 
 #include <cstring>
 
+type_table::type_table() {
+    U0 = add_primitive({primitive_type::VOID, 0}, false, false);
+    U1 = add_primitive({primitive_type::BOOLEAN, 1}, false, false);
+    U8 = add_primitive({primitive_type::UNSIGNED, 8}, false, false);
+    U16 = add_primitive({primitive_type::UNSIGNED, 16}, false, false);
+    U32 = add_primitive({primitive_type::UNSIGNED, 32}, false, false);
+    U64 = add_primitive({primitive_type::UNSIGNED, 64}, false, false);
+    S8 = add_primitive({primitive_type::SIGNED, 8}, false, false);
+    S16 = add_primitive({primitive_type::SIGNED, 16}, false, false);
+    S32 = add_primitive({primitive_type::SIGNED, 32}, false, false);
+    S64 = add_primitive({primitive_type::SIGNED, 64}, false, false);
+    C8 = add_primitive({primitive_type::CHARACTER, 8}, false, false);
+    C16 = add_primitive({primitive_type::CHARACTER, 16}, false, false);
+    C32 = add_primitive({primitive_type::CHARACTER, 32}, false, false);
+    F32 = add_primitive({primitive_type::FLOATING, 32}, false, false);
+    F64 = add_primitive({primitive_type::FLOATING, 64}, false, false);
+    TYPE = add_primitive({primitive_type::TYPE, 64}, false, false);
+    ANY = add_primitive({primitive_type::ANY, 64}, false, false);
+    INFER = add_special({special_type::INFER}, false, false);
+    NONE = add_special({special_type::NONE}, false, false);
+    NONE_ARRAY = add_special({special_type::NONE_ARRAY}, false, false);
+    NONE_STRUCT = add_special({special_type::NONE_STRUCT}, false, false);
+    NONE_TUPLE = add_special({special_type::NONE_TUPLE}, false, false);
+    NONE_FUNCTION = add_special({special_type::NONE_FUNCTION}, false, false);
+}
+
 type* type_table::add_primitive(const type_primitive& p, const bool _const, const bool volat) {
     type t {*this, types.size(), p, _const, volat};
     return get_or_add(&t);
@@ -88,6 +114,14 @@ type* type_table::get(const type_superfunction& sf, const bool _const, const boo
 type* type_table::get(const type_special& s, const bool _const, const bool volat) {
     type t {*this, types.size(), s, _const, volat};
     return get(&t);
+}
+
+type* type_table::array_of(type* t, bool _const, bool volat) {
+    return add_array({t, false, 0}, _const, volat);
+}
+
+type* type_table::sized_array_of(type* t, u64 size, bool _const, bool volat) {
+    return add_array({t, true, size}, _const, volat);
 }
 
 type* type_table::add(type* t) {
@@ -442,7 +476,7 @@ type* type_table::get(type* t) {
 type* type_table::get_or_add(type* t) {
     type* tt = get(t);
     if (!tt) {
-        return add(tt);
+        return add(t);
     } else {
         return tt;
     }

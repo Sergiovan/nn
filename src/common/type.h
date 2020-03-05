@@ -19,8 +19,8 @@ enum class type_type : u8 {
 };
 
 enum class primitive_type : u8 {
-    SIGNED, UNSIGNED, FLOATING, CHARACTER,
-    TYPE, ANY, VOID
+    SIGNED, UNSIGNED, BOOLEAN, FLOATING, 
+    CHARACTER, TYPE, ANY, VOID
 };
 
 enum class pointer_type : u8 {
@@ -28,7 +28,9 @@ enum class pointer_type : u8 {
 };
 
 enum class special_type : u8 {
-    INFER, GENERIC, NONE
+    INFER, GENERIC, NONE, 
+    NONE_ARRAY, NONE_STRUCT, NONE_TUPLE,
+    NONE_FUNCTION
 };
 
 struct type;

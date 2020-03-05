@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sstream>
 #include "common/defs.h"
 
 template <typename U, typename V>
@@ -12,3 +13,46 @@ dict<V, U> swap_map(dict<U, V>& m) {
     
     return ret;
 }
+
+namespace ss {
+    
+class streamstring;
+    
+struct streamstring_end {};
+
+template <typename T>
+struct get_res {
+    using res = streamstring&;
+};
+
+template <>
+struct get_res<streamstring_end> {
+    using res = std::string;
+};
+
+template <typename T>
+using res = typename get_res<T>::res;
+
+class streamstring {
+public:
+    template <typename T>
+    res<T> operator<<(const T& t) {
+        if constexpr (std::is_same_v<std::remove_cv_t<T>, streamstring_end>) {
+            return sss.str();
+        } else {
+            sss << t;
+            return *this;
+        }
+    }
+private:
+    std::stringstream sss{};
+};
+
+streamstring get();
+streamstring_end end();
+
+}
+
+u64 parse_hex(const char* c, u8 max_len = 0xFF, u8* len = nullptr);
+u64 utf8_to_utf32(const char* c, u8* len = nullptr);
+u64 read_utf8(const char* c, u8& bytes, u8* len = nullptr);
