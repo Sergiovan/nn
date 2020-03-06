@@ -13,7 +13,7 @@ enum class token_type {
     IDENTIFIER, COMPILER,
     
     WHITESPACE, NEWLINE, COMMENT,
-    ERROR,
+    ERROR, END_OF_FILE
 };
 
 struct token : public list_node<token> {

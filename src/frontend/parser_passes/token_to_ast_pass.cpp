@@ -27,7 +27,7 @@ void pass::pass() {
     
     u64 i{0};
     
-    while (c) {
+    while (c && c->tt != token_type::END_OF_FILE) {
         token* tok = next();
         if (tok->tt == token_type::COMMENT || tok->tt == token_type::WHITESPACE || 
             tok->tt == token_type::NEWLINE) {
@@ -37,6 +37,9 @@ void pass::pass() {
             ++i;
         }
     }
+    
+    logger::info() << *next();
+    ++i;
     
     logger::info() << "Counted " << i << " tokens";
     
@@ -78,6 +81,10 @@ token* pass::peek(grammar::symbol expected) {
             case token_type::COMPILER: {
                 
                 clear();
+                return buff;
+            }
+            case token_type::END_OF_FILE: {
+                n = buff; // Go back
                 return buff;
             }
             case token_type::IDENTIFIER: [[fallthrough]];
@@ -158,6 +165,7 @@ void pass::clear() {
             case token_type::COMPILER: [[fallthrough]];
             case token_type::IDENTIFIER: [[fallthrough]];
             case token_type::KEYWORD: [[fallthrough]];
+            case token_type::END_OF_FILE: [[fallthrough]];
             case token_type::SYMBOL:
                 return;
             case token_type::WHITESPACE: [[fallthrough]];
@@ -572,6 +580,7 @@ ast* pass::note() {
             next(); // ( or ,
             expression();
         }
+        // TODO err
         if (require_symbol(grammar::CPAREN)) next(); // )
     }
     
@@ -590,6 +599,7 @@ ast* pass::array_lit() {
         ret->compound.elems.push_back(e);
     }
     
+    // TODO err
     if (require_symbol(grammar::CBRACK)) next(); // ]
     
     return ret;
@@ -620,6 +630,7 @@ ast* pass::struct_lit() {
         }
     }
     
+    // TODO err
     if (require_symbol(grammar::CBRACE)) next(); // }
     
     return ret;
@@ -636,6 +647,7 @@ ast* pass::tuple_lit() {
         ret->compound.elems.push_back(e);
     }
     
+    // TODO err
     if (require_symbol(grammar::CPAREN)) next(); // )
     
     return ret;
@@ -643,24 +655,164 @@ ast* pass::tuple_lit() {
 
 
 ast* pass::program_unit() {
-    return nullptr;
+    ast* ret = ast::make_compound({}, c, tt.TYPELESS);
+    
+    while (c) {
+        ret->compound.elems.push_back(freestmt());
+    }
+    
+    return ret;
 }
 
 ast* pass::freestmt() {
-    return nullptr;
+    while (is(token_type::COMPILER)) {
+        note(); // Ignore for now
+    }
+    
+    require(token_type::KEYWORD); // ???
+    
+    switch (c->value) {
+        case grammar::KW_USING:
+            return usingstmt();
+        case grammar::KW_IMPORT:
+            return importstmt();
+        case grammar::KW_NAMESPACE:
+            return namespacestmt();
+        case grammar::KW_DEF: [[fallthrough]];
+        case grammar::KW_VAR: [[fallthrough]];
+        case grammar::KW_LET:
+            return declstmt();
+        default:
+            // TODO err
+            ast* ret = make_error_ast(c);
+            next(); // ???
+            return ret;
+    }
 }
 
 ast* pass::stmt() {
-    return nullptr;
+    while (is(token_type::COMPILER)) {
+        note(); // Ignore for now
+    }
+    
+    if (is(token_type::KEYWORD)) {
+        switch (c->value) {
+            case grammar::KW_IF:
+                return ifstmt();
+            case grammar::KW_FOR:
+                return forstmt();
+            case grammar::KW_WHILE: [[fallthrough]];
+            case grammar::KW_LOOP:
+                return whilestmt();
+            case grammar::KW_SWITCH:
+                return switchstmt();
+            case grammar::KW_TRY:
+                return trystmt();
+            case grammar::KW_RETURN:
+                return returnstmt();
+            case grammar::KW_RAISE:
+                return raisestmt();
+            case grammar::KW_GOTO:
+                return gotostmt();
+            case grammar::KW_LABEL:
+                return labelstmt();
+            case grammar::KW_DEFER:
+                return deferstmt();
+            case grammar::KW_BREAK:
+                return breakstmt();
+            case grammar::KW_CONTINUE:
+                return continuestmt();
+            case grammar::KW_USING:
+                return usingstmt();
+            case grammar::KW_NAMESPACE:
+                return namespacestmt();
+            case grammar::KW_DELETE:
+                return deletestmt();
+            case grammar::KW_DEF: [[fallthrough]];
+            case grammar::KW_VAR: [[fallthrough]];
+            case grammar::KW_LET:
+                return declstmt();
+            default:
+                return assorexpr();
+        }
+    } else if (is(token_type::SYMBOL)) {
+        switch (c->value) {
+            case grammar::OBRACE:
+                return scope();
+            case grammar::SEMICOLON: {
+                token* tok = next(); // ;
+                return ast::make_none({}, tok, tt.TYPELESS);
+            }
+            default:
+                return assorexpr();
+        }
+    } else {
+        return assorexpr();
+    }
 }
 
 ast* pass::scopestmt() {
-    return nullptr;
+    while (is(token_type::COMPILER)) {
+        note(); // Ignore for now
+    }
+    
+    if (is(token_type::KEYWORD)) {
+        switch (c->value) {
+            case grammar::KW_IF:
+                return ifstmt();
+            case grammar::KW_FOR:
+                return forstmt();
+            case grammar::KW_WHILE: [[fallthrough]];
+            case grammar::KW_LOOP:
+                return whilestmt();
+            case grammar::KW_SWITCH:
+                return switchstmt();
+            case grammar::KW_RETURN:
+                return returnstmt();
+            case grammar::KW_RAISE:
+                return raisestmt();
+            case grammar::KW_GOTO:
+                return gotostmt();
+            case grammar::KW_BREAK:
+                return breakstmt();
+            case grammar::KW_CONTINUE:
+                return continuestmt();
+            case grammar::KW_DELETE:
+                return deletestmt();
+            default:
+                return assorexpr();
+        }
+    } else if (is(token_type::SYMBOL)) {
+        switch (c->value) {
+            case grammar::OBRACE:
+                return scope();
+            case grammar::SEMICOLON: {
+                token* tok = next(); // ;
+                return ast::make_none({}, tok, tt.TYPELESS);
+            }
+            default:
+                return assorexpr();
+        }
+    } else {
+        return assorexpr();
+    }
 }
 
 
 ast* pass::scope() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OBRACE), "Start of scope was not {");
+    token* s = next(); // {
+    
+    ast* ret = ast::make_compound({}, s, tt.TYPELESS);
+    
+    while (!is_symbol(grammar::CBRACE) && !is(token_type::END_OF_FILE)) {
+        ret->compound.elems.push_back(stmt());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACE)) next(); // }
+    
+    return ret;
 }
 
 
@@ -911,6 +1063,10 @@ ast* pass::expressionstmt() {
     return nullptr;
 }
 
+ast* pass::assorexpr() {
+    return nullptr;
+}
+
 ast* pass::expression() {
     return nullptr;
 }
@@ -922,7 +1078,6 @@ ast* pass::ternaryexpr() {
 ast* pass::newexpr() {
     return nullptr;
 }
-
 
 ast* pass::prefixexpr() {
     return nullptr;

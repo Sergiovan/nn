@@ -42,6 +42,16 @@ void token_stream::read() {
                 .line = 1,
                 .column = 1
             });
+            push_back(new token {
+                {nullptr, nullptr},
+                .content = "",
+                .tt = token_type::END_OF_FILE,
+                .value = 0,
+                .f = *this,
+                .index = 0,
+                .line = 1,
+                .column = 1
+            });
             return;
         }
         
@@ -62,6 +72,17 @@ void token_stream::read() {
     while(!done) {
         read_one();
     }
+    
+    push_back(new token {
+        {nullptr, nullptr},
+        .content = "",
+        .tt = token_type::END_OF_FILE,
+        .value = 0,
+        .f = *this,
+        .index = contentptr,
+        .line = line + 1,
+        .column = 0
+    });
 }
 
 

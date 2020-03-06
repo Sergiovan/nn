@@ -28,7 +28,7 @@ enum class pointer_type : u8 {
 };
 
 enum class special_type : u8 {
-    INFER, GENERIC, NONE, 
+    INFER, GENERIC, NOTHING, TYPELESS, NONE, 
     NONE_ARRAY, NONE_STRUCT, NONE_TUPLE,
     NONE_FUNCTION
 };

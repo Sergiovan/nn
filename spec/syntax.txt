@@ -187,17 +187,16 @@ array_lit = marked_brack, (expression; comma)*, cbrack ;
 struct_lit = marked_brace, (expression; comma)*, (identifier_literal, assign, expression); comma)*, cbrace ;
 tuple_lit = marked_paren, (expression; comma)*, cparen ;
 
-program_unit = note*, freestatement* ;
+program_unit = freestatement* ;
 freestatement = note*, (importstmt | usingstmt | namespacestmt | declstmt) ;
 
 statement = note*, (semicolon | ifstmt | forstmt | whilestmt | switchstmt | trystmt | 
-                    returnstmt | raisestmt | yieldstmt | gotostmt | labelstmt | deferstmt | 
-                    breakstmt | continuestmt | usingstmt | namespacestmt | declstmt | assstmt | 
-                    expressionstmt | deletestmt | scope) ; 
+                    returnstmt | raisestmt | gotostmt | labelstmt | deferstmt | 
+                    breakstmt | continuestmt | usingstmt | namespacestmt | declstmt | assorexpr | deletestmt | scope) ; 
 
 
-scopestmt = note*, (semicolon | ifstmt | whilestmt | switchstmt | returnstmt | raisestmt | yieldstmt | gotostmt | 
-                    breakstmt | continuestmt | assstmt | expressionstmt | deletestmt | scope) ;
+scopestmt = note*, (semicolon | ifstmt | whilestmt | switchstmt | returnstmt | raisestmt | gotostmt | 
+                    breakstmt | continuestmt | assorexpr | deletestmt | scope) ;
 
 scope = obrace, statement*, cbrace ;
 
@@ -295,6 +294,8 @@ assstmt = (expression; comma)+, assignment, semicolon ;
 deletestmt = delete, (expression; comma)+, semicolon;
 
 expressionstmt = expression, semicolon ;
+
+assorexpr = expression, (semicolon | (comma, (expression; comma)+)?, assignment, semicolon) ;
 
 expression = ternaryexpr ;
 ternaryexpr = newexpr, (dquestion, expression, diamond, expression)? ;

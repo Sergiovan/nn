@@ -119,6 +119,8 @@ private:
     ast* deletestmt();
     
     ast* expressionstmt();
+    ast* assorexpr();
+    
     ast* expression();
     ast* ternaryexpr();
     ast* newexpr();

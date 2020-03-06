@@ -21,6 +21,8 @@ type_table::type_table() {
     TYPE = add_primitive({primitive_type::TYPE, 64}, false, false);
     ANY = add_primitive({primitive_type::ANY, 64}, false, false);
     INFER = add_special({special_type::INFER}, false, false);
+    NOTHING = add_special({special_type::NOTHING}, false, false);
+    TYPELESS = add_special({special_type::TYPELESS}, false, false);
     NONE = add_special({special_type::NONE}, false, false);
     NONE_ARRAY = add_special({special_type::NONE_ARRAY}, false, false);
     NONE_STRUCT = add_special({special_type::NONE_STRUCT}, false, false);

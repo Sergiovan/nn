@@ -50,6 +50,8 @@ public:
     type* TYPE;
     type* ANY;
     type* INFER;
+    type* NOTHING;
+    type* TYPELESS;
     type* NONE;
     type* NONE_ARRAY;
     type* NONE_STRUCT;

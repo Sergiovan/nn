@@ -29,6 +29,8 @@ std::ostream& operator<<(std::ostream& os, const token_type& tt) {
             return os << "NEWLINE";
         case token_type::COMMENT:
             return os << "COMMENT";
+        case token_type::END_OF_FILE:
+            return os << "EOF";
         case token_type::ERROR: [[fallthrough]];
         default:
             return os << "ERROR";
