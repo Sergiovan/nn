@@ -1,41 +1,41 @@
 import std;
 
-struct trie {
-	char value = '\0';
-	trie*[2] children = [null, null];
+def struct trie {
+	var value: c32 = ''\0';
+	var children: [2]*trie = '[null, null];
 	
-	void add(string key, char value, int pos = 0) {
+	def fun add(key: []c8, value: c32, pos: s32 = 0) {
 		if pos == ~key {
 			this.value = value;
 		} else {
-			int idx = 0;
-			if key[pos] == '-' {
+			var idx: s32 = 0;
+			if key[pos] == ''-' {
 				idx = 1;
 			}
 			if !!children[idx] {
-				children[idx] = new trie;
+				children[idx] = new *trie;
 			}
 			children[idx].add(key, value, pos + 1);
 		}
 	}
 	
-	char get(string key, int pos = 0) {
+	def fun get(key: []c8, pos: s32 = 0 -> c32) {
 		if pos == ~key {
 			return value;
 		} else {
-			int idx = 0;
-			if key[pos] == '-' {
+			var idx: s32 = 0;
+			if key[pos] == ''-' {
 				idx = 1;
 			}
 			if !!children[idx] {
-				return '?';
+				return ''?';
 			} else {
 				return children[idx].get(key, pos + 1);
 			}
 		}
 	}
 	
-	void clear() {
+	def fun clear() {
 		if children[0] {
 			children[0].clear();
 			delete children[0];
@@ -49,9 +49,9 @@ struct trie {
 	}
 }
 
-long const diff = <long> 'z' - <long> 'a';
-long const dist = <long> 'A' - <long> 'a';
-string[diff] const morse = [
+let diff: u64 = ''z' as u64 - ''a' as u64;
+let dist: u64 = ''A' as u64 - ''a' as u64;
+let morse: [diff][]c8 = '[
 	".-", "-...", "-.-.", "-..", ".", 
 	"..-.", "--.", "....", "..", ".---", 
 	"-.-", ".-..", "--", "-.", "---", 
@@ -60,11 +60,11 @@ string[diff] const morse = [
 	"--.."
 ];
 
-trie morse_dict;
+let morse_dict: trie;
 
-string morse_to_english(string[] words) {
-	string ret = "";
-	for string word : words {
+def fun morse_to_english(words: [][]c8 -> []c8) {
+	let ret: []c8 = "";
+	for var word in words {
 		if word == "/" {
 			ret ..= " ";
 		} else {
@@ -74,34 +74,34 @@ string morse_to_english(string[] words) {
 	return ret;
 } 
 
-void lowercase(string* str);
+let lowercase: fun(str: *[]c8);
 
-string english_to_morse(string[] words) {
-	string ret = "";
-	for string word : words {
+def fun english_to_morse(words: [][]c8 -> []c8) {
+	var ret: []c8 = "";
+	for var word in words {
 		lowercase(*word);
-		for char c : word {
-			long idx = <long> c - <long> 'a';
-			ret ..= morse[idx] .. ' ';
+		for var c in word {
+			var idx: u64 = c as u64 - ''a' as u64;
+			ret ..= morse[idx] .. '' ';
 		}
 		ret ..= "/ ";
 	}
 	return ret;
 }
 
-void lowercase(string* str) {
-	for int i = 0; i < ~@str; ++i {
-		char c = (@str)[i];
-		if c >= 'A' && c <= 'Z' {
-			(@str)[i] = <char>(<long>c - dist);
+def fun lowercase(str: *[]c8) {
+	while var i = 0; i < ~@str; ++i {
+		var c = (@str)[i];
+		if c >= ''A' && c <= ''Z' {
+			(@str)[i] = (c as u64 - dist) as c8;
 		}
 	}
 }
 
-string[] split(string in, char by = ' ') {
-	string[] ret = [];
-	string cur = "";
-	for char c : in {
+def fun split(inn: []c8, by: c8 = '' ' -> [][]c8) {
+	var ret: []c8 = '[];
+	var cur: []c8 = "";
+	for var c in inn {
 		if c != ' ' {
 			cur ..= c;
 		} else if ~cur {
@@ -112,25 +112,25 @@ string[] split(string in, char by = ' ') {
 	return ret;
 }
 
-string join(string[] in, char with = ',') {
-	string ret = "";
-	for string str : in {
+def fun join(inn: []c8, with: c8 = '',' -> []c8) {
+	var ret: []c8 = "";
+	for var str in inn {
 		ret ..= str .. with;
 	}
 	return ret;
 }
 
-int main(string[]) {
+def fun main([]c8) {
 	using std.io.*;
 	defer morse_dict.clear();
-	string in = "";
-	while !!~in {
+	var inn: []c8 = "";
+	while !!~inn {
 		print("Enter english or morse: ");
-		in = read();
+		inn = read();
 	}
 	
-	string[] words = in.split();
-	if words[0][0] == '.' || words[0][0] == '-' {
+	let words: []c8 = inn.split();
+	if words[0][0] == ''.' || words[0][0] == ''-' {
 		# We morse bois
 		words.morse_to_english().print();
 	} else {

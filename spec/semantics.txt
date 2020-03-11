@@ -1,4 +1,5 @@
-# From syntax.txt
+# This file describes the semantics of the syntax in syntax.txt
+# This is not a comprehensive description, only for reference/aid
 
 # Notes
 $<identifier_literal> => compiler note. See compiler_notes.txt.
@@ -85,20 +86,20 @@ or => keyword. Reserved.
 # Statements
 
 if => Execute scope only when a given condition evaluates to true. Optionally declare variables for the scope.
-binary(op=if, l=condition, r=binary(op=else, l=truescope, r=elsescope|empty)) # Chain them all later
+binary(op=if, l=block(xs=decl,decl...,condition), r=binary(op=else, l=truescope, r=elsescope|empty)) # Chain them all later
     elsescope => An attached else to an if statement creates an elsescope
 
 for => Execute scope once for each element in a given iterable.
 binary(op=for, l=binary(op=in, l=vardecl, r=expression), r=scope)
 
 while => Execute a loop given a certain set of parameters.
-binary(op=while, l=binary(op=whilecond, r=condition, l=block(xs=increments)), r=scope)
+binary(op=while, l=binary(op=whilecond, l=block(xs=decl,decl), r=block(xs=condition,increments...), r=scope)
 
 loop => Execute a loop given a certain set of parameters at least once.
-binary(op=loop, l=binary(op=whilecond, r=condition, l=block(xs=increments)), r=scope)
+binary(op=loop, l=binary(op=whilecond, l=block(xs=decl,decl), r=block(xs=condition,increments...), r=scope)
 
 switch => Execute a scope based on the value of an expression.
-binary(op=switch, l=value, r=binary(op=case, l=block(xs=block(xs=unary(op=case, n=value) | zero(op=else))), r=block(xs=cases))
+binary(op=switch, l=block(xs=decl,decl...,value), r=block(xs=binary(op=case, l=block(xs=cases), r=scope|zero(op=continue)) | binary(op=else, l=none, r=scope|zero(op=continue))))
 
 try => Execute a blessed scope, jump to catch if any function inside returns a non-zero value of e64
 binary(op=try, l=tryblock, r=switch|raise)
@@ -152,7 +153,7 @@ expression => An expression statement is simply an expression when no other stat
 
 # Structural
 
-program => The whole program unit. Each file is one program unit. A program unit may be empty.
+program_unit => The whole program unit. Each file is one program unit. A program unit may be empty.
 freestatement => Any statement that may appear at the top level of a program unit. import, using, namespace and declaration statements are valid.
 
 statement => Any statement. Empty, if, for, while, switch, try, return, raise, yield, goto, label, defer, break, continue, using, namespace, declaration, assignment, expression, delete and scope statements are valid.
@@ -168,12 +169,11 @@ block(xs=statements) | target of do-scope
 optvardecls => Optional variable declarations separated by semicolons.
 block(xs=declaration list .. attached statement)
 
-
-
 # Expressions
 
 number_lit => u8/u16/u32/u64/f32/f64. Number literal.
-value()
+    <n>
+    value(value=n, t=??)
 
 char_lit => c32. Single character, utf32.
 value()
@@ -448,4 +448,4 @@ binary(op=new, l=n, r=e, t=t)
 
 ?? (choice) => Fixed operator. 
     <expr choice: u1> ?? <expr e1: t> <> <expr e2: t> => <reference: t>. Chooses between 2 expressions.
-    binary(op=diamond, l=choice, r=binary(op=choice, l=e1, r=e2, t=t), t=t, assignable=true)
+    binary(op=dquestion, l=choice, r=binary(op=choice, l=e1, r=e2, t=t), t=t, assignable=true)

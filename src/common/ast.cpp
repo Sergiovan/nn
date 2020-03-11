@@ -1,6 +1,10 @@
 #include "common/ast.h"
 
 #include <cstring>
+#include <sstream>
+#include <iomanip>
+#include "common/util.h"
+#include "common/type.h"
 
 void delete_list(list<ast> l) {
     ast* next{l.head};
@@ -35,7 +39,7 @@ ast_zero ast_zero::clone() const {
     return {sym};
 }
 
-ast_unary::~ast_unary() {
+void ast_unary::clean() {
     ASSERT(node, "Unary node was null");
     delete node;
 }
@@ -44,7 +48,7 @@ ast_unary ast_unary::clone() const {
     return {sym, ast::make(node->clone()), post};
 }
 
-ast_binary::~ast_binary() {
+void ast_binary::clean() {
     ASSERT(left, "Binary left node was null");
     ASSERT(right, "Binary right node was null");
     delete left;
@@ -75,7 +79,7 @@ ast_string::ast_string(u8* chars, u64 length) : chars{chars}, length{length} {
     
 }
 
-ast_string::~ast_string() {
+void ast_string::clean() {
     ASSERT(chars, "String chars was null");
     delete [] chars;
 }
@@ -87,7 +91,7 @@ ast_string ast_string::clone() const {
     return ret;
 }
 
-ast_compound::~ast_compound() {
+void ast_compound::clean() {
     delete_list(elems);
 }
 
@@ -101,7 +105,7 @@ ast_nntype ast_nntype::clone() const {
     return {t}; // TBD
 }
 
-ast_block::~ast_block() {
+void ast_block::clean() {
     delete_list(elems);
     delete_list(at_end);
 }
@@ -128,16 +132,23 @@ ast::ast(ast_type tt, token* tok, type* t) : tt{tt}, tok{tok}, t{t} {
 ast::~ast() {
     switch (tt) {
         case ast_type::UNARY:
+            unary.clean();
             unary.~ast_unary();
             break;
         case ast_type::BINARY:
+            binary.clean();
             binary.~ast_binary();
             break;
         case ast_type::STRING:
+            string.clean();
             string.~ast_string();
             break;
-        case ast_type::BLOCK: [[fallthrough]];
+        case ast_type::BLOCK: 
+            block.clean();
+            block.~ast_block();
+            break;
         case ast_type::COMPOUND:
+            compound.clean();
             compound.~ast_compound();
             break;
         default:
@@ -291,3 +302,129 @@ ast* ast::make_iden(const ast_iden& i, token* tok, type* t) {
     return ret;
 }
 
+std::string ast::to_simple_string() {
+    return ss::get() << tt << " [" << t->to_string() 
+                     << "] " << " '" << tok->content.substr(0, 40) 
+                     << "' " << ss::end();
+}
+
+std::string ast::to_string(bool recursive, u64 level) {
+    std::stringstream ss{};
+    std::string pad(level, '*');
+    ss << pad;
+    
+    ss << " " << to_simple_string();
+    
+    switch (tt) {
+        case ast_type::NONE:
+            ss << "()";
+            break;
+        case ast_type::ZERO:
+            ss << "(" << zero.sym << ")";
+            break;
+        case ast_type::UNARY:
+            ss << "(";
+            if (unary.post) {
+                if (recursive) {
+                    ss << "\n" << unary.node->to_string(recursive, level + 1) << "\n" << pad << "> " << unary.sym 
+                       << "\n" << pad << " )";
+                } else {
+                    ss << unary.node->to_simple_string() << unary.sym << ")";
+                }
+            } else {
+                if (recursive) {
+                    ss << "\n" << pad << "> " << unary.sym << "\n" << unary.node->to_string(recursive, level + 1) 
+                    << "\n" << pad << " )";
+                } else {
+                    ss << unary.sym << unary.node->to_simple_string() << ")";
+                }
+            }
+            break;
+        case ast_type::BINARY:
+            ASSERT(binary.left, "Left node was nullptr");
+            ASSERT(binary.right, "Right node was nullptr");
+            ss << "(";
+            if (recursive) {
+                ss << "\n" << binary.left->to_string(recursive, level + 1) << "\n" << pad << "> " << binary.sym 
+                   << "\n" << binary.right->to_string(recursive, level + 1) << "\n" << pad << " )";
+            } else {
+                ss << binary.left->to_simple_string() << binary.sym << binary.right->to_simple_string() << ")";
+            }
+            break;
+        case ast_type::VALUE:
+            ss << "(" << value.value << ")";
+            break;
+        case ast_type::STRING:
+            ss << "(" << std::string(reinterpret_cast<char*>(string.chars), string.length) << ")";
+            break;
+        case ast_type::COMPOUND:
+            ss << "(";
+            if (recursive) {
+                for (auto e : compound.elems) {
+                    ss << "\n" << e->to_string(recursive, level + 1);
+                }
+            } else {
+                for (auto e : compound.elems) {
+                    ss << "\n" << pad << e->to_simple_string();
+                }
+            }
+            ss << "\n" << pad << " )";
+            break;
+        case ast_type::BLOCK:
+            ss << "(";
+            if (recursive) {
+                for (auto e : block.elems) {
+                    ss << "\n" << e->to_string(recursive, level + 1);
+                }
+                ss << "\n" << pad << " ---";
+                for (auto e : block.at_end) {
+                    ss << "\n" << pad << e->to_string(recursive, level + 1);
+                }
+            } else {
+                for (auto e : block.elems) {
+                    ss << "\n" << e->to_simple_string();
+                }
+                ss << "\n" << pad << " ---";
+                for (auto e : block.at_end) {
+                    ss << "\n" << pad << e->to_simple_string();
+                }
+            }
+            ss << "\n" << pad << " )";
+            break;
+        case ast_type::TYPE:
+            ss << "(" << nntype.t->to_string() << ")";
+            break;
+        case ast_type::IDENTIFIER:
+            ss << "(IDENTIFIER)"; // TODO
+            break;
+    }
+    
+    return ss.str();
+}
+
+std::ostream& operator<<(std::ostream& os, ast_type t) {
+    switch (t) {
+        case ast_type::NONE:
+            return os << "NONE";
+        case ast_type::ZERO:
+            return os << "ZERO";
+        case ast_type::UNARY:
+            return os << "UNARY";
+        case ast_type::BINARY:
+            return os << "BINARY";
+        case ast_type::VALUE:
+            return os << "VALUE";
+        case ast_type::STRING:
+            return os << "STRING";
+        case ast_type::COMPOUND:
+            return os << "COMPOUND";
+        case ast_type::TYPE:
+            return os << "TYPE";
+        case ast_type::BLOCK:
+            return os << "BLOCK";
+        case ast_type::IDENTIFIER:
+            return os << "IDENTIFIER";
+        default:
+            return os << "INVALID AST";
+    }
+}

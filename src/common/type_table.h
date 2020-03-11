@@ -47,6 +47,7 @@ public:
     type* C8;
     type* C16;
     type* C32;
+    type* E64;
     type* TYPE;
     type* ANY;
     type* INFER;
@@ -57,6 +58,7 @@ public:
     type* NONE_STRUCT;
     type* NONE_TUPLE;
     type* NONE_FUNCTION;
+    type* NULL_;
 private:
     type* add(type* t);
     

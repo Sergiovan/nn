@@ -118,11 +118,32 @@ dict<std::string, u64> grammar::string_to_symbol {
 
 
     {":", (u64) symbol::COLON},
+    {"::", (u64) symbol::DCOLON},
+    {"??", (u64) symbol::DQUESTION},
     {";", (u64) symbol::SEMICOLON},
     {",", (u64) symbol::COMMA},
     {".", (u64) symbol::PERIOD},
     {"=", (u64) symbol::ASSIGN},
 
+    {"^=", (u64) symbol::XOR_ASSIGN},
+    {"|=", (u64) symbol::OR_ASSIGN},
+    {"&=", (u64) symbol::AND_ASSIGN},
+    {"<<|=", (u64) symbol::BITSET_ASSIGN},
+    {"<<&=", (u64) symbol::BITCLEAR_ASSIGN},
+    {"<<^=", (u64) symbol::BITTOGGLE_ASSIGN},
+    {"<<=", (u64) symbol::SHL_ASSIGN},
+    {">>=", (u64) symbol::SHR_ASSIGN},
+    {"<<<=", (u64) symbol::RTL_ASSIGN},
+    {">>>=", (u64) symbol::RTR_ASSIGN},
+    {"+=", (u64) symbol::ADD_ASSIGN},
+    {"-=", (u64) symbol::SUB_ASSIGN},
+    {"..=", (u64) symbol::CONCAT_ASSIGN},
+    {"*=", (u64) symbol::MUL_ASSIGN},
+    {"/=", (u64) symbol::DIV_ASSIGN},
+    {"//=", (u64) symbol::IDIV_ASSIGN},
+    {"%=", (u64) symbol::MODULO_ASSIGN},
+    
+    
     {"'(", (u64) symbol::LITERAL_TUPLE}, 
     {"'[", (u64) symbol::LITERAL_ARRAY}, 
     {"'{", (u64) symbol::LITERAL_STRUCT},
@@ -145,8 +166,29 @@ dict<std::string, u64> grammar::string_to_symbol {
 dict<u64, std::string> grammar::symbol_to_string {swap_map(string_to_symbol)};
 
 std::ostream& operator<<(std::ostream& os, const symbol& sym) {
-    if (sym == SPECIAL_INVALID) {
-        return os << "Invalid symbol";
+    if (auto it = symbol_to_string.find((u64) sym); it != symbol_to_string.end()) {
+        return os << it->second;
+    } else {
+        switch (sym) {
+            case grammar::SPECIAL_INVALID:
+                return os << "INVALID";
+            case grammar::SP_NAMED:
+                return os << "NAMED PARAMETER";
+            case grammar::SP_PARAM:
+                return os << "PARAMETER";
+            case grammar::SP_COND:
+                return os << "CONDITIONALS";
+            case grammar::SP_TYPE:
+                return os << "TYPE";
+            case grammar::SP_TYPELIT:
+                return os << "TYPE LITERAL";
+            case grammar::SP_CAPTURE:
+                return os << "CAPTURE GROUP";
+            case grammar::SP_FUNTYPE:
+                return os << "FUNCTION TYPE";
+            case grammar::SPECIAL_LAST: [[fallthrough]];
+            default:
+                return os << "ERROR ERROR ERROR";
+        }
     }
-    return os << symbol_to_string[(u64) sym];
 }

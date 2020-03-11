@@ -8,6 +8,38 @@
 using pass = token_to_ast_pass;
 
 pass::token_to_ast_pass(nnmodule& mod) : mod{mod}, tt{mod.tt} {
+    using namespace grammar;
+    
+    constexpr std::array<grammar::symbol, 16> pre {{
+        SPREAD, INCREMENT, DECREMENT, SUB, LENGTH, NOT, LNOT, AT, POINTER, WEAK_PTR,
+        OBRACK, ADD, KW_TYPEOF, KW_SIZEOF, KW_CONST, KW_VOLAT
+    }};
+    
+    constexpr std::array<grammar::symbol, 2> post {{
+        INCREMENT, DECREMENT
+    }};
+    
+    constexpr std::array<grammar::symbol, 27> infix {{
+        KW_AS, MUL, DIV, IDIV, MODULO, ADD, SUB, CONCAT, 
+        SHL, SHR, RTL, RTR, BITSET, BITCLEAR, BITTOGGLE, BITCHECK,
+        AND, OR, XOR, LT, LE, GT, GE, EQUALS, NEQUALS, LAND, LOR
+    }};
+    
+//     constexpr std::array<grammar::symbol, 3> post_circumfix {{
+//         OPAREN, OBRACK, OSELECT
+//     }};
+    
+    for (auto e : pre) {
+        pre_ops.insert(e);
+    }
+    
+    for (auto e : post) {
+        post_ops.insert(e);
+    }
+    
+    for (auto e : infix) {
+        infix_ops.insert(e);
+    }
     
 }
 
@@ -22,26 +54,36 @@ void pass::pass() {
     n = mod.ts.head;
     clear();
     c = n;
+    next();
     
-    // mod.root = program_unit();
+    mod.root = program_unit();
     
-    u64 i{0};
-    
-    while (c && c->tt != token_type::END_OF_FILE) {
-        token* tok = next();
-        if (tok->tt == token_type::COMMENT || tok->tt == token_type::WHITESPACE || 
-            tok->tt == token_type::NEWLINE) {
-            // Skip
-        } else {
-            logger::info() << *tok;
-            ++i;
-        }
+    for (auto& [t, e] : mod.errors) {
+        logger::error() << e;
+        logger::info() << "@ " << *(t->tok);
     }
     
-    logger::info() << *next();
-    ++i;
+    if (!mod.errors.size()) {
+        logger::info() << "\n" << mod.root->to_string(true);
+    }
     
-    logger::info() << "Counted " << i << " tokens";
+//     u64 i{0};
+//     
+//     while (c && c->tt != token_type::END_OF_FILE) {
+//         token* tok = next();
+//         if (tok->tt == token_type::COMMENT || tok->tt == token_type::WHITESPACE || 
+//             tok->tt == token_type::NEWLINE) {
+//             // Skip
+//         } else {
+//             logger::info() << *tok;
+//             ++i;
+//         }
+//     }
+//     
+//     logger::info() << *next();
+//     ++i;
+//     
+//     logger::info() << "Counted " << i << " tokens";
     
     return;
 }
@@ -54,17 +96,12 @@ token* pass::next(grammar::symbol expected) {
     using grammar::string_to_symbol;
     
     token* buff = c;
-    peek(expected);
-    c = n;
+    c = peek(expected);
     return buff;
 }
 
 token* pass::peek(grammar::symbol expected) {
     using grammar::string_to_symbol;
-    
-    if (n != c) {
-        return n;
-    }
     
     auto& syms = string_to_symbol;
         
@@ -216,6 +253,19 @@ bool pass::require_symbol(grammar::symbol sym) {
         return true;
     } else {
         mod.errors.push_back({make_error_ast(c), ss::get() << "Expecting " << sym << ss::end()});
+        return false;
+    }
+}
+
+bool pass::is_assign() {
+    return c->tt == token_type::SYMBOL && (c->value >= grammar::ASSIGN && c->value <= grammar::MODULO_ASSIGN);
+}
+
+bool pass::require_assign() {
+    if (is_assign()) {
+        return true;
+    } else {
+        mod.errors.push_back({make_error_ast(c), "Expecting assignment"});
         return false;
     }
 }
@@ -466,7 +516,7 @@ ast* pass::char_lit() {
     
     u8 plen{0};
     u64 res = utf8_to_utf32(s.c_str() + 2, &plen);
-    if (res > 0x10FFF || plen != s.length() - 5) {
+    if (res > 0x10FFF || plen != s.length() - 3) {
         ast* ret = ast::make_value({0}, tok, tt.C32);
         mod.errors.push_back({ret, "Invalid char literal"});
         return ret;
@@ -487,7 +537,7 @@ ast* pass::string_lit() {
     
     if (s[end] != '"') {
         ast* ret = ast::make_string(ast_string{""}, tok, tt.sized_array_of(tt.C8, 0, true));
-        mod.errors.push_back({ret, "Invalid char literal"});
+        mod.errors.push_back({ret, "Invalid string literal"});
         return ret;
     } else if (s[start] == '\'') {
         for (u64 i = start; i < end; ++i) {
@@ -498,7 +548,7 @@ ast* pass::string_lit() {
         }
     } else if (s[start] != '"') {
         ast* ret = ast::make_string(ast_string{""}, tok, tt.sized_array_of(tt.C8, 0, true));
-        mod.errors.push_back({ret, "Invalid char literal"});
+        mod.errors.push_back({ret, "Invalid string literal"});
         return ret;
     }
     
@@ -506,6 +556,7 @@ ast* pass::string_lit() {
     enum class string_flags {
         utf8, utf16, utf32, c_str
     } sflags{string_flags::utf8};
+    [[maybe_unused]]
     bool warn{false};
     
     if (start != 0) {
@@ -538,7 +589,7 @@ ast* pass::string_lit() {
         if (res > 0xFFFFFFFF) {
             delete [] buff;
             ast* ret = ast::make_string(ast_string{""}, tok, tt.sized_array_of(tt.C8, 0, true));
-            mod.errors.push_back({ret, "Invalid char literal"});
+            mod.errors.push_back({ret, "Invalid string literal"});
             return ret;
         }
         if (rlen + plen > buff_size) {
@@ -556,7 +607,7 @@ ast* pass::string_lit() {
     if (i != end || c[i] != '"') {
         delete [] buff;
         ast* ret = ast::make_string(ast_string{""}, tok, tt.sized_array_of(tt.C8, 0, true));
-        mod.errors.push_back({ret, "Invalid char literal"});
+        mod.errors.push_back({ret, "Invalid string literal"});
         return ret;
     }
     
@@ -578,7 +629,7 @@ ast* pass::note() {
     if (is_symbol(grammar::OPAREN)) {
         while (is_symbol(grammar::COMMA) || is_symbol(grammar::OPAREN)) {
             next(); // ( or ,
-            expression();
+            expression(); // TODO Stop bleeding memory holy fuck
         }
         // TODO err
         if (require_symbol(grammar::CPAREN)) next(); // )
@@ -592,11 +643,13 @@ ast* pass::array_lit() {
     ASSERT(is_symbol(grammar::LITERAL_ARRAY), "Invalid start to array literal");
     
     ast* ret = ast::make_compound({}, c, tt.NONE_ARRAY);
+    next(); // '[
     
-    while (is_symbol(grammar::COMMA) || is_symbol(grammar::LITERAL_ARRAY)) {
-        next(); // '[ ,
-        ast* e = expression();
-        ret->compound.elems.push_back(e);
+    if (!is_symbol(grammar::CBRACK)) {
+        do {
+            ast* e = expression();
+            ret->compound.elems.push_back(e);
+        } while (is_symbol(grammar::COMMA) && next());
     }
     
     // TODO err
@@ -609,24 +662,26 @@ ast* pass::struct_lit() {
     ASSERT(is_symbol(grammar::LITERAL_STRUCT), "Invalid start to struct literal");
     
     ast* ret = ast::make_compound({}, c, tt.NONE_STRUCT);
+    next(); // '{
     
-    while (is_symbol(grammar::COMMA) || is_symbol(grammar::LITERAL_STRUCT)) {
-        next(); // '{ ,
-        ast* e = expression();
-        ret->compound.elems.push_back(ast::make_binary({grammar::SP_NAMED, nullptr, e}, e->tok, e->t));
-    }
-    
-    if (is_symbol(grammar::ASSIGN)) {
-        ast* iden = ret->compound.elems.tail;
-        ASSERT(iden && iden->tt == ast_type::BINARY && iden->binary.sym == grammar::SP_NAMED, "Invalid struct element");
-        next(); // =
-        iden->binary.left = expression();
-        while (is_symbol(grammar::COMMA)) {
-            next(); // ,
-            ast* n = expression(); // iden?
-            if (require_symbol(grammar::ASSIGN)) next(); // =
+    if (!is_symbol(grammar::CBRACE)) {
+        do {
             ast* e = expression();
-            ret->compound.elems.push_back(ast::make_binary({grammar::SP_NAMED, n, e}, e->tok, e->t));
+            ret->compound.elems.push_back(ast::make_binary({grammar::SP_NAMED, ast::make_none({}, e->tok, tt.TYPELESS), e}, e->tok, e->t));
+        } while (is_symbol(grammar::COMMA) && next());
+    
+        if (is_symbol(grammar::ASSIGN)) {
+            ast* iden = ret->compound.elems.tail;
+            ASSERT(iden && iden->tt == ast_type::BINARY && iden->binary.sym == grammar::SP_NAMED, "Invalid struct element");
+            next(); // =
+            iden->binary.left = expression();
+            while (is_symbol(grammar::COMMA)) {
+                next(); // ,
+                ast* n = expression(); // iden?
+                if (require_symbol(grammar::ASSIGN)) next(); // =
+                ast* e = expression();
+                ret->compound.elems.push_back(ast::make_binary({grammar::SP_NAMED, n, e}, e->tok, e->t));
+            }
         }
     }
     
@@ -640,11 +695,13 @@ ast* pass::tuple_lit() {
     ASSERT(is_symbol(grammar::LITERAL_TUPLE), "Invalid start to tuple literal");
     
     ast* ret = ast::make_compound({}, c, tt.NONE_TUPLE);
-    
-    while (is_symbol(grammar::COMMA) || is_symbol(grammar::LITERAL_TUPLE)) {
-        next(); // '( ,
-        ast* e = expression();
-        ret->compound.elems.push_back(e);
+    next(); // '(
+        
+    if (!is_symbol(grammar::CPAREN)) {
+        do {
+            ast* e = expression();
+            ret->compound.elems.push_back(e);
+        } while (is_symbol(grammar::COMMA) && next());
     }
     
     // TODO err
@@ -655,10 +712,10 @@ ast* pass::tuple_lit() {
 
 
 ast* pass::program_unit() {
-    ast* ret = ast::make_compound({}, c, tt.TYPELESS);
+    ast* ret = ast::make_block({}, c, tt.TYPELESS);
     
-    while (c) {
-        ret->compound.elems.push_back(freestmt());
+    while (!is(token_type::END_OF_FILE)) {
+        ret->block.elems.push_back(freestmt());
     }
     
     return ret;
@@ -803,10 +860,10 @@ ast* pass::scope() {
     ASSERT(is_symbol(grammar::OBRACE), "Start of scope was not {");
     token* s = next(); // {
     
-    ast* ret = ast::make_compound({}, s, tt.TYPELESS);
+    ast* ret = ast::make_block({}, s, tt.TYPELESS);
     
     while (!is_symbol(grammar::CBRACE) && !is(token_type::END_OF_FILE)) {
-        ret->compound.elems.push_back(stmt());
+        ret->block.elems.push_back(stmt());
     }
     
     // TODO err
@@ -817,324 +874,1929 @@ ast* pass::scope() {
 
 
 ast* pass::optscope() {
-    return nullptr;
+    if (is_keyword(grammar::KW_DO)) {
+        next(); // do
+        return scopestmt();
+    } else if (is_symbol(grammar::OBRACE)) {
+        return scope();
+    } else {
+        // TODO err
+        ast* ret = make_error_ast(c);
+        next(); // ???
+        mod.errors.push_back({ret, "Unexpected symbol"});
+        return ret;
+    }
 }
 
 
 ast* pass::optvardecls() {
-    return nullptr;
+    ast* ret = ast::make_block({}, c, tt.TYPELESS);
+    
+    while (is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_VAR)) {
+        ret->block.elems.push_back(vardecl());
+        
+        // TODO err
+        if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    }
+    
+    return ret;
 }
 
 
 ast* pass::ifstmt() {
-    return nullptr;
-}
-
-ast* pass::ifscope() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_IF), "Expected 'if'");
+    
+    token* tok = next(); // if
+    
+    ast* ret = ast::make_binary({grammar::KW_IF}, tok, tt.TYPELESS);
+    
+    ast* left = ret->binary.left = ast::make_block({}, c, tt.TYPELESS);
+    left->block.elems.push_back(optvardecls());
+    left->block.elems.push_back(expression());
+    
+    ast* right = ret->binary.right = ast::make_binary({grammar::KW_ELSE}, tok, tt.TYPELESS);
+    if (is_keyword(grammar::KW_DO)) {
+        next(); // do
+        right->binary.left = scopestmt();
+        right->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+    } else if (is_symbol(grammar::OBRACE)) {
+        right->binary.left = scopestmt();
+        
+        if (is_keyword(grammar::KW_ELSE)) {
+            next(); // else
+            right->binary.right = scopestmt();
+        } else {
+            right->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+        }
+    } else {
+        // TODO err
+        ast* res = make_error_ast(c);
+        next(); // ???
+        right->binary.left = res; // ???????
+        right->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+        mod.errors.push_back({res, "Unexpected symbol"});
+    }
+    
+    return ret;
 }
 
 
 ast* pass::forstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_FOR), "Expected 'for'");
+    token* tok = next(); // for
+    
+    ast* ret = ast::make_binary({grammar::KW_FOR}, tok, tt.TYPELESS);
+    ast* decl{nullptr};
+    if (is_keyword(grammar::KW_LET) || require_keyword(grammar::KW_VAR)) {
+        decl = vardecl();
+    } else {
+        // TODO err
+        decl = make_error_ast(c);
+        
+    }
+    token* in = c;
+    
+    // TODO err
+    if (require_keyword(grammar::KW_IN)) next(); // in
+    
+    ast* value = expression();
+    ret->binary.left = ast::make_binary({grammar::KW_IN, decl, value}, in, tt.TYPELESS);
+    ret->binary.right = optscope();
+    
+    return ret;
 }
 
 ast* pass::whilestmt() {
-    return nullptr;
+    if (is_keyword(grammar::KW_WHILE)) {
+        return whiledostmt();
+    } else if (is_keyword(grammar::KW_LOOP)) {
+        return dowhilestmt();
+    } else {
+        // TODO err
+        ASSERT(false, "Expected 'while' or 'loop'");
+        return ast::make_none({}, c, tt.TYPELESS); // Unreachable
+    }
 }
 
 ast* pass::whilecond() {
-    return nullptr;
+    ast* ret = ast::make_block({}, c, tt.TYPELESS);
+    
+    ret->block.elems.push_back(expression());
+        
+    while (is_symbol(grammar::SEMICOLON)) {
+        next(); // ;
+        ret->block.elems.push_back(assorexpr(false)); // Do not consume the semicolons please ;-;
+    }
+    
+    return ret;
 }
 
 ast* pass::whiledostmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_WHILE), "Expected 'while'");
+    token* tok = next(); // while
+    
+    ast* res = ast::make_binary({grammar::KW_WHILE}, tok, tt.TYPELESS);
+    ast* left = res->binary.left = ast::make_binary({grammar::SP_COND}, tok, tt.TYPELESS);
+    left->binary.left = optvardecls();
+    left->binary.right = whilecond();
+    
+    res->binary.right = optscope();
+    
+    return res;
 }
 
 ast* pass::dowhilestmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_LOOP), "Expected 'loop'");
+    token* tok = next(); // while
+    
+    ast* res = ast::make_binary({grammar::KW_LOOP}, tok, tt.TYPELESS);
+    
+    ast* left = res->binary.left = ast::make_binary({grammar::SP_COND}, tok, tt.TYPELESS);
+    left->binary.left = optvardecls();
+    
+    res->binary.right = optscope();
+    
+    // TODO err
+    if (require_keyword(grammar::KW_WHILE)) next(); // while
+    
+    left->binary.right = assorexpr();
+    
+    return res;
 }
 
 
 ast* pass::switchstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_SWITCH), "Expected 'switch'");
+    
+    token* tok = next(); // switch
+    ast* ret = ast::make_binary({grammar::KW_SWITCH}, tok, tt.TYPELESS);
+    ret->binary.left = optvardecls();
+    ASSERT(ret->binary.left->is_block(), "Result of optvardecls() wasn't a block");
+    ret->binary.left->block.elems.push_back(expression());
+    
+    if (require_symbol(grammar::OBRACE)) {
+        ret->binary.right = switchscope();
+    } else {
+        // TODO err
+        next(); // ???
+    }
+    
+    return ret;
 }
 
 ast* pass::switchscope() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OBRACE), "Expected '{'");
+    
+    token* tok = next(); // {
+    
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    while (!is_symbol(grammar::CBRACE) && !is(token_type::END_OF_FILE)) {
+        while (is(token_type::COMPILER)) {
+            note(); // Ignore for now
+        }
+        
+        ret->block.elems.push_back(casedecl());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACE)) next(); // }
+    
+    return ret;
 }
 
 ast* pass::casedecl() {
-    return nullptr;
+    ast* ret = ast::make_binary({}, c, tt.TYPELESS);
+    
+    if (is_keyword(grammar::KW_CASE)) {
+        ret->binary.sym = grammar::KW_CASE;
+        ret->tok = next();
+        
+        ast* left = ret->binary.left = ast::make_block({}, c, tt.TYPELESS);
+        left->block.elems.push_back(expression());
+        while (is_symbol(grammar::COMMA)) {
+            next(); // ,
+            left->block.elems.push_back(expression());
+        }
+        
+        if (is_keyword(grammar::KW_CONTINUE)) {
+            token* tok = next(); // continue
+            ret->binary.right = ast::make_zero({grammar::KW_CONTINUE}, tok, tt.TYPELESS);
+            
+            if (require_symbol(grammar::SEMICOLON)) next(); // ;
+        } else {
+            ret->binary.right = optscope();
+        }
+        
+        
+    } else if (is_keyword(grammar::KW_ELSE)) {
+        ret->binary.sym = grammar::KW_ELSE;
+        ret->tok = next();
+        ret->binary.left = ast::make_none({}, c, tt.TYPELESS);
+        
+        if (is_keyword(grammar::KW_CONTINUE)) {
+            token* tok = next();
+            ret->binary.right = ast::make_zero({grammar::KW_CONTINUE}, tok, tt.TYPELESS);
+        } else {
+            ret->binary.right = optscope();
+        }
+        
+    } else {
+        // TODO err
+        ret->binary.sym = grammar::SPECIAL_INVALID;
+        ret->binary.left = ast::make_none({}, c, tt.TYPELESS);
+        ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+        next(); // ???
+        mod.errors.push_back({ret, "Invalid switch case"});
+    }
+    
+    return ret;
 }
 
 
 ast* pass::trystmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_TRY), "Expected 'try'");
+    token* tok = next(); // try
+    
+    ast* ret = ast::make_binary({grammar::KW_TRY}, tok, tt.TYPELESS);
+    ast* left = ret->binary.left = ast::make_block({}, tok, tt.TYPELESS);
+    
+    while (!is_keyword(grammar::KW_CATCH) && !is_keyword(grammar::KW_RAISE) && 
+           !is(token_type::END_OF_FILE)) {
+        left->block.elems.push_back(stmt());
+    }
+    
+    if (is_keyword(grammar::KW_CATCH)) {
+        token* tok = next();
+        ast* right = ret->binary.right = ast::make_binary({grammar::KW_CATCH}, tok, tt.TYPELESS);
+        
+        if (is_keyword(grammar::KW_E64)) {
+            next(); // e64
+            if (require(token_type::IDENTIFIER)) { 
+                right->binary.left = identifier();
+            } else {
+                right->binary.left = ast::make_none({}, c, tt.TYPELESS);
+            }
+        }
+        
+        if (require_symbol(grammar::OBRACE)) {
+            right->binary.right = switchscope();
+        } else {
+            // TODO err
+            right->binary.right = ast::make_none({}, c, tt.TYPELESS);
+            next(); // ???
+        }
+    } else if (is_keyword(grammar::KW_RAISE)) {
+        
+        ret->binary.right = ast::make_zero({grammar::KW_RAISE}, tok, tt.TYPELESS);
+        
+        next(); // raise
+        if (require_symbol(grammar::SEMICOLON)) next();
+        
+        
+    } else {
+        // TODO err
+        ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+        next(); // ???
+        mod.errors.push_back({ret, "Invalid catch case"});
+    }
+    
+    return ret;
 }
 
 
 ast* pass::returnstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_RETURN), "Expected 'return'");
+    token* tok = next(); // return
+    
+    ast* ret = ast::make_unary({grammar::KW_RETURN, ast::make_block({}, tok, tt.TYPELESS)}, tok, tt.TYPELESS);
+    if (!is_symbol(grammar::SEMICOLON)) {
+        ret->unary.node->block.elems.push_back(expression());
+        
+        while (is_symbol(grammar::COMMA)) {
+            next(); // ,
+            ret->unary.node->block.elems.push_back(expression());
+        }
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 ast* pass::raisestmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_RAISE), "Expected 'raise'");
+    token* tok = next(); // raise
+    
+    ast* ret = ast::make_unary({grammar::KW_RAISE, ast::make_block({}, tok, tt.TYPELESS)}, tok, tt.TYPELESS);
+    ret->unary.node->block.elems.push_back(expression());
+    
+    if (!is_symbol(grammar::SEMICOLON)) {
+        ret->unary.node->block.elems.push_back(expression()); // Constant expression?
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 
 ast* pass::gotostmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_GOTO), "Expected 'goto'");
+    token* tok = next(); // goto
+    
+    ast* ret = ast::make_unary({grammar::KW_GOTO}, tok, tt.TYPELESS);
+    if (require(token_type::IDENTIFIER)) {
+        ret->unary.node = identifier();
+    } else {
+        ret->unary.node = ast::make_none({}, tok, tt.TYPELESS);
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 ast* pass::labelstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_LABEL), "Expected 'label'");
+    token* tok = next(); // label
+    
+    ast* ret = ast::make_unary({grammar::KW_LABEL}, tok, tt.TYPELESS);
+    if (require(token_type::IDENTIFIER)) {
+        ret->unary.node = identifier();
+    } else {
+        ret->unary.node = ast::make_none({}, tok, tt.TYPELESS);
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 
 ast* pass::deferstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_DEFER), "Expected 'defer'");
+    token* tok = next(); // defer
+    
+    ast* ret = ast::make_unary({grammar::KW_DEFER}, tok, tt.TYPELESS);
+    ret->unary.node = scopestmt();
+    
+    return ret;
 }
 
 ast* pass::breakstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_BREAK), "Expected 'break'");
+    token* tok = next(); // break
+    
+    ast* ret = ast::make_zero({grammar::KW_LABEL}, tok, tt.TYPELESS);
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 ast* pass::continuestmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_CONTINUE), "Expected 'continue'");
+    token* tok = next(); // continue
+    
+    ast* ret = ast::make_zero({grammar::KW_CONTINUE}, tok, tt.TYPELESS);
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 
 ast* pass::importstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_IMPORT), "Expected 'import'");
+    token* tok = next(); // import
+    
+    ast* ret = ast::make_binary({grammar::KW_IMPORT}, tok, tt.TYPELESS);
+    
+    if (is(token_type::STRING)) {
+        ret->binary.left = string_lit();
+    } else {
+        ret->binary.left = compound_identifier_simple();
+    }
+    
+    if (is_symbol(grammar::KW_AS)) {
+        next(); // as
+        
+        if (is(token_type::IDENTIFIER)) {
+            ret->binary.right = identifier();
+        } else {
+            // TODO err
+            ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+            if (!is_symbol(grammar::SEMICOLON)) {
+                next(); // ???
+            }
+            mod.errors.push_back({ret, "Invalid identifier"});
+        }
+    } else {
+        ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 ast* pass::usingstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_USING), "Expected 'using'");
+    token* tok = next(); // using
+    
+    ast* ret = ast::make_binary({grammar::KW_USING}, tok, tt.TYPELESS);
+    
+    ret->binary.left = expression();
+    
+    if (is_symbol(grammar::KW_AS)) {
+        next(); // as
+        
+        if (is(token_type::IDENTIFIER)) {
+            ret->binary.right = identifier();
+        } else {
+            // TODO err
+            ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+            if (!is_symbol(grammar::SEMICOLON)) {
+                next(); // ???
+            }
+            mod.errors.push_back({ret, "Invalid identifier"});
+        }
+    } else {
+        ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 
 ast* pass::namespacestmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_NAMESPACE), "Expected 'namespace'");
+    token* tok = next(); // namespace
+    
+    ast* ret = ast::make_binary({grammar::KW_NAMESPACE}, tok, tt.TYPELESS);
+    
+    if (is(token_type::IDENTIFIER)) {
+        ret->binary.left = compound_identifier_simple();
+    } else {
+        // TODO err
+        ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+        if (!is_symbol(grammar::SEMICOLON)) {
+            next(); // ???
+        }
+        mod.errors.push_back({ret, "Invalid identifier"});
+    }
+    
+    if (require_symbol(grammar::OBRACE)) {
+        ret->binary.right = namespacescope();
+    }
+    
+    return ret;
 }
 
 ast* pass::namespacescope() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OBRACE), "Expected 'brace'");
+    
+    ast* ret = ast::make_block({}, c, tt.TYPELESS);
+    
+    next(); // {
+    
+    while (!is_symbol(grammar::CBRACE) && !is(token_type::END_OF_FILE)) {
+        while (is(token_type::COMPILER)) {
+            note(); // Ignore for now
+        }
+        
+        require(token_type::KEYWORD); // ???
+        
+        switch (c->value) {
+            case grammar::KW_USING:
+                ret->block.elems.push_back(usingstmt());
+                break;
+            case grammar::KW_NAMESPACE:
+                ret->block.elems.push_back(namespacestmt());
+                break;
+            case grammar::KW_DEF: [[fallthrough]];
+            case grammar::KW_VAR: [[fallthrough]];
+            case grammar::KW_LET:
+                ret->block.elems.push_back(declstmt());
+                break;
+            default:
+                // TODO err
+                ast* ret = make_error_ast(c);
+                if (!is_symbol(grammar::CBRACE)) {
+                    next(); // ???
+                }
+                ret->block.elems.push_back(ret);
+                break;
+        }
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACE)) next(); // }
+    
+    return ret;
 }
 
 
-ast* pass::declarator() {
-    return nullptr;
-}
-
+// ast* pass::declarator() {
+//     return nullptr;
+// }
+// 
 ast* pass::_type() {
-    return nullptr;
+    token* tok = c;
+    ast* t = expression();
+    return ast::make_unary({grammar::COLON, t}, tok, tt.TYPE);
 }
 
 ast* pass::inferrable_type() {
-    return nullptr;
+    token* tok = c;
+    
+    if (is_keyword(grammar::KW_INFER)) {
+        return ast::make_unary({grammar::COLON, ast::make_nntype({tt.INFER}, c, tt.INFER)}, c, tt.TYPE);
+    } else {
+        ast* t = expression();
+        return ast::make_unary({grammar::COLON, t}, tok, tt.TYPE);
+    }
 }
 
 
-ast* pass::paramtype() {
-    return nullptr;
-}
-
-ast* pass::rettype() {
-    return nullptr;
-}
+// ast* pass::paramtype() {
+//     return nullptr;
+// }
+// 
+// ast* pass::rettype() {
+//     return nullptr;
+// }
 
 
 ast* pass::declstmt() {
-    return nullptr;
+    if (is_keyword(grammar::KW_DEF)) {
+        return defstmt();
+    } else if (is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_LET)) {
+        ast* ret = vardecl();
+        
+        if (require_symbol(grammar::SEMICOLON)) next(); // ;
+        
+        return ret;
+    } else {
+        ASSERT(false, "Expected 'def', 'var' or 'let'");
+        return nullptr; // aaaa
+    }
 }
 
 ast* pass::defstmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_DEF), "Expected 'def'");
+    
+    token* tok = next(); // def
+    
+    require(token_type::KEYWORD);
+    
+    ast* ret{nullptr};
+    
+    switch (c->value) {
+        case grammar::KW_FUN:
+            ret = funcdef();
+            break;
+        case grammar::KW_STRUCT:
+            ret = structtypelitdef();
+            break;
+        case grammar::KW_UNION:
+            ret = uniontypelitdef();
+            break;
+        case grammar::KW_ENUM:
+            ret = enumtypelitdef();
+            break;
+        case grammar::KW_TUPLE:
+            ret = tupletypelitdef();
+            break;
+        default:
+            // TODO err
+            ast* ret = make_error_ast(c);
+            next(); // ???
+            return ret;
+    }
+    
+    return ast::make_unary({grammar::KW_DEF, ret}, tok, tt.TYPELESS);
 }
 
+ast* pass::maybe_identifier() {
+    if (is(token_type::IDENTIFIER)) {
+        return identifier();
+    } else if (is_keyword(grammar::KW_PLACEHOLDER)) {
+        token* plac = next(); // _
+        return ast::make_zero({grammar::KW_PLACEHOLDER}, plac, tt.TYPELESS);
+    } else {
+        return ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS);
+    }
+}
 
 ast* pass::vardecl() {
-    return nullptr;
+    if (is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_LET)) {
+        token* tok = next();
+        grammar::symbol sym = (grammar::symbol) tok->value; // var let
+        
+        return ast::make_unary({sym, simplevardecl()}, tok, tt.TYPELESS);
+        
+    } else {
+        ASSERT(false, "Expected 'var' or 'let'");
+        return nullptr; // nu >:(
+    }
 }
 
 ast* pass::simplevardecl() {
-    return nullptr;
+    ast* ret = ast::make_binary({grammar::KW_DEF}, c, tt.TYPELESS);
+    ast* left = ret->binary.left = ast::make_block({}, c, tt.TYPELESS); 
+    do {
+        left->block.elems.push_back(
+            ast::make_binary({grammar::KW_DEF, ast::make_block({}, c, tt.TYPELESS)}, c, tt.TYPELESS)
+        );
+        ast* group = left->block.elems.tail;
+        ast* block = group->binary.left;
+        do {
+            if (is(token_type::IDENTIFIER)) {
+                block->block.elems.push_back(identifier());
+            } else if (is_keyword(grammar::KW_PLACEHOLDER)) {
+                token* tok = next(); // _
+                block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, tok, tt.TYPELESS));
+            } else if (is_symbol(grammar::COLON)) {
+                token* tok = next(); // :
+                group->binary.right = inferrable_type();
+                group->binary.right->unary.sym = grammar::COLON;
+                group->binary.right->tok = tok;
+                break;
+            } else if (is_symbol(grammar::ASSIGN)) {
+                token* tok = c;
+                group->binary.right = ast::make_unary({grammar::COLON, 
+                    ast::make_nntype({tt.INFER}, tok, tt.TYPE)}, tok, tt.TYPELESS);
+                goto out_while;
+            } else {
+                require_symbol(grammar::COMMA);
+                block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS));
+            }
+        } while (is_symbol(grammar::COMMA) && next()); // ,
+        
+        if (is_symbol(grammar::COLON)) {
+            next(); // :
+            group->binary.right = inferrable_type();
+        } else {
+            group->binary.right = ast::make_unary({grammar::COLON, 
+                ast::make_nntype({tt.INFER}, c, tt.TYPE)}, c, tt.TYPELESS);
+        }
+        // We're here after a type, but there could be more shit
+    } while (is_symbol(grammar::COMMA) && next()); // ,
+    
+    out_while:
+    
+    if (is_symbol(grammar::ASSIGN)) {
+        ret->binary.right = assignment();
+    } else {
+        ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+    }
+    
+    return ret;
 }
 
 
 ast* pass::funclit_or_type() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_FUN), "Expected 'fun'");
+    token* tok = next(); // fun
+    
+    if (is_symbol(grammar::OBRACK)) {
+        ast* ret = ast::make_compound({}, tok, tt.NONE_FUNCTION);
+        ret->compound.elems.push_back(capture_group());
+        
+        ret->compound.elems.push_back(maybe_identifier());
+        
+        if (require_symbol(grammar::OPAREN)) {
+            ret->compound.elems.push_back(functypesig());
+        } else {
+            // TODO err
+            ret->compound.elems.push_back(make_error_ast(c));
+        }
+        
+        if (require_symbol(grammar::OBRACE)) {
+            ret->compound.elems.push_back(scope());
+        } else {
+            // TODO err
+            ret->compound.elems.push_back(make_error_ast(c));
+            next(); // ???
+        }
+        
+        return ret;
+    } else {
+        ast* ret = ast::make_binary({grammar::KW_FUN}, tok, tt.TYPE);
+        ret->binary.left = maybe_identifier();
+        
+        if (require_symbol(grammar::OPAREN)) {
+            ret->binary.right = functypesig();
+        } else {
+            // TODO err
+            ret->binary.right = make_error_ast(c);
+            next(); // ???
+        }
+        
+        return ret;
+    }
 }
 
-ast* pass::funclitdef() {
-    return nullptr;
+ast* pass::funclit() {
+    ASSERT(is_keyword(grammar::KW_FUN), "Expected 'fun'");
+    
+    token* tok = next(); // fun
+    
+    ast* ret = ast::make_compound({}, tok, tt.NONE_FUNCTION);
+    
+    if (require_symbol(grammar::OBRACK)) {
+        ret->compound.elems.push_back(capture_group());
+    } else {
+        // TODO err
+        ret->compound.elems.push_back(make_error_ast(c));
+    }
+    
+    ret->compound.elems.push_back(maybe_identifier());
+    
+    if (require_symbol(grammar::OPAREN)) {
+        ret->compound.elems.push_back(functypesig());
+    } else {
+        // TODO err
+        ret->compound.elems.push_back(make_error_ast(c));
+    }
+    
+    if (require_symbol(grammar::OBRACE)) {
+        ret->compound.elems.push_back(scope());
+    } else {
+        // TODO err
+        ret->compound.elems.push_back(make_error_ast(c));
+        next(); // ???
+    }
+    
+    return ret;
+}
+
+ast* pass::funcdef() {
+    ASSERT(is_keyword(grammar::KW_FUN), "Expected 'fun'");
+    
+    token* tok = next(); // fun
+    
+    ast* ret = ast::make_compound({}, tok, tt.NONE_FUNCTION);
+    
+    if (is_symbol(grammar::OBRACK)) {
+        ret->compound.elems.push_back(capture_group());
+    } else {
+        ret->compound.elems.push_back(ast::make_zero({grammar::SP_CAPTURE}, c, tt.TYPELESS));
+    }
+    
+    if (require(token_type::IDENTIFIER)) {
+        ret->compound.elems.push_back(identifier());
+    } else {
+        // TODO err
+        ret->compound.elems.push_back(make_error_ast(c));
+    }
+    
+    if (require_symbol(grammar::OPAREN)) {
+        ret->compound.elems.push_back(functypesig());
+    } else {
+        // TODO err
+        ret->compound.elems.push_back(make_error_ast(c));
+    }
+    
+    if (require_symbol(grammar::OBRACE)) {
+        ret->compound.elems.push_back(scope());
+    } else {
+        // TODO err
+        ret->compound.elems.push_back(make_error_ast(c));
+        next(); // ???
+    }
+    
+    return ret;
+}
+
+ast* pass::capture_group() {
+    ASSERT(is_symbol(grammar::OBRACK), "Expected [");
+    
+    ast* ret = ast::make_compound({}, c, tt.NONE_TUPLE);
+    next(); // [
+    
+    if (!is_symbol(grammar::CBRACK)) {
+        do {            
+            if (is_symbol(grammar::POINTER)) {
+                token* ptr = next(); // *
+                
+                if (require(token_type::IDENTIFIER)) {
+                    ret->compound.elems.push_back(ast::make_unary({grammar::POINTER, identifier()}, ptr, tt.NONE));
+                } else {
+                    // TODO err
+                    ret->compound.elems.push_back(make_error_ast(c));
+                    next(); // ???
+                }
+                
+            } else if (require(token_type::IDENTIFIER)) {
+                
+                ast* bin = ast::make_binary({grammar::ASSIGN, identifier()}, c, tt.TYPELESS);
+                
+                if (is_symbol(grammar::ASSIGN)) {
+                    bin->tok = c;
+                    bin->binary.right = assignment();
+                } else {
+                    bin->binary.right = ast::make_none({}, c, tt.TYPELESS);
+                }
+                
+                ret->compound.elems.push_back(bin);
+                
+            } else {
+                // TODO err
+                ret->compound.elems.push_back(make_error_ast(c));
+                next(); // ???
+            }
+        } while (is_symbol(grammar::COMMA) && next());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACK)) next(); // ]
+    
+    return ret;
 }
 
 ast* pass::functypesig() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OPAREN), "Expected (");
+    token* tok = next(); // ( 
+    ast* ret = ast::make_binary({grammar::COLON}, tok, tt.NONE_FUNCTION);
+    ast* params = ret->binary.left = ast::make_compound({}, tok, tt.TYPELESS);
+    
+    if (!is_symbol(grammar::CPAREN) && !is_symbol(grammar::RARROW) && 
+        !is_symbol(grammar::SRARROW) && !is(token_type::END_OF_FILE)) {
+        do {
+            params->compound.elems.push_back(funcparam());
+        } while (is_symbol(grammar::COMMA) && next());
+    }
+    
+    bool let{false};
+    // TODO err
+    ast* returns = ret->binary.right = ast::make_unary({grammar::RARROW}, tok, tt.TYPELESS);
+    
+    if (is_symbol(grammar::SRARROW) || is_symbol(grammar::RARROW)) {
+        tok = next(); // -> =>
+        let = tok->value == grammar::SRARROW;
+        returns->unary.sym = (grammar::symbol) tok->value;
+        
+        if (is_keyword(grammar::KW_INFER)) {
+            tok = next(); // infer
+            returns->unary.node = ast::make_nntype({tt.INFER}, tok, tt.TYPE);
+        } else {
+            ast* comp = returns->unary.node = ast::make_compound({}, tok, tt.TYPELESS);
+            
+            if (!is_symbol(grammar::CPAREN)) {
+                comp->compound.elems.push_back(funcret(let));
+                while (is_symbol(grammar::COMMA)) {
+                    next(); // ,
+                    comp->compound.elems.push_back(funcret(let));
+                }
+            }
+        }
+        
+    } else {
+        returns->unary.node = ast::make_nntype({tt.INFER}, tok, tt.TYPE);
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CPAREN)) next(); // )
+    
+    return ret;
 }
 
 ast* pass::funcparam() {
-    return nullptr;
+    ast* ret = ast::make_binary({}, c, tt.TYPELESS);
+    bool declarator{false};
+    
+    if (is_keyword(grammar::KW_LET)) {
+        token* tok = next(); // let
+        ret->binary.sym = grammar::KW_LET;
+        ret->tok = tok;
+        declarator = true;
+    } else if (is_keyword(grammar::KW_VAR)) {
+        token* tok = next(); // var
+        ret->binary.sym = grammar::KW_VAR;
+        ret->tok = tok;
+        declarator = true;
+    } else {
+        ret->binary.sym = grammar::KW_VAR;
+    }
+    
+    ast* left = ret->binary.left = ast::make_binary({grammar::ASSIGN}, c, tt.TYPELESS);
+    ast* right = ret->binary.right = ast::make_binary({grammar::COLON}, c, tt.TYPELESS);
+    
+    if (declarator) {
+        left->binary.left = maybe_identifier();
+        if (is_symbol(grammar::DCOLON)) {
+            right->binary.sym = grammar::DCOLON;
+            next(); // ::
+        } else if (require_symbol(grammar::COLON)) {
+            // TODO err
+            next(); // :
+        }
+    } else if (is_symbol(grammar::DCOLON) || is_symbol(grammar::COLON)) {
+        left->binary.left = maybe_identifier();
+        right->binary.sym = (grammar::symbol) next()->value; // ::        
+    } else {
+        ast* first = expression();
+        
+        if (is_symbol(grammar::DCOLON) || is_symbol(grammar::COLON)) {
+            left->binary.left = first; // It's the name
+            right->binary.sym = (grammar::symbol) next()->value; // ::
+        } else {
+            left->binary.left = ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS);
+            // It's the type
+            right->binary.left = first;
+            goto past_type;
+        }
+    }
+    
+    right->binary.left = _type();
+    
+    past_type:
+    
+    if (is_symbol(grammar::SPREAD)) {
+        right->binary.right = ast::make_zero({grammar::SPREAD}, next(), tt.TYPELESS); // ...
+    } else {
+        right->binary.right = ast::make_none({}, c, tt.TYPELESS);
+    }
+    
+    if (is_symbol(grammar::ASSIGN)) {
+        next(); // =
+        left->binary.right = expression();
+    } else {
+        left->binary.right = ast::make_none({}, c, tt.TYPELESS);
+    }
+    
+    return ret;
 }
 
-ast* pass::funcret() {
-    return nullptr;
+ast* pass::funcret(bool let) {
+    ast* ret = ast::make_binary({}, c, tt.TYPELESS);
+    bool declarator{false};
+    
+    if (is_keyword(grammar::KW_LET)) {
+        token* tok = next(); // let
+        ret->binary.sym = grammar::KW_LET;
+        ret->tok = tok;
+        declarator = true;
+    } else if (is_keyword(grammar::KW_VAR)) {
+        token* tok = next(); // var
+        ret->binary.sym = grammar::KW_VAR;
+        ret->tok = tok;
+        declarator = true;
+    } else {
+        ret->binary.sym = let ? grammar::KW_LET : grammar::KW_VAR;
+    }
+    
+    if (declarator) {
+        ret->binary.left = maybe_identifier(); // Name and colon obligatory
+    } else if (is_symbol(grammar::COLON)) {
+        ret->binary.left = maybe_identifier(); // Name not there, this'll give us what we want
+    } else {
+        if (is_keyword(grammar::KW_INFER)) {
+            ret->binary.left = ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS);
+            ret->binary.right = inferrable_type();
+            
+            return ret;
+        } else {
+            ast* first = expression();
+            
+            if (is_symbol(grammar::COLON)) {
+                ret->binary.left = first;
+            } else {
+                ret->binary.left = ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS);
+                ret->binary.right = first;
+                
+                return ret;
+            }
+        }
+    }
+    
+    // token* tok = c;
+    // TODO err
+    if (require_symbol(grammar::COLON)) next(); // :
+    
+    ret->binary.right = inferrable_type();
+    
+    return ret;
 }
 
 
 ast* pass::structtypelit() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_STRUCT), "Expected 'struct'");
+    
+    token* tok = next(); // struct
+    
+    ast* ret = ast::make_binary({grammar::KW_STRUCT}, tok, tt.TYPE);
+    ret->binary.left = maybe_identifier();
+    
+    if (is_symbol(grammar::OBRACE)) {
+        ret->binary.right = structscope();
+    } else {
+        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+    }
+    
+    return ret;
 }
 
 ast* pass::structtypelitdef() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_STRUCT), "Expected 'struct'");
+    
+    token* tok = next(); // struct
+    
+    ast* ret = ast::make_binary({grammar::KW_STRUCT}, tok, tt.TYPE);
+    // TODO err
+    if (require(token_type::IDENTIFIER)) {
+        ret->binary.left = identifier();
+    } else {
+        ret->binary.left = make_error_ast(c);
+    }
+    
+    if (is_symbol(grammar::OBRACE)) {
+        ret->binary.right = structscope();
+    } else {
+        ret->binary.right = make_error_ast(c);
+    }
+    
+    return ret;
 }
 
 ast* pass::structscope() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OBRACE), "Expected {");
+    token* tok = next(); // {
+    
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    while (!is_symbol(grammar::CBRACE) && !is(token_type::END_OF_FILE)) {
+        while (is(token_type::COMPILER)) {
+            note(); // Ignore for now
+        }
+        
+        // TODO err
+        if (require(token_type::KEYWORD)) {
+            switch (c->value) {
+                case grammar::KW_DEF: 
+                    ret->block.elems.push_back(defstmt());
+                    break;
+                case grammar::KW_VAR: [[fallthrough]];
+                case grammar::KW_LET: {
+                    ret->block.elems.push_back(structvardecl());
+                    
+                    // TODO err
+                    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+                    
+                    break;
+                }
+                default: {
+                    // TODO err
+                    ast* err = make_error_ast(c);
+                    mod.errors.push_back({err, ss::get() << "Unexpected keyword " << (grammar::symbol) c->value << ss::end()});
+                    next(); // ???
+                }
+            }
+        } else {
+            next(); // ???
+        }
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACE)) next();
+    
+    return ret;
 }
 
 ast* pass::structvardecl() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_VAR), "Expected 'var' or 'let'");
+    token* tok = next(); // var let
+    
+    ast* vardecl = ast::make_binary({grammar::KW_DEF}, tok, tt.TYPELESS);
+    ast* left = vardecl->binary.left = ast::make_block({}, tok, tt.TYPELESS); 
+    do {
+        left->block.elems.push_back(
+            ast::make_binary({grammar::KW_DEF, ast::make_block({}, c, tt.TYPELESS)}, c, tt.TYPELESS)
+        );
+        ast* group = left->block.elems.tail;
+        ast* block = group->binary.left;
+        do {
+            if (is(token_type::IDENTIFIER)) {
+                block->block.elems.push_back(identifier());
+            } else if (is_keyword(grammar::KW_PLACEHOLDER)) {
+                token* tok = next(); // _
+                block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, tok, tt.TYPELESS));
+            } else if (is_symbol(grammar::COLON) || is_symbol(grammar::DCOLON)) {
+                token* tok = next(); // : ::
+                group->binary.right = _type();
+                group->binary.right->unary.sym = (grammar::symbol) tok->value;
+                group->binary.right->tok = tok;
+                break;
+            } else if (is_symbol(grammar::ASSIGN)) {
+                token* tok = c;
+                group->binary.right = ast::make_unary({grammar::COLON, 
+                    ast::make_nntype({tt.INFER}, tok, tt.TYPE)}, tok, tt.TYPELESS);
+                goto out_while;
+            } else {
+                require_symbol(grammar::COMMA);
+                block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS));
+            }
+        } while (is_symbol(grammar::COMMA) && next()); // ,
+        
+        if (is_symbol(grammar::COLON) || is_symbol(grammar::DCOLON)) {
+            token* tok = next(); // : ::
+            group->binary.right = _type();
+            group->binary.right->unary.sym = (grammar::symbol) tok->value;
+            group->binary.right->tok = tok;
+            break;
+        }
+        
+        // We're here after a type, but there could be more shit
+    } while (is_symbol(grammar::COMMA) && next()); // ,
+    
+    out_while:
+    
+    if (is_symbol(grammar::ASSIGN)) {
+        vardecl->binary.right = assignment();
+    } else {
+        vardecl->binary.right = ast::make_none({}, c, tt.TYPELESS);
+    }
+    
+    return vardecl;
 }
 
 
 ast* pass::uniontypelit() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_UNION), "Expected 'union'");
+    
+    token* tok = next(); // union
+    
+    ast* ret = ast::make_binary({grammar::KW_UNION}, tok, tt.TYPE);
+    ret->binary.left = maybe_identifier();
+    
+    if (is_symbol(grammar::OBRACE)) {
+        ret->binary.right = unionscope();
+    } else {
+        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+    }
+    
+    return ret;
 }
 
 ast* pass::uniontypelitdef() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_UNION), "Expected 'union'");
+    
+    token* tok = next(); // union
+    
+    ast* ret = ast::make_binary({grammar::KW_UNION}, tok, tt.TYPE);
+    // TODO err
+    if (require(token_type::IDENTIFIER)) {
+        ret->binary.left = identifier();
+    } else {
+        ret->binary.left = make_error_ast(c);
+    }
+    
+    // TODO err
+    if (is_symbol(grammar::OBRACE)) {
+        ret->binary.right = unionscope();
+    } else {
+        ret->binary.right = make_error_ast(c);
+    }
+    
+    return ret;
 }
 
+ast* pass::unionscope() {
+    ASSERT(is_symbol(grammar::OBRACE), "Expected {");
+    token* tok = next(); // {
+    
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    while (!is_symbol(grammar::CBRACE) && !is(token_type::END_OF_FILE)) {
+        while (is(token_type::COMPILER)) {
+            note(); // Ignore for now
+        }
+        
+        require(token_type::KEYWORD);
+        switch (c->value) {
+            case grammar::KW_DEF: 
+                ret->block.elems.push_back(defstmt());
+                break;
+            case grammar::KW_VAR: [[fallthrough]];
+            case grammar::KW_LET: {
+                ret->block.elems.push_back(vardecl());
+                
+                // TODO err
+                if (require_symbol(grammar::SEMICOLON)) next(); // ;
+                
+                break;
+            }
+            default: {
+                // TODO err
+                ast* err = make_error_ast(c);
+                mod.errors.push_back({err, ss::get() << "Unexpected keyword " << (grammar::symbol) c->value << ss::end()});
+                next(); // ???
+            }
+        }
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACE)) next();
+    
+    return ret;
+}
 
 ast* pass::enumtypelit() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_ENUM), "Expected 'enum'");
+    
+    token* tok = next(); // enum
+    
+    ast* ret = ast::make_binary({grammar::KW_ENUM}, tok, tt.TYPE);
+    ret->binary.left = maybe_identifier();
+    
+    if (is_symbol(grammar::OBRACE)) {
+        ret->binary.right = enumscope();
+    } else {
+        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+    }
+    
+    return ret;
 }
 
 ast* pass::enumtypelitdef() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_ENUM), "Expected 'enum'");
+    
+    token* tok = next(); // enum
+    
+    ast* ret = ast::make_binary({grammar::KW_ENUM}, tok, tt.TYPE);
+    // TODO err
+    if (require(token_type::IDENTIFIER)) {
+        ret->binary.left = identifier();
+    } else {
+        ret->binary.left = make_error_ast(c);
+    }
+    
+    // TODO err
+    if (is_symbol(grammar::OBRACE)) {
+        ret->binary.right = enumscope();
+    } else {
+        ret->binary.right = make_error_ast(c);
+    }
+    
+    return ret;
 }
 
 ast* pass::enumscope() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OBRACE), "Expected {");
+    token* tok = next(); // {
+    
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    if (!is_symbol(grammar::CBRACE) && !is(token_type::END_OF_FILE)) {
+        do {
+            while (is(token_type::COMPILER)) {
+                note(); // Ignore for now
+            }
+            
+            ast* elem = ast::make_binary({grammar::SP_NAMED}, c, tt.NONE);
+            
+            if (require(token_type::IDENTIFIER)) {
+                elem->binary.left = identifier();
+            } else {
+                elem->binary.left = make_error_ast(c);
+            }
+            
+            if (is_symbol(grammar::ASSIGN)) {
+                next(); // 
+                elem->binary.right = expression();
+            } else {
+                elem->binary.right = ast::make_none({}, c, tt.TYPELESS);
+            }
+            
+            ret->block.elems.push_back(elem);
+        } while (is_symbol(grammar::COMMA) && next());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACE)) next();
+    
+    return ret;
 }
 
 
 ast* pass::tupletypelit() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_TUPLE), "Expected 'tuple'");
+    
+    token* tok = next(); // tuple
+    
+    ast* ret = ast::make_binary({grammar::KW_TUPLE}, tok, tt.TYPE);
+    ret->binary.left = maybe_identifier();
+    
+    if (is_symbol(grammar::OPAREN)) {
+        ret->binary.right = tupletypes();
+    } else {
+        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+    }
+    
+    return ret;
 }
 
 ast* pass::tupletypelitdef() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_TUPLE), "Expected 'tuple'");
+    
+    token* tok = next(); // tuple
+    
+    ast* ret = ast::make_binary({grammar::KW_TUPLE}, tok, tt.TYPE);
+    // TODO err
+    if (require(token_type::IDENTIFIER)) {
+        ret->binary.left = identifier();
+    } else {
+        ret->binary.left = make_error_ast(c);
+    }
+    
+    // TODO err
+    if (is_symbol(grammar::OPAREN)) {
+        ret->binary.right = tupletypes();
+    } else {
+        ret->binary.right = make_error_ast(c);
+    }
+    
+    return ret;
 }
 
 ast* pass::tupletypes() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OPAREN), "Expected (");
+    token* tok = next(); // (
+    
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    if (!is_symbol(grammar::OPAREN) && !is(token_type::END_OF_FILE)) {
+        do {            
+            ret->block.elems.push_back(_type());
+        } while (is_symbol(grammar::COMMA) && next());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::OPAREN)) next();
+    
+    return ret;
 }
 
 
-ast* pass::typelit() {
-    return nullptr;
-}
+// ast* pass::typelit() {
+//     return nullptr;
+// }
 
 ast* pass::typelit_nofunc() {
-    return nullptr;
+    
+    require(token_type::KEYWORD);
+    
+    type* t{nullptr};
+    
+    switch (c->value) {
+        case grammar::KW_U0: t = tt.U0; break;
+        case grammar::KW_U1: t = tt.U1; break;
+        case grammar::KW_U8: t = tt.U8; break;
+        case grammar::KW_U16: t = tt.U16; break;
+        case grammar::KW_U32: t = tt.U32; break;
+        case grammar::KW_U64: t = tt.U64; break;
+        case grammar::KW_S8: t = tt.S8; break;
+        case grammar::KW_S16: t = tt.S16; break;
+        case grammar::KW_S32: t = tt.S32; break;
+        case grammar::KW_S64: t = tt.S64; break;
+        case grammar::KW_F32: t = tt.F32; break;
+        case grammar::KW_F64: t = tt.F64; break;
+        case grammar::KW_C8: t = tt.C8; break;
+        case grammar::KW_C16: t = tt.C16; break;
+        case grammar::KW_C32: t = tt.C32; break;
+        case grammar::KW_E64: t = tt.E64; break;
+        case grammar::KW_TYPE: t = tt.TYPE; break;
+        case grammar::KW_ANY: t = tt.ANY; break;
+        case grammar::KW_STRUCT: return structtypelit();
+        case grammar::KW_UNION: return uniontypelit();
+        case grammar::KW_ENUM: return enumtypelit();
+        case grammar::KW_TUPLE: return tupletypelit();
+        default:
+            ast* ret = make_error_ast(next());
+            mod.errors.push_back({ret, ss::get() << "Expected type literal but got" << 
+                                       (grammar::symbol) c->value << ss::end()});
+            return ret;
+    }
+    
+    token* tok = next(); // u0 u1 u8 u16 u32 u64 s8 s16 s32 s64 f32 f64 c8 c16 c32 e64 type any
+    
+    return ast::make_nntype({t}, tok, tt.TYPE);
 }
 
 
 ast* pass::assignment() {
-    return nullptr;
+    ASSERT(is_assign(), "Expected =");
+    token* tok = next(); // =
+    
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    ret->block.elems.push_back(expression());
+    
+    while (is_symbol(grammar::COMMA)) {
+        next(); // ,
+        ret->block.elems.push_back(expression());
+    }
+    
+    return ret;
 }
 
-ast* pass::assstmt() {
-    return nullptr;
+ast* pass::assstmt() {   
+    ast* ret = ast::make_binary({grammar::ASSIGN}, c, tt.TYPELESS);
+    ast* left = ret->binary.left = ast::make_block({}, c, tt.TYPELESS);
+    ast* right = ret->binary.right = ast::make_block({}, c, tt.TYPELESS);
+    
+    left->block.elems.push_back(expression());
+    
+    while (is_keyword(grammar::COMMA)) {
+        next(); // ,
+        left->block.elems.push_back(expression());
+    }
+    
+    // TODO err
+    if (require_assign()) {
+        token* tok = next(); // =
+        ret->binary.sym = (grammar::symbol) tok->value;
+    }
+    
+    right->block.elems.push_back(expression());
+    
+    while (is_keyword(grammar::COMMA)) {
+        next(); // ,
+        right->block.elems.push_back(expression());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 
 ast* pass::deletestmt() {
-    return nullptr;
+    ASSERT(is_keyword(grammar::KW_DELETE), "Expected 'delete'");
+    
+    token* tok = next(); // delete
+    
+    ast* ret = ast::make_unary({grammar::KW_DELETE}, tok, tt.TYPELESS);
+    ast* exprs = ret->unary.node = ast::make_block({}, tok, tt.TYPELESS);
+    
+    exprs->block.elems.push_back(expression());
+    
+    while (is_symbol(grammar::COMMA)) {
+        next(); // ,
+        exprs->block.elems.push_back(expression());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
 
 ast* pass::expressionstmt() {
-    return nullptr;
+    ast* ret = expression();
+    
+    // TODO err
+    if (require_symbol(grammar::SEMICOLON)) next(); // ;
+    
+    return ret;
 }
 
-ast* pass::assorexpr() {
-    return nullptr;
+ast* pass::assorexpr(bool stmt) {
+    token* tok = c;
+    ast* first = expression();
+    
+    if (is_symbol(grammar::SEMICOLON)) {
+        if (stmt) next(); // ;
+        return first;
+    } else if (is_symbol(grammar::COMMA) || is_assign()) {
+        ast* ret = ast::make_binary({grammar::ASSIGN}, tok, tt.TYPELESS);
+        ast* left = ret->binary.left = ast::make_block({}, tok, tt.TYPELESS);
+        ast* right = ret->binary.right = ast::make_block({}, tok, tt.TYPELESS);
+        
+        left->block.elems.push_back(first);
+        
+        while (is_symbol(grammar::COMMA)) {
+            next(); // ,
+            left->block.elems.push_back(expression());
+        }
+        
+        // TODO err
+        if (require_assign()) {
+            token* tok = next(); // =
+            ret->binary.sym = (grammar::symbol) tok->value;
+        }
+        
+        right->block.elems.push_back(expression());
+        
+        while (is_keyword(grammar::COMMA)) {
+            next(); // ,
+            right->block.elems.push_back(expression());
+        }
+        
+        // TODO err
+        if (stmt && require_symbol(grammar::SEMICOLON)) next(); // ;
+        
+        return ret;
+    } else {
+        if (stmt) {
+            mod.errors.push_back({first, ss::get() << "Invalid statement" << ss::end()});
+        }
+        return first;
+    }
 }
 
 ast* pass::expression() {
-    return nullptr;
+    return ternaryexpr();
 }
 
 ast* pass::ternaryexpr() {
-    return nullptr;
+    ast* nexpr = newexpr();
+    if (is_symbol(grammar::DQUESTION)) {
+        token* t = next(); // ??
+        ast* ternary = ast::make_binary({grammar::DQUESTION, nexpr, 
+            ast::make_binary({grammar::CHOICE}, t, tt.NONE)}, t, tt.NONE);
+        ternary->binary.left = expression();
+        // TODO err
+        ternary->tok = c;
+        if (require_symbol(grammar::DIAMOND)) next(); // <>
+        ternary->binary.right = expression();
+        return ternary;
+    } else {
+        return nexpr;
+    }
+    
 }
 
 ast* pass::newexpr() {
-    return nullptr;
+    if (is_keyword(grammar::KW_NEW)) {
+        token* tok = next(); // new
+        
+        ast* ret = ast::make_binary({grammar::KW_NEW}, tok, tt.NONE);
+        ast* right = ret->binary.right = ast::make_binary({grammar::MUL}, tok, tt.TYPELESS);
+        
+        if (is_symbol(grammar::OPAREN)) {
+            next(); // (
+            right->binary.right = expression();
+            
+            // TODO err
+            if (require_symbol(grammar::CPAREN)) next(); // )
+        } else {
+            right->binary.right = ast::make_value({1}, tok, tt.U64);
+        }
+        
+        ast* first = expression();
+        
+        if (is_symbol(grammar::COLON)) {
+            next(); // :
+            ret->binary.left = first;
+            right->binary.left = expression();
+        } else {
+            right->binary.left = first;
+            ret->binary.left = ast::make_none({}, tok, tt.TYPELESS);
+        }
+        
+        return ret;
+    } else {
+        return prefixexpr();
+    }
 }
 
 ast* pass::prefixexpr() {
-    return nullptr;
+    if ((is(token_type::SYMBOL) || is(token_type::KEYWORD)) && pre_ops.count((grammar::symbol) c->value)) {
+        if (!is_symbol(grammar::OBRACK)) {
+            token* tok = next(); // sym
+            return ast::make_unary({(grammar::symbol) tok->value, expression()}, tok, tt.NONE);
+        } else {
+            token* tok = next(); // [
+            ast* ret = ast::make_binary({grammar::CBRACK}, tok, tt.NONE); // !!!
+            if (!is_symbol(grammar::CBRACK)) {
+                ret->binary.left = expression();
+            } else {
+                ret->binary.left = ast::make_none({}, tok, tt.TYPELESS);
+            }
+            
+            // TODO err
+            if (require_symbol(grammar::CBRACK)) next(); // ]
+            ret->binary.right = expression();
+            return ret;
+        }
+    } else {
+        return postfixexpr();
+    }
 }
 
 ast* pass::postfixexpr() {
-    return nullptr;
+    ast* infix = infixexpr();
+    
+    while ((is(token_type::SYMBOL) || is(token_type::KEYWORD)) && post_ops.count((grammar::symbol) c->value)) {
+        token* tok = next(); // sym
+        infix = ast::make_unary({(grammar::symbol) tok->value, infix}, tok, tt.NONE);
+        infix->unary.post = true;
+    }
+    
+    return infix;
 }
 
 ast* pass::infixexpr() {
-    return nullptr;
-}
-
-ast* pass::postcircumfixexpr() {
-    return nullptr;
-}
-
-ast* pass::function_call() {
-    return nullptr;
-}
-
-ast* pass::access() {
-    return nullptr;
-}
-
-ast* pass::reorder() {
-    return nullptr;
+    ast* dot = dotexpr();
+    if ((is(token_type::SYMBOL) || is(token_type::KEYWORD)) && infix_ops.count((grammar::symbol) c->value)) {
+        token* tok = next(); // sym
+        ast* ret = ast::make_binary({(grammar::symbol) tok->value, dot}, tok, tt.NONE);
+        ret->binary.right = expression();
+        
+        return ret;
+    } else {
+        return dot;
+    }
 }
 
 ast* pass::dotexpr() {
-    return nullptr;
+    ast* postcircumfix = postcircumfixexpr();
+    
+    if (is_symbol(grammar::PERIOD)) {
+        token* tok = next(); // .
+        ast* ret = ast::make_unary({grammar::PERIOD, ast::make_block({}, tok, tt.TYPELESS)}, tok, tt.NONE);
+        ast* block = ret->unary.node;
+        block->block.elems.push_back(postcircumfix);
+        
+        do {
+            if (is_symbol(grammar::MUL)) {
+                token* tok = next(); // *
+                block->block.elems.push_back(ast::make_zero({grammar::MUL}, tok, tt.NONE));
+                break;
+            } else {
+                block->block.elems.push_back(postcircumfixexpr());
+            }
+        } while (is_symbol(grammar::PERIOD) && next());
+        
+        return ret;
+    } else {
+        return postcircumfix;
+    }
+}
+
+ast* pass::postcircumfixexpr() {
+    ast* literal = literalexpr();
+    
+    while (is(token_type::SYMBOL)) {
+        switch (c->value) {
+            case grammar::OPAREN: {
+                literal = ast::make_binary({grammar::OPAREN, literal, function_call()}, c, tt.NONE);
+                break;
+            }
+            case grammar::OBRACK: {
+                literal = ast::make_binary({grammar::OBRACK, literal, access()}, c, tt.NONE);
+                break;
+            }
+            case grammar::OSELECT: {
+                literal = ast::make_binary({grammar::OSELECT, literal, reorder()}, c, tt.NONE);
+                break;
+            }
+            default:
+                return literal;
+        }
+    } 
+    
+    return literal;
+}
+
+ast* pass::function_call() {
+    ASSERT(is_symbol(grammar::OPAREN), "Expected (");
+    
+    token* tok = next(); // (
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    if (!is_symbol(grammar::CPAREN)) {
+        do {
+            token* tok = c;
+            ast* first = expression();
+            if (is_symbol(grammar::ASSIGN)) {
+                tok = next(); // =
+                ret->block.elems.push_back(ast::make_binary({
+                    grammar::SP_NAMED, 
+                    first, 
+                    expression()
+                }, tok, tt.TYPELESS));
+            } else {
+                ret->block.elems.push_back(ast::make_binary({
+                    grammar::SP_NAMED, 
+                    ast::make_none({}, tok, tt.TYPELESS), 
+                    first
+                }, tok, tt.TYPELESS));
+            }
+        } while (is_symbol(grammar::COMMA) && next());
+    }
+    
+    // TODO err
+    if (require_symbol(grammar::CPAREN)) next(); // )
+    
+    return ret;
+}
+
+ast* pass::access() {
+    ASSERT(is_symbol(grammar::OBRACK), "Expected [");
+    next(); // [
+    
+    ast* ret = expression();
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACK)) next(); // ]
+    
+    return ret;
+}
+
+ast* pass::reorder() {
+    ASSERT(is_symbol(grammar::OSELECT), "Expected ::[");
+    token* tok = next(); // ::[
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    do {
+        ret->block.elems.push_back(expression());
+    } while (is_symbol(grammar::COMMA) && next());
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACK)) next(); // ]
+    
+    return ret;
 }
 
 
-ast* pass::literal() {
-    return nullptr;
-}
+// ast* pass::literal() {
+//     return nullptr;
+// }
 
 ast* pass::literalexpr() {
-    return nullptr;
+    ast* ret{nullptr};
+    
+    switch (c->tt) {
+        case token_type::NUMBER: [[fallthrough]];
+        case token_type::INTEGER: [[fallthrough]];
+        case token_type::FLOATING:
+            ret = number();
+            break;
+        case token_type::STRING:
+            ret = string_lit();
+            break;
+        case token_type::CHARACTER:
+            ret = char_lit();
+            break;
+        case token_type::SYMBOL:
+            switch (c->value) {
+                case grammar::LITERAL_ARRAY:
+                    ret = array_lit();
+                    break;
+                case grammar::LITERAL_STRUCT:
+                    ret = struct_lit();
+                    break;
+                case grammar::LITERAL_TUPLE:
+                    ret = tuple_lit();
+                    break;
+                case grammar::NOTHING:
+                    ret = ast::make_value({0}, next(), tt.NOTHING); // ---
+                    break;
+                default:
+                    ret = identifierexpr();
+                    break;
+            }
+            break;
+        case token_type::KEYWORD:
+            switch (c->value) {
+                case grammar::KW_FALSE:
+                    ret = ast::make_value({0}, next(), tt.U1); // false
+                    break;
+                case grammar::KW_TRUE:
+                    ret = ast::make_value({1}, next(), tt.U1); // true
+                    break;
+                case grammar::KW_NULL:
+                    ret = ast::make_value({0}, next(), tt.NULL_); // null
+                    break;
+                case grammar::KW_FUN:
+                    ret = funclit_or_type();
+                    break;
+                case grammar::KW_THIS:
+                    ret = ast::make_zero({grammar::KW_THIS}, next(), tt.NONE); // this
+                    break;
+                case grammar::KW_PLACEHOLDER:
+                    ret = ast::make_zero({grammar::KW_PLACEHOLDER}, next(), tt.NONE); // _
+                    break;
+                default:
+                    ret = typelit_nofunc();
+                    break;
+                
+            }
+            break;
+        default:
+            ret = identifierexpr();
+            break;
+    }
+    
+    if (is_symbol(grammar::OSELECT)) {
+        token* tok = c;
+        return ast::make_binary({grammar::OSELECT, ret, select()}, tok, tt.NONE);
+    } else {
+        return ret;
+    }
 }
 
 ast* pass::identifierexpr() {
-    return nullptr;
+    if (is_symbol(grammar::OPAREN)) {
+        return parenexpr();
+    } else if (is(token_type::IDENTIFIER)) {
+        return identifier();
+    } else {
+        // Alright, it could be nothing else
+        // TODO err
+        ast* ret = make_error_ast(c);
+        mod.errors.push_back({ret, "Invalid expression"});
+        if (!is_symbol(grammar::SEMICOLON) && !is_symbol(grammar::OBRACE) && 
+            !is_symbol(grammar::OPAREN) && !is_symbol(grammar::OBRACK)) {
+                next(); // ???
+        }
+        return ret;
+    }
 }
 
 ast* pass::parenexpr() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OPAREN), "Expected (");
+    token* tok = next(); // (
+    ast* ret = ast::make_unary({grammar::CPAREN, expression()}, tok, tt.NONE);
+    
+    // TODO err
+    if (require_symbol(grammar::CPAREN)) next(); // )
+    
+    return ret;
 }
 
 
 ast* pass::select() {
-    return nullptr;
+    ASSERT(is_symbol(grammar::OSELECT), "Expected ::[");
+    token* tok = next(); // ::[
+    ast* ret = ast::make_block({}, tok, tt.TYPELESS);
+    
+    do {
+        token* tok = c;
+        ast* first = expression();
+        if (is_symbol(grammar::ASSIGN)) {
+            tok = next(); // =
+            ret->block.elems.push_back(ast::make_binary({
+                grammar::SP_NAMED, 
+                first, 
+                expression()
+            }, tok, tt.TYPELESS));
+        } else {
+            ret->block.elems.push_back(ast::make_binary({
+                grammar::SP_NAMED, 
+                ast::make_none({}, tok, tt.TYPELESS), 
+                expression()
+            }, tok, tt.TYPELESS));
+        }
+    } while (is_symbol(grammar::COMMA) && next());
+    
+    // TODO err
+    if (require_symbol(grammar::CBRACK)) next(); // ]
+    
+    return ret;
 }
 
 ast* pass::compound_identifier_simple() {
-    return nullptr;
+    ASSERT(is(token_type::IDENTIFIER), "Expected identifier");
+    
+    token* tok = c;
+    ast* ret = ast::make_unary({grammar::PERIOD, ast::make_block({}, tok, tt.TYPELESS)}, tok, tt.TYPELESS);
+    ast* block = ret->unary.node;
+    
+    do {
+        if (is_symbol(grammar::MUL)) {
+            token* tok = next(); // *
+            block->block.elems.push_back(ast::make_zero({grammar::MUL}, tok, tt.TYPELESS));
+            break;
+        } else {
+            if (require(token_type::IDENTIFIER)) {
+                block->block.elems.push_back(identifier());
+            } else {
+                // TODO err
+                block->block.elems.push_back(make_error_ast(c));
+                next(); // ???
+            }
+        }
+    } while (is_symbol(grammar::PERIOD) && next());
+    
+    return ret;
 }
 
 ast* pass::make_error_ast(token* t) {

@@ -284,7 +284,6 @@ void token_stream::read_one() {
                         switch (c) {
                             case ' ': [[fallthrough]];
                             case '\t':[[fallthrough]];
-                            case '\n':[[fallthrough]];
                             case '\r':[[fallthrough]];
                             case '`': [[fallthrough]];
                             case '~': [[fallthrough]];
@@ -316,6 +315,12 @@ void token_stream::read_one() {
                             case '#': [[fallthrough]];
                             case '?':
                                 goto end_literal;
+                                break;
+                            case '\n': {
+                                logger::debug() << "????";
+                                goto end_literal;
+                                break;
+                            }
                             case '"': {
                                 ++contentptr;
                                 goto string; // Stop it
@@ -473,20 +478,24 @@ void token_stream::read_one() {
                     case 'x': [[fallthrough]];
                     case 'X': 
                         base = 16;
+                        add(c);
+                        contentptr++;
                         break;
                     case 'o': [[fallthrough]];
                     case 'O':
                         base = 8;
+                        add(c);
+                        contentptr++;
                         break;
                     case 'b': [[fallthrough]];
                     case 'B':
                         base = 2;
+                        add(c);
+                        contentptr++;
                         break;
                     default:
                         break;
                 }
-                add(c);
-                contentptr++;
             }
             
             switch (base) {

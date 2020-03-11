@@ -20,7 +20,7 @@ enum class type_type : u8 {
 
 enum class primitive_type : u8 {
     SIGNED, UNSIGNED, BOOLEAN, FLOATING, 
-    CHARACTER, TYPE, ANY, VOID
+    CHARACTER, ERROR, TYPE, ANY, VOID
 };
 
 enum class pointer_type : u8 {
@@ -30,7 +30,7 @@ enum class pointer_type : u8 {
 enum class special_type : u8 {
     INFER, GENERIC, NOTHING, TYPELESS, NONE, 
     NONE_ARRAY, NONE_STRUCT, NONE_TUPLE,
-    NONE_FUNCTION
+    NONE_FUNCTION, NULL_
 };
 
 struct type;
@@ -149,4 +149,11 @@ struct type {
     
     ~type();
     type(type&& o);
+    
+    std::string to_string(bool simple = false);
 };
+
+std::ostream& operator<<(std::ostream& os, type_type t);
+std::ostream& operator<<(std::ostream& os, primitive_type t);
+std::ostream& operator<<(std::ostream& os, pointer_type t);
+std::ostream& operator<<(std::ostream& os, special_type t);

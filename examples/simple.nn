@@ -1,4 +1,5 @@
-def fun example() {
+#> def fun example() {
+	''\'';
 	1;
 	10;
 	10.0;
@@ -37,7 +38,6 @@ def fun example() {
 	a+;!@%$^%^*;a;
 	a+";"+a;
 	"hello\"";
-	''\'';
 	'c32"Do more thing";
 	'c"Dothing";
 	'stongth;
@@ -48,11 +48,24 @@ def fun example() {
 	'[];
 	'a[];
 	'['('{"'"})];
-}
+} <#
 
 let foo: fun(-> :s32);
 def fun foo(-> :s32) {
 	return 1;
+}
+
+def fun add(x:: 'a, y: 'a) {
+	return x + y;
+}
+
+def struct holds {
+	var x: 'a;
+	var y:: 'a;
+}
+
+def fun self(let x: type) {
+	return [2]x;
 }
 
 def fun foo(a: s32 -> :s32) {
@@ -77,10 +90,10 @@ def fun fooo(a: s32 -> :s32) {
 
 let name: struct;
 def struct name {
-	a: f32;
-	b: f64;
-	c : s32;
-	d: []c64;
+	var a: f32;
+	var b: f64;
+	var c: s32;
+	var d: []c32;
 
 	$constructor 
 	def fun foo() {
@@ -89,8 +102,8 @@ def struct name {
 }
 
 def union uname {
-	a: s32 = 3;
-	b: f32;
+	var a: s32 = 3;
+	var b: f32;
 }
 
 def enum cutlery {
@@ -99,7 +112,7 @@ def enum cutlery {
 
 $main
 #> #> Yay, comments! <# <#
-main(arg: [][]u8 -> :s32) { 
+def fun main(arg: [][]u8 -> :s32) { 
 	var arr: []s32 = '[1, 2, 3, 4, 5, 6];
 	
 	defer if ~arg > 2 {
@@ -119,7 +132,7 @@ main(arg: [][]u8 -> :s32) {
 	$fake 
 	using s32 as i32;
 	using []*s32 as api32;
-	using fun(:s32 -> :s32) as fun_foo;
+	using fun(s32 -> s32) as fun_foo;
 
 	var huh: i32 = 1;
 	var okay: s32 = 2;
@@ -141,7 +154,7 @@ main(arg: [][]u8 -> :s32) {
 	try
 		var in_try: s32 = 69;
 		bar();
-	catch sig b {
+	catch e64 b {
 		case bar.X_2 {
 			;
 		}
@@ -151,6 +164,15 @@ main(arg: [][]u8 -> :s32) {
 			}
 		}
 	}
+
+	loop {
+		let addi = add::['a = u64];
+		addi(1, 2);
+		var t: self(u64);
+		add::['a = s32](0, 0);
+		let best = self(typeof('{1, 1} as holds));
+		var d: best = '['{2, 2}, '{3, 3}];
+	} while in_try == 70;
 
 	in_try = -1;
 	
@@ -205,7 +227,7 @@ main(arg: [][]u8 -> :s32) {
 		one -= itwo;
 	}
 	
-	var sname: name = {1.0f, 2f, 5, "Hello!"};
+	var sname: name = '{1.0f, 2f, 5, "Hello!"};
 	var three: f32 = sname.a;
 	
 	var un: uname;
@@ -220,7 +242,7 @@ main(arg: [][]u8 -> :s32) {
 
 	var laster: s32, err: e64 = foo(2, 1, 2, 3, 4, 5);
 	laster, err = foo(2, (fun [] wee(){return 1, 2, 3, 4, 5;})());
-	baz(a = 2, b = [1, 2, 3, 4, 5]);
+	baz(a = 2, b = '[1, 2, 3, 4, 5]);
 
 	var ca: s32 = 1;
 	var cb: s32 = 2;
@@ -230,7 +252,7 @@ main(arg: [][]u8 -> :s32) {
 	pc();
 
 	var func1: fun(-> :u0) = (fun [] func(){});
-	var func2: fun(:s32 -> u0) = (fun [] func(a: s32){});
+	var func2: fun(:s32 -> :u0) = (fun [] func(a: s32){});
 
 	func2(2);
 

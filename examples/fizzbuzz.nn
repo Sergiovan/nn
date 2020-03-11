@@ -1,4 +1,4 @@
-let print: fun(:any... -> u0);
+let print: fun(:any... -> :u0);
 
 def fun fizzbuzz(max: s32) {
     while var count: s32 = 1; count <= max; ++count {

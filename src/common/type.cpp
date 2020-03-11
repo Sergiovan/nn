@@ -1,5 +1,8 @@
 #include "common/type.h"
 
+#include <sstream>
+#include <iomanip>
+
 bool type::is_primitive() {
     return tt == type_type::PRIMITIVE;
 }
@@ -201,5 +204,290 @@ type::type(type&& o)
             std::swap(special, o.special);
             break;
         }
+    }
+}
+
+std::string type::to_string(bool simple) {
+    std::stringstream ss{};
+    
+    if (!simple) {
+        ss << "(" << std::hex << id << ") " << std::dec;
+    }
+    
+    if (const_flag) {
+        ss << "const ";
+    }
+    if (volat_flag) {
+        ss << "volat ";
+    }
+    
+    switch (tt) {
+        case type_type::PRIMITIVE:
+            switch (primitive.tt) {
+                case primitive_type::SIGNED:
+                    ss << "s" << primitive.bits;
+                    break;
+                case primitive_type::BOOLEAN:
+                    ss << "bool ";
+                    [[fallthrough]];
+                case primitive_type::UNSIGNED:
+                    ss << "u" << primitive.bits;
+                    break;
+                case primitive_type::FLOATING:
+                    ss << "f" << primitive.bits;
+                    break;
+                case primitive_type::CHARACTER:
+                    ss << "c" << primitive.bits;
+                    break;
+                case primitive_type::ERROR:
+                    ss << "e" << primitive.bits;
+                    break;
+                case primitive_type::TYPE:
+                    ss << "type";
+                    break;
+                case primitive_type::ANY:
+                    ss << "any";
+                    break;
+                case primitive_type::VOID:
+                    ss << "u0";
+                    break;
+            }
+            break;
+        case type_type::POINTER:
+            switch (pointer.tt) {
+                case pointer_type::NAKED:
+                    ss << "*" << pointer.at->to_string(true);
+                    break;
+                case pointer_type::UNIQUE:
+                    ss << "!" << pointer.at->to_string(true);
+                    break;
+                case pointer_type::SHARED:
+                    ss << "+" << pointer.at->to_string(true);
+                    break;
+                case pointer_type::WEAK:
+                    ss << "?" << pointer.at->to_string(true);
+                    break;
+            }
+            break;
+        case type_type::ARRAY:
+            ss << "[";
+            if (array.sized) {
+                ss << array.size;
+            }
+            ss << "]" << array.at->to_string(true);
+            break;
+        case type_type::COMPOUND:
+            for (auto t : compound.elems) {
+                ss << ":" << t->to_string(true);
+            }
+            break;
+        case type_type::STRUCT: [[fallthrough]];
+        case type_type::UNION: [[fallthrough]];
+        case type_type::ENUM: [[fallthrough]];
+        case type_type::TUPLE:
+            ss << tt << " " << scompound.comp->to_string(true);
+            break;
+        case type_type::FUNCTION:
+            ss << "fun (";
+            for (auto& p : function.params) {
+                if (p.compiletime) {
+                    ss << "let ";
+                }
+                if (p.thisarg) {
+                    ss << "this ";
+                }
+                if (p.generic) {
+                    ss << "::";
+                } else {
+                    ss << ":";
+                }
+                ss << p.t->to_string(simple);
+                if (p.spread) {
+                    ss << "...";
+                }
+                ss << ", ";
+            }
+            ss << "-> ";
+            for (auto& r : function.rets) {
+                if (r.compiletime) {
+                    ss << "let ";
+                }
+                ss << ":" << r.t->to_string(simple);
+                ss << ", ";
+            }
+            ss << ")";
+            break;
+        case type_type::SUPERFUNCTION: {
+            ss << "fun (";
+            type_function& fn = sfunction.function->function;
+            type_superfunction& sfn = sfunction;
+            for (u64 i = 0; i < sfunction.params.size(); ++i) {
+                auto& p = fn.params[i];
+                auto& sp = sfn.params[i];
+                if (p.compiletime) {
+                    ss << "let ";
+                }
+                if (p.thisarg) {
+                    ss << "this ";
+                }
+                ss << sp.name;
+                if (p.generic) {
+                    ss << "::";
+                } else {
+                    ss << ":";
+                }
+                ss << p.t->to_string(simple);
+                if (p.spread) {
+                    ss << "...";
+                }
+                if (sp.defaulted) {
+                    ss << " =";
+                }
+                ss << ", ";
+            }
+            ss << "-> ";
+            for (u64 i = 0; i < sfunction.rets.size(); ++i) {
+                auto& r = fn.rets[i];
+                auto& sr = sfn.rets[i];
+                if (r.compiletime) {
+                    ss << "let ";
+                }
+                ss << sr.name << ": " << r.t->to_string(simple);
+                ss << ", ";
+            }
+            break;
+        }
+        case type_type::SPECIAL:
+            switch (special.tt) {
+                case special_type::INFER:
+                    ss << "infer";
+                    break;
+                case special_type::GENERIC:
+                    ss << "generic '" << id;
+                    break;
+                case special_type::NOTHING:
+                    ss << "---";
+                    break;
+                case special_type::TYPELESS:
+                    ss << "typeless";
+                    break;
+                case special_type::NONE:
+                    ss << "undecided";
+                    break;
+                case special_type::NONE_ARRAY:
+                    ss << "undecided array";
+                    break;
+                case special_type::NONE_STRUCT:
+                    ss << "undecided struct";
+                    break;
+                case special_type::NONE_TUPLE:
+                    ss << "undecided tuple";
+                    break;
+                case special_type::NONE_FUNCTION:
+                    ss << "undecided function";
+                    break;
+                case special_type::NULL_:
+                    ss << "null";
+                    break;
+            }
+            break;
+    }
+    return ss.str();
+}
+
+std::ostream& operator<<(std::ostream& os, type_type t) {
+    switch (t) {
+        case type_type::PRIMITIVE:
+            return os << "PRIMITIVE";
+        case type_type::POINTER:
+            return os << "POINTER";
+        case type_type::ARRAY:
+            return os << "ARRAY";
+        case type_type::COMPOUND:
+            return os << "COMPOUND";
+        case type_type::STRUCT:
+            return os << "STRUCT";
+        case type_type::UNION:
+            return os << "UNION";
+        case type_type::ENUM:
+            return os << "ENUM";
+        case type_type::TUPLE:
+            return os << "TUPLE";
+        case type_type::FUNCTION:
+            return os << "FUNCTION";
+        case type_type::SUPERFUNCTION:
+            return os << "SUPERFUNCTION";
+        case type_type::SPECIAL:
+            return os << "SPECIAL";
+        default:
+            return os << "INVALID TYPE";
+    }
+}
+
+std::ostream& operator<<(std::ostream& os, primitive_type t) {
+    switch (t) {
+        case primitive_type::SIGNED:
+            return os << "SIGNED";
+        case primitive_type::UNSIGNED:
+            return os << "UNSIGNED";
+        case primitive_type::BOOLEAN:
+            return os << "BOOLEAN";
+        case primitive_type::FLOATING:
+            return os << "FLOATING";
+        case primitive_type::CHARACTER:
+            return os << "CHARACTER";
+        case primitive_type::ERROR:
+            return os << "ERROR";
+        case primitive_type::TYPE:
+            return os << "TYPE";
+        case primitive_type::ANY:
+            return os << "ANY";
+        case primitive_type::VOID:
+            return os << "VOID";
+        default:
+            return os << "INVALID PRIMITIVE";
+    }
+}
+
+std::ostream& operator<<(std::ostream& os, pointer_type t) {
+    switch (t) {
+        case pointer_type::NAKED:
+            return os << "NAKED";
+        case pointer_type::UNIQUE:
+            return os << "UNIQUE";
+        case pointer_type::SHARED:
+            return os << "SHARED";
+        case pointer_type::WEAK:
+            return os << "WEAK";
+        default:
+            return os << "INVALID POINTER";
+    }
+}
+
+std::ostream& operator<<(std::ostream& os, special_type t) {
+    switch (t) {
+        case special_type::INFER:
+            return os << "INFER";
+        case special_type::GENERIC:
+            return os << "GENERIC";
+        case special_type::NOTHING:
+            return os << "NOTHING";
+        case special_type::TYPELESS:
+            return os << "TYPELESS";
+        case special_type::NONE:
+            return os << "NONE";
+            
+        case special_type::NONE_ARRAY:
+            return os << "NONE_ARRAY";
+        case special_type::NONE_STRUCT:
+            return os << "NONE_STRUCT";
+        case special_type::NONE_TUPLE:
+            return os << "NONE_TUPLE";
+        case special_type::NONE_FUNCTION:
+            return os << "NONE_FUNCTION";
+        case special_type::NULL_:
+            return os << "NULL";
+        default:
+            return os << "INVALID SPECIAL";
     }
 }

@@ -13,11 +13,12 @@ type_table::type_table() {
     S16 = add_primitive({primitive_type::SIGNED, 16}, false, false);
     S32 = add_primitive({primitive_type::SIGNED, 32}, false, false);
     S64 = add_primitive({primitive_type::SIGNED, 64}, false, false);
+    F32 = add_primitive({primitive_type::FLOATING, 32}, false, false);
+    F64 = add_primitive({primitive_type::FLOATING, 64}, false, false);
     C8 = add_primitive({primitive_type::CHARACTER, 8}, false, false);
     C16 = add_primitive({primitive_type::CHARACTER, 16}, false, false);
     C32 = add_primitive({primitive_type::CHARACTER, 32}, false, false);
-    F32 = add_primitive({primitive_type::FLOATING, 32}, false, false);
-    F64 = add_primitive({primitive_type::FLOATING, 64}, false, false);
+    E64 = add_primitive({primitive_type::ERROR, 64}, false, false);
     TYPE = add_primitive({primitive_type::TYPE, 64}, false, false);
     ANY = add_primitive({primitive_type::ANY, 64}, false, false);
     INFER = add_special({special_type::INFER}, false, false);
@@ -28,6 +29,7 @@ type_table::type_table() {
     NONE_STRUCT = add_special({special_type::NONE_STRUCT}, false, false);
     NONE_TUPLE = add_special({special_type::NONE_TUPLE}, false, false);
     NONE_FUNCTION = add_special({special_type::NONE_FUNCTION}, false, false);
+    NULL_ = add_special({special_type::NULL_}, false, false);
 }
 
 type* type_table::add_primitive(const type_primitive& p, const bool _const, const bool volat) {

@@ -1,3 +1,5 @@
+# Expressions are anything that's not a statement
+# This file describes the standard expressions, operators and precedence
 # x, y and z are arbitrary expressions
 
 # Non-operators and pseudo-operators, in order of precedence
@@ -11,7 +13,7 @@
 
 # After all operators
 
-1: new x z
+1: new (y) x: z
 2: x ?? y <> z
 
 # Operators, in order of precedence

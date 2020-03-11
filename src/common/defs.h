@@ -19,7 +19,7 @@ inline void _assert(bool condition, const char* msg, const char* func) {
 #define __TOSTRING(x) __STRINGIFY(x)
 #define ASSERT(x, msg) \
 do { \
-    _assert(!!(x), "Assertion \"" #x "\" failed: " #msg " at" __FILE__ ":" __TOSTRING(__LINE__) " in ", __PRETTY_FUNCTION__); \
+    _assert(!!(x), "Assertion \"" #x "\" failed: " #msg " at " __FILE__ ":" __TOSTRING(__LINE__) " in ", __PRETTY_FUNCTION__); \
 } while (false)
 
 

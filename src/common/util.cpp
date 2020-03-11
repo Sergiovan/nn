@@ -124,7 +124,7 @@ u64 read_utf8(const char* c, u8& bytes, u8* plen) {
     constexpr std::array<u8, 9> utf8_length{{1, 0, 2, 3, 4, 0, 0, 0, 0}};
     constexpr std::array<u8, 4> utf8_mask{{0xFF, 0x1F, 0xF, 0x7}};
     
-    u8 chars[4];
+    u8 chars[4] {0, 0, 0, 0};
     u8 len = 0;
     u8 rlen = 0;
     const char* start = c;
@@ -144,9 +144,10 @@ u64 read_utf8(const char* c, u8& bytes, u8* plen) {
     } else {
         chars[len] = *c;
         c++;
+        ++*plen;
     }
     
-    u8 ones = 8 - (__builtin_clz(~chars[0]));
+    u8 ones = __builtin_clz(~chars[0]);
     bytes = rlen = utf8_length[ones];
     chars[0] &= utf8_mask[rlen - 1];
     
@@ -167,6 +168,7 @@ u64 read_utf8(const char* c, u8& bytes, u8* plen) {
         } else {
             chars[len] = *c;
             c++;
+            ++*plen;
         }
         
         if (chars[len] < 0x70) {
@@ -177,7 +179,7 @@ u64 read_utf8(const char* c, u8& bytes, u8* plen) {
         len++;
     }
     
-    if (*c || len < rlen) {
+    if (len < rlen) {
         return ((c - start) << 32);
     }
     

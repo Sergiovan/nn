@@ -13,7 +13,7 @@ def struct linked_node {
 }
 
 #> Simple linked list <#
-struct linked_list {
+def struct linked_list {
     var length: s32;
     var head: *linked_node;
     var tail: *linked_node;
@@ -60,10 +60,10 @@ def fun factorial(number: s64 -> :s64) {
     return number * factorial(number - 1); # Lovely recurstion
 }
 
-let pow: fun(base: f64, exp: f64 -> f64);
+let pow: fun(base: f64, exp: f64 -> :f64);
 
 #> Default parameters <#
-permutations(digits: s32, used: []s32 = [] -> :[]s32){
+def fun permutations(digits: s32, used: []s32 = '[] -> :[]s32){
     var ret: [factorial(10 - ~used) / factorial(digits)]s32; # TBD if this is how you declare arrays
     var index: s32; # Default initialization to 0. 
     while var i: s32 = 0; i < 9; ++i { #For loops are really just while
@@ -93,7 +93,7 @@ def fun think(list: *linked_list, guess: s32, dead: s32, hurt: s32){
     while var node, prev: *linked_node = list.head, null; node; prev = node; node = node.next { # Yikes
         var subdead, subhurt: s32;
         while var i = 0; i < 4; ++i {
-            while var j = 0 < 4; ++j {
+            while var j = 0; j < 4; ++j {
                 if split_guess[i] == node.value.digit(j) {
                     if i == j {
                         subdead++;

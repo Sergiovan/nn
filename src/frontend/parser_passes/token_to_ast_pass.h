@@ -3,6 +3,8 @@
 #include "frontend/parser.h"
 #include "common/ast.h"
 
+#include <unordered_set>
+
 class token_to_ast_pass {
 public:
     token_to_ast_pass(nnmodule& mod);
@@ -22,6 +24,9 @@ private:
     bool require(token_type tt);
     bool require_keyword(grammar::symbol kw);
     bool require_symbol(grammar::symbol sym);
+    
+    bool is_assign();
+    bool require_assign();
     
     ast* number();
     ast* identifier();
@@ -45,7 +50,7 @@ private:
     ast* optvardecls();
     
     ast* ifstmt();
-    ast* ifscope();
+    // ast* ifscope();
     
     ast* forstmt();
     ast* whilestmt();
@@ -75,24 +80,30 @@ private:
     ast* namespacestmt();
     ast* namespacescope();
     
-    ast* declarator();
+//     ast* declarator();
     ast* _type();
     ast* inferrable_type();
     
-    ast* paramtype();
-    ast* rettype();
+//     ast* paramtype();
+//     ast* rettype();
     
     ast* declstmt();
     ast* defstmt();
+    
+    ast* maybe_identifier();
     
     ast* vardecl();
     ast* simplevardecl();
     
     ast* funclit_or_type();
-    ast* funclitdef();
+    ast* funclit();
+    ast* funcdef();
+    ast* capture_group();
+    
     ast* functypesig();
+    
     ast* funcparam();
-    ast* funcret();
+    ast* funcret(bool let);
     
     ast* structtypelit();
     ast* structtypelitdef();
@@ -101,6 +112,7 @@ private:
     
     ast* uniontypelit();
     ast* uniontypelitdef();
+    ast* unionscope();
     
     ast* enumtypelit();
     ast* enumtypelitdef();
@@ -110,7 +122,7 @@ private:
     ast* tupletypelitdef();
     ast* tupletypes();
     
-    ast* typelit();
+//     ast* typelit();
     ast* typelit_nofunc();
     
     ast* assignment();
@@ -119,7 +131,7 @@ private:
     ast* deletestmt();
     
     ast* expressionstmt();
-    ast* assorexpr();
+    ast* assorexpr(bool stmt = true);
     
     ast* expression();
     ast* ternaryexpr();
@@ -128,13 +140,13 @@ private:
     ast* prefixexpr();
     ast* postfixexpr();
     ast* infixexpr();
+    ast* dotexpr();
     ast* postcircumfixexpr();
     ast* function_call();
     ast* access();
     ast* reorder();
-    ast* dotexpr();
     
-    ast* literal();
+//     ast* literal();
     ast* literalexpr();
     ast* identifierexpr();
     ast* parenexpr();
@@ -150,4 +162,8 @@ private:
     token* c{nullptr};
     token* n{nullptr};
     list<ast> errors{};
+    
+    std::unordered_set<grammar::symbol> pre_ops{};
+    std::unordered_set<grammar::symbol> post_ops{};
+    std::unordered_set<grammar::symbol> infix_ops{};
 };

@@ -26,19 +26,19 @@ struct ast_zero {
 
 struct ast_unary {
     grammar::symbol sym;
-    ast* node;
+    ast* node{nullptr};
     bool post{false};
     
-    ~ast_unary();
+    void clean();
     ast_unary clone() const;
 };
 
 struct ast_binary {
     grammar::symbol sym;
-    ast* left;
-    ast* right;
+    ast* left{nullptr};
+    ast* right{nullptr};
     
-    ~ast_binary();
+    void clean();
     ast_binary clone() const;
 };
 
@@ -57,13 +57,13 @@ struct ast_string {
     u8* chars;
     u64 length;
     
-    ~ast_string();
+    void clean();
     ast_string clone() const;
 };
 
 struct ast_compound {
-    list<ast> elems;
-    ~ast_compound();
+    list<ast> elems{};
+    void clean();
     ast_compound clone() const;
 };
 
@@ -75,9 +75,9 @@ struct ast_nntype {
 };
 
 struct ast_block {
-    list<ast> elems;
-    list<ast> at_end;
-    ~ast_block();
+    list<ast> elems{};
+    list<ast> at_end{};
+    void clean();
     ast_block clone() const;
 };
 
@@ -136,4 +136,9 @@ struct ast : public list_node<ast> {
     static ast* make_nntype(const ast_nntype& t, token* tok, type* typ);
     static ast* make_block(const ast_block& c, token* tok, type* t);
     static ast* make_iden(const ast_iden& i, token* tok, type* t);
+    
+    std::string to_simple_string();
+    std::string to_string(bool recursive = false, u64 level = 0);
 };
+
+std::ostream& operator<<(std::ostream& os, ast_type t);

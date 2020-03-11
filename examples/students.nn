@@ -15,7 +15,7 @@ def fun sorted(students: []student, comparison: fun(:student, :student -> :s8) -
 	}
 	
 	def fun merge(a :[]student, b :[]student -> :[]student) {
-		student[~a + ~b] ret;
+		var ret: [~a + ~b]student;
 		var i, j: u64 = 0, 0;
 		label loop_begin;
 			if i == ~a && j == ~b {
@@ -28,7 +28,7 @@ def fun sorted(students: []student, comparison: fun(:student, :student -> :s8) -
 				++i;
 			} else {
 				var z: s8 = comparison(a[i], b[j]);
-				ret[i + j] = z <= 0 ? a[i++] : b[j++]; 
+				ret[i + j] = z <= 0 ?? a[i++] <> b[j++]; 
 			}
 		goto loop_begin;
 		label loop_end;
@@ -54,12 +54,12 @@ def fun sorted(students: []student, comparison: fun(:student, :student -> :s8) -
 	return merge(a, b);
 }
 
-var main(:[]c8 -> :s32) {
+def fun main(:[]c8 -> :s32) {
 	var students: []student = '[
 		'{class.A, 10, "Christian"}, '{class.A, 0, "Sergio"}, 
 		'{class.B, 3, "Johnathan"}, '{class.B, 8, "Oliver"}, 
 		'{class.C, 5, "Sarah"}, '{class.C, 7, "Peter"}, 
-		'{class.D, 9, "Marta"}, '{class.D, 2, "Maggy"}, '{class.D, 1, "Francis"},
+		'{class.D, 9, "Marta"}, '{class.D, 2, "Maggy"}, '{class.D, 1, "Francis"}
 	];
 	
 	var by_grade: []student = sorted(comparison = fun [] (a: student, b: student -> :s8) {
@@ -71,7 +71,7 @@ var main(:[]c8 -> :s32) {
 		io.print("\nGrade: ", s.grade as s32);
 		io.print("\nGroup: ");
 		
-		var class_desc: c32[];
+		var class_desc: []c32;
 		
 		using class.*;
 		switch s.group {

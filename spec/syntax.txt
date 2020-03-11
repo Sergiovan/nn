@@ -1,3 +1,5 @@
+# This file describes the syntax of nn
+#
 # Hash marks a comment
 # "x" is for x, literally
 # x* is 0 or more of x
@@ -192,11 +194,11 @@ freestatement = note*, (importstmt | usingstmt | namespacestmt | declstmt) ;
 
 statement = note*, (semicolon | ifstmt | forstmt | whilestmt | switchstmt | trystmt | 
                     returnstmt | raisestmt | gotostmt | labelstmt | deferstmt | 
-                    breakstmt | continuestmt | usingstmt | namespacestmt | declstmt | assorexpr | deletestmt | scope) ; 
+                    breakstmt | continuestmt | usingstmt | namespacestmt | declstmt | assorexpr, semicolon | deletestmt | scope) ; 
 
 
 scopestmt = note*, (semicolon | ifstmt | whilestmt | switchstmt | returnstmt | raisestmt | gotostmt | 
-                    breakstmt | continuestmt | assorexpr | deletestmt | scope) ;
+                    breakstmt | continuestmt | assorexpr, semicolon | deletestmt | scope) ;
 
 scope = obrace, statement*, cbrace ;
 
@@ -210,12 +212,12 @@ ifscope = scope, (else, scopestmt)? ;
 forstmt = for, vardecl, in, expression, optscope ;
 
 whilestmt = (whileloopstmt | loopwhilestmt) ;
-whilecond = expression, (semicolon, (semicolon, expression))? ;
+whilecond = assorexpr, (semicolon, (assorexpr; semicolon)*)? ;
 whiledostmt = while, optvardecls, whilecond, optscope ;
-dowhilestmt = loop, optvardecls, optscope, while, whilecond ; 
+dowhilestmt = loop, optvardecls, optscope, while, assorexpr, semicolon ; 
 
 switchstmt = switch, optvardecls, expression, switchscope ;
-switchscope = obrace, note*, casedecl, cbrace ; 
+switchscope = obrace, (note*, casedecl)*, cbrace ; 
 casedecl = (case, (expression; comma)+ | else), (continue | optscope) ;
 
 trystmt = try, statement*, catch, ((e64, identifier_literal)?, switchscope | raise, semicolon) ;
@@ -236,7 +238,7 @@ deferstmt = defer, scopestmt ;
 breakstmt = break, semicolon ;
 continuestmt = continue, semicolon ;
 
-importstmt = import, (compound_identifier_simple, (dot, asterisk)? | string_lit), (as, identifier_literal)?, semicolon ;
+importstmt = import, (compound_identifier_simple, | string_lit), (as, identifier_literal)?, semicolon ;
 usingstmt = using, (cexpression, (dot, asterisk)?), (as, identifier_literal)?, semicolon ; # Constant expression only
 
 namespacestmt = namespace, compound_identifier_simple, namespacescope ; 
@@ -252,41 +254,43 @@ rettype = colon, inferrable_type ;
 declstmt = (vardecl, semicolon | defstmt) ;
 defstmt = def, (funcdef | structtypelitdef | uniontypelitdef | enumtypelitdef | tupletypelitdef) ;
 
-vardecl = declarator, simplevardecl ;
-simplevardecl = (((identifier_literal | placeholder)?; comma)+, (colon, inferrable_type)?)+, assignment ;
+maybe_identifier = (identifier_literal | placeholder)? ;
 
-funclit_or_type = fun, (capture_group, (identifier_literal | placeholder)?, functypesig, scope | (identifier_literal | placeholder)?, functypesig) ;
-funclit = fun, capture_group, (identifier_literal | placeholder)?, functypesig, scope ;
+vardecl = declarator, simplevardecl ;
+simplevardecl = (maybe_identifier, (colon, inferrable_type)?; comma)+, assignment? ;
+
+funclit_or_type = fun, (capture_group, maybe_identifier, functypesig, scope | maybe_identifier, functypesig) ;
+funclit = fun, capture_group, maybe_identifier, functypesig, scope ;
 funcdef = fun, capture_group?, identifier_literal, functypesig, scope ;
 capture_group = obrack, (pointer, identifier_literal | identifier_literal, (assignment)?; comma) , cbrack ;
 
-functypesig = oparen, (param; comma)*, ((rarrow | srarrow), (return; comma))?, cparen ; 
+functypesig = oparen, (param; comma)*, ((rarrow | srarrow), ((return; comma)* | infer))?, cparen ; 
 
-param = declarator?, (identifier_literal | placeholder)?, paramtype, spread?, (assign, cexpression)? ;
-return = ((declarator?, (identifier_literal | placeholder)?, rettype)* | infer) ;
+param = (declarator?, maybe_identifier, paramtype | type), spread?, (assign, cexpression)? ;
+return = (declarator?, maybe_identifier, rettype | inferrable_type) ;
 
-structtypelit = struct, (identifier_literal | placeholder)?, structscope? ;
+structtypelit = struct, maybe_identifier, structscope? ;
 structtypelitdef = struct, identifier_literal, structscope ;
 
 structscope = obrace, (note*, (structvardecl, semicolon | defstmt))*, cbrace ;
-structvardecl = declarator, (((identifier_literal | placeholder)?; comma)+, ((colon, cexpression)?, assignment | (colon | doublecolon), cexpression, assignment?))+ ;
+structvardecl = declarator, ((maybe_identifier; comma)+, (((colon | doublecolon), cexpression)?; comma), assignment? ;
 
 # Unions should get better
 
-uniontypelit = union, (identifier_literal | placeholder)?, unionscope? ;
+uniontypelit = union, maybe_identifier, unionscope? ;
 uniontypelitdef = union, identifier_literal, unionscope ;
-unionscope = obrace, (node*, (vardecl, semicolon | funcdecl))*, cbrace ;
+unionscope = obrace, (node*, (vardecl, semicolon | defstmt))*, cbrace ;
 
-enumtypelit = enum, (identifier_literal | placeholder)?, enumscope? ;
+enumtypelit = enum, maybe_identifier, enumscope? ;
 enumtypelitdef = enum, identifier_literal, enumscope ;
 enumscope = obrace, (note*, identifier_literal, (assign, cexpression)?; comma)*, cbrace ;
 
-tupletypelit = tuple, (identifier_literal | placeholder)?, tupletypes? ;
+tupletypelit = tuple, maybe_identifier, tupletypes? ;
 tupletypelitdef = tuple, identifier_literal, tupletypes ;
-tupletypes = oparen, (type*; comma), cparen ;
+tupletypes = oparen, (type; comma)*, cparen ;
 
-typelit = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | funclit | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
-typelit_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | type | any | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
+typelit = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | e64 | type | any | funclit | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
+typelit_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | e64 | type | any | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
 
 assignment = assign, (expression; comma)+ ;
 assstmt = (expression; comma)+, assignment, semicolon ;
@@ -295,22 +299,23 @@ deletestmt = delete, (expression; comma)+, semicolon;
 
 expressionstmt = expression, semicolon ;
 
-assorexpr = expression, (semicolon | (comma, (expression; comma)+)?, assignment, semicolon) ;
+assorexpr = expression, (comma, (expression; comma)+)?, assignment? ;
 
 expression = ternaryexpr ;
 ternaryexpr = newexpr, (dquestion, expression, diamond, expression)? ;
-newexpr = (new, (oparen, expression, cparen)?, cexpression, expression | preunaryexpr ) ;
+newexpr = (new, (oparen, expression, cparen)?, (cexpression | expression, colon, cexpression) | preunaryexpr ) ;
 
-prefixexpr = (prefix_operator*, postfixexpr) ;
+prefixexpr = (prefix_operator+, expression | postfixexpr) ;
 postfixexpr = (infixexpr, postifx_operator*) ;
-infixexpr = (postcircumfixexpr, (infix_operator, expression | dotexpr)?) ;
-postcircumfixexpr = dotexpr, (function_call | access | reorder)* ;
+infixexpr = dotexpr, (infix_operator, expression)? ;
+
+dotexpr = postcircumfixexpr, (dot, postcircumfixexpr)*, (dot, asterisk)? ;
+
+postcircumfixexpr = literalexpr, (function_call | access | reorder)* ;
 
 function_call = oparen, ((expression | identifier_literal, assign, expression); comma), cparen ;
 access = obrack, expression, cbrack ;
 reorder = doublecolon, obrack, (cexpression; comma)+, cbrack ; # ::[]
-
-dotexpr = literalexpr, (dot, expression)? ;
 
 literal = (number_lit | char_lit | string_lit | array_lit | struct_lit | tuple_lit | typelit_nofunc | funclit_or_type | false | true | null | nothing) ;
 
@@ -320,6 +325,6 @@ parenexpr = (oparen, expression, cparen) ;
 
 select = doublecolon, obrack, ((cexpression; comma)+, (identifier_literal, assign, cexpression; comma)* | (identifier_literal, assign, cexpression; comma)+), cbrack ; # ::[]
 
-compound_identifier_simple = identifier_literal, (dot, identifier_literal)* ; # a.b.c.d
+compound_identifier_simple = identifier_literal, (dot, identifier_literal)*, (dot, asterisk)? ; # a.b.c.d
 
 cexpression = expression ; # Constant expression
