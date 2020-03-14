@@ -2,12 +2,13 @@
 
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include "common/util.h"
 #include "common/logger.h"
 
 using pass = token_to_ast_pass;
 
-pass::token_to_ast_pass(nnmodule& mod) : mod{mod}, tt{mod.tt} {
+pass::token_to_ast_pass(parser& p, nnmodule& mod) : p{p}, mod{mod}, tt{mod.tt} {
     using namespace grammar;
     
     constexpr std::array<grammar::symbol, 16> pre {{
@@ -43,49 +44,25 @@ pass::token_to_ast_pass(nnmodule& mod) : mod{mod}, tt{mod.tt} {
     
 }
 
-void pass::pass() {
+bool pass::read() {
     mod.ts.read();
     
     if (mod.ts.head->tt == token_type::ERROR) {
         mod.errors.push_back({make_error_ast(mod.ts.head), mod.ts.head->content});
-        return;
+        return false;
+    } else {
+        return true;
     }
-    
+}
+
+bool pass::pass() {    
     n = mod.ts.head;
     clear();
     c = n;
     next();
     
     mod.root = program_unit();
-    
-    for (auto& [t, e] : mod.errors) {
-        logger::error() << e;
-        logger::info() << "@ " << *(t->tok);
-    }
-    
-    if (!mod.errors.size()) {
-        logger::info() << "\n" << mod.root->to_string(true);
-    }
-    
-//     u64 i{0};
-//     
-//     while (c && c->tt != token_type::END_OF_FILE) {
-//         token* tok = next();
-//         if (tok->tt == token_type::COMMENT || tok->tt == token_type::WHITESPACE || 
-//             tok->tt == token_type::NEWLINE) {
-//             // Skip
-//         } else {
-//             logger::info() << *tok;
-//             ++i;
-//         }
-//     }
-//     
-//     logger::info() << *next();
-//     ++i;
-//     
-//     logger::info() << "Counted " << i << " tokens";
-    
-    return;
+    return !mod.errors.size();
 }
 
 token* pass::next() {
@@ -1279,10 +1256,50 @@ ast* pass::importstmt() {
     
     ast* ret = ast::make_binary({grammar::KW_IMPORT}, tok, tt.TYPELESS);
     
+    namespace fs = std::filesystem;
+    
+    fs::path imprt{};
+    
     if (is(token_type::STRING)) {
-        ret->binary.left = string_lit();
+        ast* str = ret->binary.left = string_lit();
+        
+        ASSERT(str->tt == ast_type::STRING, "string_lit() returned non-string");
+        
+        imprt = std::string{str->string.chars, str->string.chars + str->string.length};
+        
     } else {
-        ret->binary.left = compound_identifier_simple();
+        ast* un = ret->binary.left = compound_identifier_simple();
+        
+        ASSERT(un->tt == ast_type::UNARY, "compound_identifier_simple() returned non-unary");
+        ASSERT(un->unary.node->tt == ast_type::BLOCK, "compound_identifier_simple() unary node was not a block");
+        
+        fs::path cf{mod.ts.get_name()};
+        imprt = cf.parent_path();
+        
+        for (auto c : un->unary.node->block.elems) {
+            ASSERT(c->tt == ast_type::IDENTIFIER, "compound_identifier_simple() was not made up of identifiers");
+            imprt /= c->tok->content; // Hmmmm
+        }
+        
+        imprt.replace_extension("nn");
+        
+    }
+    
+    logger::debug() << "Imported path was " << imprt;
+    
+    // TODO Path search shenanigans
+    
+    if (fs::exists(imprt)) {
+        nnmodule* m = p.get_or_add(fs::absolute(imprt));
+        if (m != &mod) {
+            p.add_pass_task(m, pass_type::TOKEN_TO_AST);
+            mod.add_dependency(m);
+        } else {
+            mod.errors.push_back({ret, ss::get() << "Cannot import self" << ss::end()});
+        }
+    } else {
+        // TODO err
+        mod.errors.push_back({ret, ss::get() << "File " << imprt << " could not be found" << ss::end()});
     }
     
     if (is_symbol(grammar::KW_AS)) {

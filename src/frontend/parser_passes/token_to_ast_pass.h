@@ -7,9 +7,10 @@
 
 class token_to_ast_pass {
 public:
-    token_to_ast_pass(nnmodule& mod);
+    token_to_ast_pass(parser& p, nnmodule& mod);
     
-    void pass();
+    bool read();
+    bool pass();
 private:    
     token* next(); // pops c, peek(), c = n
     token* next(grammar::symbol expected); // Same but expecting something
@@ -156,6 +157,7 @@ private:
     
     ast* make_error_ast(token* t);
     
+    parser& p;
     nnmodule& mod;
     type_table& tt;
     // symbol_table& sym;

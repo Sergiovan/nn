@@ -13,12 +13,12 @@ int main(int argc, char** argv) {
         return -1;
     }
     
-    logger::debug() << "Program start";
+    logger::info() << "Program start";
     
     parser p{};
     p.parse(argv[1]);
     
-    logger::debug() << "Program end";
+    logger::info() << "Program end";
     
     return 0;
 }
