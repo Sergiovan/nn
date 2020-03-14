@@ -57,6 +57,8 @@ struct type_compound {
 
 struct type_supercompound {
     type* comp;
+    u8 generic : 1;
+    u8 generated : 1;
 };
 
 struct param {
