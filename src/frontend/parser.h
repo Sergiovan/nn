@@ -13,6 +13,7 @@
 #include "common/threading/thread_pool.h"
 
 struct ast;
+class symbol_table;
 
 enum class pass_type {
     ERROR, 
@@ -34,10 +35,11 @@ class parser;
 class nnmodule {
 public:
     nnmodule(parser& p, const std::string& filename);
+    ~nnmodule();
     
     token_stream ts;
     ast* root{nullptr};
-    // symbol_table st{};
+    symbol_table* st{};
     type_table tt{};
     std::filesystem::path abs_loc{};
     
@@ -94,6 +96,7 @@ private:
     thread_pool task_manager{8};
     
     nnmodule* root{nullptr};
+    symbol_table* root_st{nullptr};
     dict<std::string, nnmodule*> modules{};
     
     static constexpr u64 pass_amount{(u64) pass_type::LAST};

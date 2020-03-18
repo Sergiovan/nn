@@ -2437,6 +2437,145 @@ ast* pass::assorexpr(bool stmt) {
     }
 }
 
+// Finds leftmost expression node in (right) child
+// This is the node that must be adopted when 
+// swapping tree nodes due to precedence
+ast* find_leftmost(ast* from, s16 prec) {
+    ast* n, * p{nullptr};
+    switch (from->tt) {
+        case ast_type::UNARY: 
+            n = from->unary.node;
+            break;
+        case ast_type::BINARY:
+            n = from->binary.right;
+            break;
+        default:
+            ASSERT(false, "find_leftmost() called on non-ary");
+            return from; // Never reached
+    }
+    
+    if (n->precedence == -1 || n->precedence >= prec) {
+        return p;
+    }
+    
+    do {
+        n->inhprecedence = prec;
+        p = n;
+        
+        switch (n->tt) {
+            case ast_type::UNARY: 
+                n = n->unary.node;
+                break;
+            case ast_type::BINARY:
+                n = n->binary.left;
+                break;
+            default:
+                return p;
+        }
+        
+        if (n->precedence == -1 || n->precedence >= prec) {
+            return p;
+        }
+        
+    } while (true);
+}
+
+// Precedence sorts tree starting at un
+// Function return is new root of the tree, now sorted by precedence
+// Subtree of un must already be sorted
+ast* reorder_unary(ast* un) {
+    ASSERT(un->tt == ast_type::UNARY, "ast passed to reorder_unary() wasn't unary");
+    
+    ast* ret = un;
+    
+    if (ret->precedence == -1) {
+        return ret; // Nothing to do
+    }
+    
+    switch (ret->tt) {
+        case ast_type::UNARY: [[fallthrough]];
+        case ast_type::BINARY: {
+            ast* leftmost = find_leftmost(ret, ret->precedence);
+            if (!leftmost) {
+                return un;
+            }
+            switch (leftmost->tt) {
+                case ast_type::UNARY: {
+                    ast* leftmost_child = leftmost->unary.node;
+                    leftmost->unary.node = ret;
+                    ret->unary.node = leftmost_child;
+                    ret = leftmost;
+                    break;
+                }
+                case ast_type::BINARY: {
+                    ast* leftmost_child = leftmost->binary.left;
+                    leftmost->binary.left = ret;
+                    ret->unary.node = leftmost_child;
+                    ret = leftmost;
+                    break;
+                }
+                default:
+                    ASSERT(false, "find_leftmost() returned non-ary");
+                    return un;
+            }
+            break;
+        }
+        default:
+            break; // Nothing
+    }
+    
+    return ret;
+}
+
+// Precedence sorts tree starting at bin
+// Function return is new root of the tree, now sorted by precedence
+// Right child tree of bin must already be sorted
+ast* reorder_binary(ast* bin) {
+    ASSERT(bin->tt == ast_type::BINARY, "ast passed to reorder_binary() wasn't binary");
+    
+    ast* ret = bin;
+    
+    if (ret->precedence == -1) {
+        return ret; // Nothing to do
+    }
+    
+    switch (ret->tt) {
+        case ast_type::UNARY: [[fallthrough]];
+        case ast_type::BINARY: {
+            ast* leftmost = find_leftmost(ret, ret->precedence);
+            if (!leftmost) {
+                return bin; // Already at lowest level
+            }
+            switch (leftmost->tt) {
+                case ast_type::UNARY: {
+                    ast* leftmost_child = leftmost->unary.node;
+                    leftmost->unary.node = ret;
+                    ast* top = ret->binary.right;
+                    ret->binary.right = leftmost_child;
+                    ret = top;
+                    ret = leftmost;
+                    break;
+                }
+                case ast_type::BINARY: {
+                    ast* leftmost_child = leftmost->binary.left;
+                    leftmost->binary.left = ret;
+                    ast* top = ret->binary.right;
+                    ret->binary.right = leftmost_child;
+                    ret = top;
+                    break;
+                }
+                default:
+                    ASSERT(false, "find_leftmost() returned non-ary");
+                    return bin;
+            }
+            break;
+        }
+        default:
+            break; // Nothing
+    }
+    return ret;
+}
+
 ast* pass::expression() {
     return ternaryexpr();
 }
@@ -2448,8 +2587,10 @@ ast* pass::ternaryexpr() {
         ast* ternary = ast::make_binary({grammar::DQUESTION, nexpr, 
             ast::make_binary({grammar::CHOICE}, t, tt.NONE)}, t, tt.NONE);
         ternary->binary.left = expression();
+        ternary->precedence = 0x0; // Lowest
+        ternary->inhprecedence = nexpr->inhprecedence > 0 ? nexpr->inhprecedence : 0x0;
         // TODO err
-        ternary->tok = c;
+        ternary->binary.right->tok = c;
         if (require_symbol(grammar::DIAMOND)) next(); // <>
         ternary->binary.right = expression();
         return ternary;
@@ -2496,21 +2637,34 @@ ast* pass::newexpr() {
 ast* pass::prefixexpr() {
     if ((is(token_type::SYMBOL) || is(token_type::KEYWORD)) && pre_ops.count((grammar::symbol) c->value)) {
         if (!is_symbol(grammar::OBRACK)) {
+            // For now
             token* tok = next(); // sym
-            return ast::make_unary({(grammar::symbol) tok->value, expression()}, tok, tt.NONE);
+            ast* ret = ast::make_unary({(grammar::symbol) tok->value, expression()}, tok, tt.NONE);
+        
+            if ((grammar::symbol) tok->value == grammar::SPREAD) {
+                ret->precedence = 0x3E;
+            } else {
+                ret->precedence = 0x3C;
+            }
+            
+            ret->inhprecedence = ret->unary.node->inhprecedence > ret->precedence ? ret->unary.node->inhprecedence : ret->inhprecedence;
+            
+            return reorder_unary(ret);
         } else {
             token* tok = next(); // [
             ast* ret = ast::make_binary({grammar::CBRACK}, tok, tt.NONE); // !!!
             if (!is_symbol(grammar::CBRACK)) {
-                ret->binary.left = expression();
+                ret->binary.right = expression();
             } else {
-                ret->binary.left = ast::make_none({}, tok, tt.TYPELESS);
+                ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
             }
             
             // TODO err
             if (require_symbol(grammar::CBRACK)) next(); // ]
-            ret->binary.right = expression();
-            return ret;
+            ret->binary.left = expression();
+            ret->precedence = 0x3C;
+            ret->inhprecedence = ret->binary.left->inhprecedence > 0x3C ? ret->binary.left->inhprecedence : 0x3C;
+            return reorder_binary(ret);
         }
     } else {
         return postfixexpr();
@@ -2522,21 +2676,117 @@ ast* pass::postfixexpr() {
     
     while ((is(token_type::SYMBOL) || is(token_type::KEYWORD)) && post_ops.count((grammar::symbol) c->value)) {
         token* tok = next(); // sym
+        s16 prev_prec = infix->precedence;
         infix = ast::make_unary({(grammar::symbol) tok->value, infix}, tok, tt.NONE);
         infix->unary.post = true;
+        infix->precedence = 0x3F;
+        infix->inhprecedence = prev_prec > 0x3F ? prev_prec : 0x3F;
+        infix = reorder_unary(infix);
     }
     
     return infix;
 }
 
 ast* pass::infixexpr() {
-    ast* dot = dotexpr();
+    ast* dot = dotexpr(); 
     if ((is(token_type::SYMBOL) || is(token_type::KEYWORD)) && infix_ops.count((grammar::symbol) c->value)) {
         token* tok = next(); // sym
-        ast* ret = ast::make_binary({(grammar::symbol) tok->value, dot}, tok, tt.NONE);
-        ret->binary.right = expression();
+        grammar::symbol sym = (grammar::symbol) tok->value;
+        ast* ret = ast::make_binary({sym, dot}, tok, tt.NONE);
+        ast* right = ret->binary.right = expression();
         
-        return ret;
+        switch (sym) {
+            case grammar::KW_AS:
+                ret->precedence = 0x3F;
+                break;
+            case grammar::MUL:
+                ret->precedence = 0x3B;
+                break;
+            case grammar::DIV:
+                ret->precedence = 0x3B;
+                break;
+            case grammar::IDIV:
+                ret->precedence = 0x3B;
+                break;
+            case grammar::MODULO:
+                ret->precedence = 0x3B;
+                break;
+            case grammar::ADD:
+                ret->precedence = 0x3A;
+                break;
+            case grammar::SUB:
+                ret->precedence = 0x3A;
+                break;
+            case grammar::CONCAT:
+                ret->precedence = 0x3A;
+                break;
+            case grammar::SHL:
+                ret->precedence = 0x39;
+                break;
+            case grammar::SHR:
+                ret->precedence = 0x39;
+                break;
+            case grammar::RTL:
+                ret->precedence = 0x39;
+                break;
+            case grammar::RTR:
+                ret->precedence = 0x39;
+                break;
+            case grammar::BITSET:
+                ret->precedence = 0x38;
+                break;
+            case grammar::BITCLEAR:
+                ret->precedence = 0x38;
+                break;
+            case grammar::BITTOGGLE:
+                ret->precedence = 0x38;
+                break;
+            case grammar::BITCHECK:
+                ret->precedence = 0x38;
+                break;
+            case grammar::AND:
+                ret->precedence = 0x37;
+                break;
+            case grammar::OR:
+                ret->precedence = 0x36;
+                break;
+            case grammar::XOR:
+                ret->precedence = 0x35;
+                break;
+            case grammar::LT:
+                ret->precedence = 0x34;
+                break;
+            case grammar::LE:
+                ret->precedence = 0x34;
+                break;
+            case grammar::GT:
+                ret->precedence = 0x34;
+                break;
+            case grammar::GE:
+                ret->precedence = 0x34;
+                break;
+            case grammar::EQUALS:
+                ret->precedence = 0x33;
+                break;
+            case grammar::NEQUALS:
+                ret->precedence = 0x33;
+                break;
+            case grammar::LAND:
+                ret->precedence = 0x32;
+                break;
+            case grammar::LOR:
+                ret->precedence = 0x31;
+                break;
+            default:
+                ASSERT(false, "Invalid infix operator");
+                break;
+        }
+        
+        ret->inhprecedence = right->inhprecedence > ret->precedence ? 
+                             right->inhprecedence : 
+                             ret->precedence;
+        
+        return reorder_binary(ret);
     } else {
         return dot;
     }
@@ -2561,32 +2811,38 @@ ast* pass::dotexpr() {
             }
         } while (is_symbol(grammar::PERIOD) && next());
         
-        return ret;
+        return ret; // Always precedence -1
     } else {
         return postcircumfix;
     }
 }
 
 ast* pass::postcircumfixexpr() {
-    ast* literal = literalexpr();
+    ast* literal = literalexpr(); // Everything below this always has precedence -1
     
     while (is(token_type::SYMBOL)) {
+        s16 prec = -1;
         switch (c->value) {
             case grammar::OPAREN: {
                 literal = ast::make_binary({grammar::OPAREN, literal, function_call()}, c, tt.NONE);
+                prec = 0x3F;
                 break;
             }
             case grammar::OBRACK: {
                 literal = ast::make_binary({grammar::OBRACK, literal, access()}, c, tt.NONE);
+                prec = 0x3F;
                 break;
             }
             case grammar::OSELECT: {
                 literal = ast::make_binary({grammar::OSELECT, literal, reorder()}, c, tt.NONE);
+                prec = 0x3D;
                 break;
             }
             default:
                 return literal;
         }
+        literal->precedence = prec;
+        literal->inhprecedence = prec;
     } 
     
     return literal;
@@ -2719,15 +2975,14 @@ ast* pass::literalexpr() {
             break;
         default:
             ret = identifierexpr();
+            if (is_symbol(grammar::OSELECT)) {
+                token* tok = c;
+                ret = ast::make_binary({grammar::OSELECT, ret, select()}, tok, tt.NONE);
+            }
             break;
     }
     
-    if (is_symbol(grammar::OSELECT)) {
-        token* tok = c;
-        return ast::make_binary({grammar::OSELECT, ret, select()}, tok, tt.NONE);
-    } else {
-        return ret;
-    }
+    return ret;
 }
 
 ast* pass::identifierexpr() {
@@ -2779,7 +3034,7 @@ ast* pass::select() {
             ret->block.elems.push_back(ast::make_binary({
                 grammar::SP_NAMED, 
                 ast::make_none({}, tok, tt.TYPELESS), 
-                expression()
+                first
             }, tok, tt.TYPELESS));
         }
     } while (is_symbol(grammar::COMMA) && next());

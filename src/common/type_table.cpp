@@ -178,7 +178,7 @@ std::string type_table::mangle(type* t) {
     std::string mangled;
     
     auto add1 = [&mangled](u8 len, u64 data){
-        ASSERT(len < mangled.length() - 8, "Not enough space");
+        ASSERT(len <= mangled.length() - 8, "Not enough space");
         switch (len) {
             case 1: {
                 u8* mdata = reinterpret_cast<u8*>(mangled.data() + 8);
@@ -205,7 +205,7 @@ std::string type_table::mangle(type* t) {
     auto add = [&mangled](u8 len, const std::vector<u64>& data){
         switch (len) {
             case 1: {
-                ASSERT(data.size() < mangled.length() - 8, "Not enough space");
+                ASSERT(data.size() <= mangled.length() - 8, "Not enough space");
                 u8* mdata = reinterpret_cast<u8*>(mangled.data() + 8);
                 for (u64 i = 0; i < data.size(); ++i) {
                     mdata[i] = data[i];
@@ -213,7 +213,7 @@ std::string type_table::mangle(type* t) {
                 break;
             }
             case 2: {
-                ASSERT(data.size() < (mangled.length() - 8) / 2, "Not enough space");
+                ASSERT(data.size() <= (mangled.length() - 8) / 2, "Not enough space");
                 u16* mdata = reinterpret_cast<u16*>(mangled.data() + 8);
                 for (u64 i = 0; i < data.size(); ++i) {
                     mdata[i] = data[i];
@@ -221,7 +221,7 @@ std::string type_table::mangle(type* t) {
                 break;
             }
             case 4: {
-                ASSERT(data.size() < (mangled.length() - 8) / 4, "Not enough space");
+                ASSERT(data.size() <= (mangled.length() - 8) / 4, "Not enough space");
                 u32* mdata = reinterpret_cast<u32*>(mangled.data() + 8);
                 for (u64 i = 0; i < data.size(); ++i) {
                     mdata[i] = data[i];
@@ -229,7 +229,7 @@ std::string type_table::mangle(type* t) {
                 break;
             }
             case 8: {
-                ASSERT(data.size() < (mangled.length() - 8) / 8, "Not enough space");
+                ASSERT(data.size() <= (mangled.length() - 8) / 8, "Not enough space");
                 std::memcpy(mangled.data() + 8, data.data(), data.size());
                 break;
             }
@@ -239,7 +239,7 @@ std::string type_table::mangle(type* t) {
     switch (t->tt) {
         case type_type::PRIMITIVE: {
             flags.len = 1;
-            mangled.reserve(8 + 4);
+            mangled.resize(8 + 4);
             
             u16* as_u16 = reinterpret_cast<u16*>(mangled.data() + 8);
             as_u16[0] = (u16) t->primitive.tt;
@@ -248,14 +248,14 @@ std::string type_table::mangle(type* t) {
         }
         case type_type::POINTER: {
             flags.len = required[__builtin_clz(t->pointer.at->id)];
-            mangled.reserve(9 + flags.len);
+            mangled.resize(9 + flags.len);
             add1(flags.len, t->pointer.at->id);
             mangled[8 + flags.len] = (char) t->pointer.tt;
             break;
         }
         case type_type::ARRAY: {
-            flags.len = required[std::max(__builtin_clz(t->array.sized), __builtin_clz(t->array.at->id))];
-            mangled.reserve(9 + flags.len * 2);
+            flags.len = required[std::max(__builtin_clz(t->array.size), __builtin_clz(t->array.at->id))];
+            mangled.resize(9 + flags.len * 2);
             add(flags.len, {t->array.sized, t->array.at->id});
             mangled[8 + flags.len * 2] = (char) t->array.sized;
             break;
@@ -277,7 +277,7 @@ std::string type_table::mangle(type* t) {
         case type_type::ENUM: [[fallthrough]];
         case type_type::TUPLE: {
             flags.len = required[__builtin_clz(t->scompound.comp->id)];
-            mangled.reserve(8 + flags.len);
+            mangled.resize(8 + flags.len);
             add1(flags.len, t->scompound.comp->id);
             break;
         }        
@@ -341,13 +341,13 @@ std::string type_table::mangle(type* t) {
         }
         case type_type::SUPERFUNCTION: {
             flags.len = required[__builtin_clz(t->sfunction.function->id)];
-            mangled.reserve(8 + flags.len);
+            mangled.resize(8 + flags.len);
             add1(flags.len, t->sfunction.function->id);
             break;
         }
         case type_type::SPECIAL: {
             flags.len = 1;
-            mangled.reserve(8 + 1);
+            mangled.resize(8 + 1);
             mangled[8] = (char) t->special.tt;
             break;
         }
@@ -397,7 +397,7 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
         case type_type::ENUM: [[fallthrough]];
         case type_type::TUPLE: {
             ASSERT(tt[as_t[0]], "Type id pointed nowhere");
-            dest->scompound = type_supercompound{tt[as_t[0]]};
+            dest->scompound = type_supercompound{tt[as_t[0]], false, false}; // TODO Generic/Generated
             break;
         }        
         case type_type::FUNCTION: {

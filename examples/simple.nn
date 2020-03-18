@@ -1,54 +1,11 @@
-#> def fun example() {
-	''\'';
-	1;
-	10;
-	10.0;
-	10e+23;
-	10f;
-	10.0f;
-	10e+23f;
-	1_0;
-	1'0;
-	0b;
-	0b0;
-	0b1;
-	0b12;
-	0o;
-	0o1;
-	0o01234567;
-	0o789;
-	0x1;
-	0x;
-	0x1234567890ABCDEFabcdef;
-	0xfghi;
-	'1;
-	_1;
-	a;
-	aa;
-	a_a;
-	a';
-	a1;
-	_;
-	_a;
-	'a;
-	# \
-	asd;
-	a+a;
-	a++a;
-	a+;!@%$^%^*;a;
-	a+";"+a;
-	"hello\"";
-	'c32"Do more thing";
-	'c"Dothing";
-	'stongth;
-	'();
-	'a();
-	'{};
-	'a{};
-	'[];
-	'a[];
-	'['('{"'"})];
-} <#
+def fun example() {
+    a ^ b == c && d || e;
+    a | b < d ^ c;
+    a ^ b | c < d;
+    1 / 2 * 3 + 4;
+    ...abacaba(1, 2, 3)::[1, 2, 3];
+    ++ 1 --;
+}
 
 let foo: fun(-> :s32);
 def fun foo(-> :s32) {
@@ -114,7 +71,7 @@ $main
 #> #> Yay, comments! <# <#
 def fun main(arg: [][]u8 -> :s32) { 
 	var arr: []s32 = '[1, 2, 3, 4, 5, 6];
-	
+    
 	defer if ~arg > 2 {
 		arr[2] = 7;
 	} else {
@@ -122,9 +79,9 @@ def fun main(arg: [][]u8 -> :s32) {
 	}
 
 	def enum not_cutlery {WHAT, IS, THIS}
-	
+    
 	var c: cutlery = cutlery.SPOON;
-	
+    
 	using cutlery as _c;
 
 	c = _c.SPORK;
@@ -150,7 +107,7 @@ def fun main(arg: [][]u8 -> :s32) {
 	def fun bar(-> :s32) {
 		raise X_2;
 	}
-	
+    
 	try
 		var in_try: s32 = 69;
 		bar();
@@ -175,7 +132,7 @@ def fun main(arg: [][]u8 -> :s32) {
 	} while in_try == 70;
 
 	in_try = -1;
-	
+    
 	switch c {
 		case cutlery.FORK, cutlery.SPOON {
 			return -1;
@@ -183,12 +140,12 @@ def fun main(arg: [][]u8 -> :s32) {
 		case cutlery.SPORK continue;
 		else do break;
 	} 
-	
+    
 	var sol: s32 = -~arr as s32;
 	for var i: s32 in arr {
 		sol += i;
 	}
-	
+    
 	while var i: s32 = 5; --i < 0 {
 		;
 	}
@@ -196,7 +153,7 @@ def fun main(arg: [][]u8 -> :s32) {
 	while var i: s32 = 0; i < 5; ++i; i += 1 {
 		sol *= i;
 	}
-	
+    
 	{
 		var a: *s32 = new *s32;
 		var b: []s32 = new [10]s32;
@@ -209,7 +166,7 @@ def fun main(arg: [][]u8 -> :s32) {
 	}
 	label leave;
 	# leave;
-	
+    
 	var gone: s32 = 0;
 	label whoops;
 	gone++;
@@ -218,18 +175,18 @@ def fun main(arg: [][]u8 -> :s32) {
 	} else {
 		goto better;
 	}
-	
+    
 	label better;
-	
+    
 	var one: s32, two: f32 = 1, 2 as f32;
-	
+    
 	while var itwo: s32 = two as s32; one > 0 {
 		one -= itwo;
 	}
-	
+    
 	var sname: name = '{1.0f, 2f, 5, "Hello!"};
 	var three: f32 = sname.a;
-	
+    
 	var un: uname;
 	un.a = 4;
 	three = un.b;
@@ -237,7 +194,7 @@ def fun main(arg: [][]u8 -> :s32) {
 	var nothing: s32 = ---;
 	var namefoo: s32 = sname.foo();
 	namefoo.foo();
-	
+    
 	var boolean: u1 = false;
 
 	var laster: s32, err: e64 = foo(2, 1, 2, 3, 4, 5);
@@ -259,10 +216,10 @@ def fun main(arg: [][]u8 -> :s32) {
 	if err || err == foo.NO_WAY {
 		return -69;
 	}
-	
+    
 	var some_char: c32 = ''b';
 	var some_string: []c8 = "Do me this favor";
-	
+    
 	def struct nested {
 		var a: s32;
 	}

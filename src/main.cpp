@@ -4,6 +4,7 @@
 #include "common/token_stream.h"
 
 #include "frontend/parser.h"
+#include "common/ast.h"
 
 int main(int argc, char** argv) {
     std::ios_base::sync_with_stdio(false);
@@ -16,9 +17,13 @@ int main(int argc, char** argv) {
     logger::info() << "Program start";
     
     parser p{};
-    p.parse(argv[1]);
+    auto m = p.parse(argv[1]);
     
     logger::info() << "Program end";
+    
+    if (argc > 2 && !m->errors.size()) {
+        logger::debug() << m->root->to_string(true);
+    }
     
     return 0;
 }

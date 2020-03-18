@@ -106,6 +106,11 @@ struct ast : public list_node<ast> {
         ast_iden iden;
     };
     
+    s16 precedence{-1}; // Higher precedence goes lower in AST
+    s16 inhprecedence{-1}; // Highest precedence in left subtree
+    // Only expressions and pseudoexpressions have precedence
+    // Precedence -1 means stop exploring
+    
     bool compiletime{false}; // The value of this is known at compiletime
     
     ast();

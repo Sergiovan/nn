@@ -3,6 +3,7 @@
 #include "parser_passes/token_to_ast_pass.h"
 #include "common/logger.h"
 #include "common/util.h"
+#include "common/symbol_table.h"
 
 nnmodule::nnmodule(parser& p, const std::string& filename) : ts{filename}, p{p} {
     namespace fs = std::filesystem;
@@ -13,8 +14,14 @@ nnmodule::nnmodule(parser& p, const std::string& filename) : ts{filename}, p{p} 
         abs_loc = fs::absolute(path);
     } 
     
+    st = new symbol_table{};
     // Else error will be noticed by first pass
     
+}
+
+nnmodule::~nnmodule() {
+    ASSERT(st, "st was nullptr");
+    delete st;
 }
 
 pass_type nnmodule::get_current() {
@@ -104,6 +111,7 @@ parser::~parser() {
 nnmodule* parser::parse(const std::string& filename) {
     nnmodule* mod = get_or_add(filename);
     root = mod;
+    root_st = mod->st;
     
     bool res = _parse(*mod);
     

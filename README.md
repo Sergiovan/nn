@@ -13,12 +13,13 @@ Check [examples](examples/) for .nn examples.
 Check [ROADMAP.md](ROADMAP.md) to see what's coming.
 
 ## Progress
-* Spec: Not started.
-* Lexer: Not started.
-* Parser: Not started.
-    * First pass: Not started.
-    * Second pass: Not started.
-* AST Optimizer: Not started.
+* Spec: Always in progress.
+* Lexer: First version.
+* Parser: In progress.
+    * Token to AST pass: First version.
+    * Types and Symbol Table pass: In progress.
+    * Constant propagation pass: In progress.
+* AST executor: Not started
 * IR Generator: Delayed indefinitely.
 * IR Optimizer: Delayed indefinitely. 
 * Assembler: Delayed indefinitely.
