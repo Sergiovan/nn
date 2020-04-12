@@ -63,6 +63,13 @@ struct generic_guard {
     F f;
 };
 
+template<typename T, typename F> 
+void for_each(T& t, F&& f) {
+    for(auto e : t) {
+        f(e);
+    }
+}
+
 u64 parse_hex(const char* c, u8 max_len = 0xFF, u8* len = nullptr);
 u64 utf8_to_utf32(const char* c, u8* len = nullptr);
 u64 read_utf8(const char* c, u8& bytes, u8* len = nullptr);

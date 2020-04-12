@@ -30,6 +30,7 @@ type_table::type_table() {
     NONE_TUPLE = add_special({special_type::NONE_TUPLE}, false, false);
     NONE_FUNCTION = add_special({special_type::NONE_FUNCTION}, false, false);
     NULL_ = add_special({special_type::NULL_}, false, false);
+    ERROR_TYPE = add_special({special_type::ERROR_TYPE}, false, false);
 }
 
 type* type_table::add_primitive(const type_primitive& p, const bool _const, const bool volat) {
@@ -150,9 +151,18 @@ union param_flags {
     u8 raw = 0;
     struct {
         u8 compiletime : 1;
+        u8 reference : 1;
         u8 spread : 1;
         u8 generic : 1;
         u8 thisarg : 1;
+    };
+};
+
+union ret_flags {
+    u8 raw = 0;
+    struct {
+        u8 compiletime : 1;
+        u8 reference : 1;
     };
 };
 
@@ -288,7 +298,7 @@ std::string type_table::mangle(type* t) {
             u64 reservesize = 2 + paramsize + retsize;
             std::vector<u64> ids;
             std::vector<param_flags> pflags;
-            std::vector<u8> rflags; // Really a vector<bool> 
+            std::vector<ret_flags> rflags;
             
             u8 max_len = 0;
             ids.reserve(reservesize);
@@ -300,8 +310,9 @@ std::string type_table::mangle(type* t) {
             for (auto& tt : f.params) {
                 ids.push_back(tt.t->id);
                 max_len = max_len > required[__builtin_clz(tt.t->id)] ? max_len : required[__builtin_clz(tt.t->id)];
-                param_flags p;
+                param_flags p{0};
                 p.compiletime = tt.compiletime;
+                p.reference = tt.generic;
                 p.spread = tt.spread;
                 p.generic = tt.generic;
                 p.thisarg = tt.thisarg;
@@ -310,7 +321,10 @@ std::string type_table::mangle(type* t) {
             for (auto& tt : f.rets) {
                 ids.push_back(tt.t->id);
                 max_len = max_len > required[__builtin_clz(tt.t->id)] ? max_len : required[__builtin_clz(tt.t->id)];
-                rflags.push_back(tt.compiletime);
+                ret_flags r{0};
+                r.compiletime = tt.compiletime;
+                r.reference = tt.reference;
+                rflags.push_back(r);
             }
             add(max_len, ids);
             
@@ -320,17 +334,13 @@ std::string type_table::mangle(type* t) {
             std::memset(mangled.data() + byte, 0, mangled.length() - byte);
             
             for (auto& pf : pflags) {
-                mangled[byte] |= (pf.raw & 0xF) << bit;
-                bit += 4;
-                if (bit == 8) {
-                    bit = 0;
-                    ++byte;
-                }
+                mangled[byte] = pf.raw & 0x1F;
+                ++byte;
             }
             
             for (auto& rf : rflags) {
-                mangled[byte] |= (rf & 1) << bit;
-                ++bit;
+                mangled[byte] |= (rf.raw & 0x3) << bit;
+                bit += 2;
                 if (bit == 8) {
                     bit = 0;
                     ++byte;
@@ -413,22 +423,18 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
             
             for (u64 i = 0; i < psize; ++i) {
                 ASSERT(tt[as_t[2 + i]], "Type id pointed nowhere");
-                param_flags flgs{(u8) ((d[byte] >> bit) & 0xF)};
+                param_flags flgs{(u8) (d[byte] & 0x1F)};
                 params.push_back(
-                    {tt[as_t[2 + i]], flgs.compiletime, flgs.spread, flgs.generic, flgs.thisarg}
+                    {tt[as_t[2 + i]], flgs.compiletime, flgs.reference, flgs.spread, flgs.generic, flgs.thisarg}
                 );
-                bit += 4;
-                if (bit == 8) {
-                    bit = 0;
-                    ++byte;
-                }
+                ++byte;
             }
             
             for (u64 i = 0; i < rsize; ++i) {
                 ASSERT(tt[as_t[2 + psize + i]], "Type id pointed nowhere");
-                u8 retflg = (d[byte] >> bit) & 1;
-                rets.push_back({tt[as_t[2 + psize + i]], retflg});
-                ++bit;
+                ret_flags retflg{(u8) ((d[byte] >> bit) & 0x3)};
+                rets.push_back({tt[as_t[2 + psize + i]], retflg.compiletime, retflg.reference});
+                bit += 2;
                 if (bit == 8) {
                     bit = 0;
                     ++byte;

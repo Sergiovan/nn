@@ -7,7 +7,6 @@ def fun example() {
     ++ 1 --;
 }
 
-let foo: fun(-> :s32);
 def fun foo(-> :s32) {
 	return 1;
 }
@@ -45,7 +44,6 @@ def fun fooo(a: s32 -> :s32) {
 	return a;
 }
 
-let name: struct;
 def struct name {
 	var a: f32;
 	var b: f64;
@@ -55,6 +53,14 @@ def struct name {
 	$constructor 
 	def fun foo() {
 		return 0;
+	}
+}
+
+def struct stuff {
+	ref b: tuple (u8, u8, u8);
+
+	def fun gib(-> ref b: tuple (u8, u8, u8)) {
+		return b;
 	}
 }
 
@@ -96,6 +102,16 @@ def fun main(arg: [][]u8 -> :s32) {
 	var nyeom: api32 = '[null, null, null];
 	$unreal 
 	var a: fun_foo = fooo;
+
+	var tupl = '(0 as u8, 0 as u8, 0 as u8);
+	var stf: stuff = '{tupl};
+
+	ref stf_b = stf.gib();
+	stf.b = '(1, 1, 1);
+
+	if !!stf_b[0] || !!stf_b[1] || !!stf_b[2] {
+		raise REF_ERR;
+	} 
 
 	a(2);
 

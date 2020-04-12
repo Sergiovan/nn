@@ -59,6 +59,7 @@ public:
     type* NONE_TUPLE;
     type* NONE_FUNCTION;
     type* NULL_;
+    type* ERROR_TYPE;
 private:
     type* add(type* t);
     

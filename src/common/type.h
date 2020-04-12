@@ -7,6 +7,7 @@
 
 struct ast;
 class type_table;
+class symbol_table;
 
 enum class type_type : u8 {
     PRIMITIVE, POINTER, 
@@ -30,7 +31,7 @@ enum class pointer_type : u8 {
 enum class special_type : u8 {
     INFER, GENERIC, NOTHING, TYPELESS, NONE, 
     NONE_ARRAY, NONE_STRUCT, NONE_TUPLE,
-    NONE_FUNCTION, NULL_
+    NONE_FUNCTION, NULL_, ERROR_TYPE
 };
 
 struct type;
@@ -59,11 +60,13 @@ struct type_supercompound {
     type* comp;
     u8 generic : 1;
     u8 generated : 1;
+    symbol_table* st{nullptr};
 };
 
 struct param {
     type* t;
     u8 compiletime : 1;
+    u8 reference : 1;
     u8 spread : 1;
     u8 generic : 1;
     u8 thisarg : 1;
@@ -72,6 +75,7 @@ struct param {
 struct ret {
     type* t;
     u8 compiletime : 1;
+    u8 reference : 1;
 };
 
 // Names and default values are __not__ part of the function type
@@ -94,6 +98,7 @@ struct type_superfunction {
     type* function;
     std::vector<param_info> params;
     std::vector<ret_info> rets;
+    symbol_table* st{nullptr};
 };
 
 struct type_special {

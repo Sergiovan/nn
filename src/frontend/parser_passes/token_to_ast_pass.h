@@ -96,6 +96,7 @@ private:
     ast* vardecl();
     ast* simplevardecl();
     
+    ast* functype();
     ast* funclit_or_type();
     ast* funclit();
     ast* funcdef();
@@ -106,16 +107,13 @@ private:
     ast* funcparam();
     ast* funcret(bool let);
     
-    ast* structtypelit();
     ast* structtypelitdef();
     ast* structscope();
     ast* structvardecl();
     
-    ast* uniontypelit();
     ast* uniontypelitdef();
     ast* unionscope();
     
-    ast* enumtypelit();
     ast* enumtypelitdef();
     ast* enumscope();
     

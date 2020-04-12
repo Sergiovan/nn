@@ -99,7 +99,7 @@ bool symbol::is_label() {
     return tt == symbol_type::LABEL;
 }
 
-symbol_table::symbol_table() {
+symbol_table::symbol_table(symbol* owner) : owner{owner} {
     
 }
 
@@ -120,8 +120,8 @@ symbol_table::~symbol_table() {
     }
 }
 
-symbol_table* symbol_table::make_child() {
-    symbol_table* ret = new symbol_table();
+symbol_table* symbol_table::make_child(symbol* owner) {
+    symbol_table* ret = new symbol_table(owner);
     ret->parent = this;
     children.push_back(ret);
     return ret;
@@ -173,15 +173,15 @@ symbol* symbol_table::add_borrowed(const std::string& name, symbol* sym) {
 }
 
 symbol* symbol_table::add_undefined(const std::string& name, type* t) {
-    return add(name, new symbol(name, symbol_variable{t, nullptr, make_child(), false, true, false, false}));
+    return add(name, new symbol(name, symbol_variable{t, nullptr, make_child(), false, true, false, false, false, false}));
 }
 
-symbol* symbol_table::add_primitive(const std::string& name, type* t, ast* value, bool defined, bool compiletime) {
-    return add(name, new symbol(name, symbol_variable{t, value, make_child(), defined, compiletime, false, false}));
+symbol* symbol_table::add_primitive(const std::string& name, type* t, ast* value, bool defined, bool compiletime, bool reference) {
+    return add(name, new symbol(name, symbol_variable{t, value, make_child(), defined, compiletime, reference, false, false, false}));
 }
 
 symbol* symbol_table::add_type(const std::string& name, type* t, ast* value, symbol_table* st) {
-    return add(name, new symbol(name, symbol_variable{t, value, st, true, true, false, false}));
+    return add(name, new symbol(name, symbol_variable{t, value, st, true, true, false, false, false, false}));
 }
 
 // symbol* symbol_table::add_function(const std::string& name, type* t, ast* value, symbol_table* st) {
@@ -312,4 +312,8 @@ symbol* symbol_table::borrow(symbol_table* o) {
     }
     
     return offending;
+}
+
+symbol* symbol_table::get_owner() {
+    return owner;
 }

@@ -389,6 +389,9 @@ std::string type::to_string(bool simple) {
                 case special_type::NULL_:
                     ss << "null";
                     break;
+                case special_type::ERROR_TYPE:
+                    ss << "error";
+                    break;
             }
             break;
     }
@@ -487,6 +490,8 @@ std::ostream& operator<<(std::ostream& os, special_type t) {
             return os << "NONE_FUNCTION";
         case special_type::NULL_:
             return os << "NULL";
+        case special_type::ERROR_TYPE:
+            return os << "ERROR TYPE";
         default:
             return os << "INVALID SPECIAL";
     }

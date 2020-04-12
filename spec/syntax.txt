@@ -65,7 +65,7 @@ c8 = "c8" ;
 c16 = "c16" ;
 c32 = "c32" ;
 
-type = "type" ;
+kwtype = "type" ;
 any = "any" ;
 
 fun = "fun" ;
@@ -78,6 +78,7 @@ infer = "infer" ;
 
 var = "var" ;
 let = "let" ;
+ref = "ref" ;
 def = "def" ;
 
 const = "const" ;
@@ -244,7 +245,7 @@ usingstmt = using, (cexpression, (dot, asterisk)?), (as, identifier_literal)?, s
 namespacestmt = namespace, compound_identifier_simple, namespacescope ; 
 namespacescope = obrace, (note*, (usingstmt | namespacestmt | declstmt))*, cbrace ;
 
-declarator = (var | let) ;
+declarator = (var | let | ref) ;
 type = cexpression ; # Just a nicety
 inferrable_type = (cexpression | infer) ;
 
@@ -259,6 +260,7 @@ maybe_identifier = (identifier_literal | placeholder)? ;
 vardecl = declarator, simplevardecl ;
 simplevardecl = (maybe_identifier, (colon, inferrable_type)?; comma)+, assignment? ;
 
+functype = fun, maybe_identifier, functypesig ;
 funclit_or_type = fun, (capture_group, maybe_identifier, functypesig, scope | maybe_identifier, functypesig) ;
 funclit = fun, capture_group, maybe_identifier, functypesig, scope ;
 funcdef = fun, capture_group?, identifier_literal, functypesig, scope ;
@@ -269,7 +271,6 @@ functypesig = oparen, (param; comma)*, ((rarrow | srarrow), ((return; comma)* | 
 param = (declarator?, maybe_identifier, paramtype | type), spread?, (assign, cexpression)? ;
 return = (declarator?, maybe_identifier, rettype | inferrable_type) ;
 
-structtypelit = struct, maybe_identifier, structscope? ;
 structtypelitdef = struct, identifier_literal, structscope ;
 
 structscope = obrace, (note*, (structvardecl, semicolon | defstmt))*, cbrace ;
@@ -277,20 +278,18 @@ structvardecl = declarator, ((maybe_identifier; comma)+, (((colon | doublecolon)
 
 # Unions should get better
 
-uniontypelit = union, maybe_identifier, unionscope? ;
 uniontypelitdef = union, identifier_literal, unionscope ;
 unionscope = obrace, (node*, (vardecl, semicolon | defstmt))*, cbrace ;
 
-enumtypelit = enum, maybe_identifier, enumscope? ;
 enumtypelitdef = enum, identifier_literal, enumscope ;
 enumscope = obrace, (note*, identifier_literal, (assign, cexpression)?; comma)*, cbrace ;
 
-tupletypelit = tuple, maybe_identifier, tupletypes? ;
+tupletypelit = tuple, maybe_identifier, tupletypes ;
 tupletypelitdef = tuple, identifier_literal, tupletypes ;
 tupletypes = oparen, (type; comma)*, cparen ;
 
-typelit = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | e64 | type | any | funclit | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
-typelit_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | e64 | type | any | structtypelit | uniontypelit | enumtypelit | tupletypelit) ;
+typelit = (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | e64 | kwtype | any | functype | tupletypelit) ;
+typelit_nofunc =  (u0 | u1 | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | e64 | kwtype | any | tupletypelit) ;
 
 assignment = assign, (expression; comma)+ ;
 assstmt = (expression; comma)+, assignment, semicolon ;

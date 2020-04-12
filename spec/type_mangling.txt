@@ -24,13 +24,13 @@ n * mangle length compound type id
 SUPERCOMPOUND (mangle length)
 mangle length compound type id
 
-FUNCTION (mangle length * (2 + n + m) bytes + (n * 4 + m) bits)
+FUNCTION (mangle length * (2 + n + m) bytes + (n * 8 + m * 2) bits)
 mangle length param amount = n
 mangle length return amount = m
 n * mangle length param type id
 m * mangle length return type id
-n * 4 bits param flags
-m bits return flags
+n * 5 bits param flags, each preceded by 3 0 bits padding
+m * 2 bits return flags
 
 SUPERFUNCTION (mangle length)
 mangle length function type id

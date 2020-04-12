@@ -714,7 +714,8 @@ ast* pass::freestmt() {
             return namespacestmt();
         case grammar::KW_DEF: [[fallthrough]];
         case grammar::KW_VAR: [[fallthrough]];
-        case grammar::KW_LET:
+        case grammar::KW_LET: [[fallthrough]];
+        case grammar::KW_REF:
             return declstmt();
         default:
             // TODO err
@@ -764,7 +765,8 @@ ast* pass::stmt() {
                 return deletestmt();
             case grammar::KW_DEF: [[fallthrough]];
             case grammar::KW_VAR: [[fallthrough]];
-            case grammar::KW_LET:
+            case grammar::KW_LET: [[fallthrough]];
+            case grammar::KW_REF:
                 return declstmt();
             default:
                 return assorexpr();
@@ -869,7 +871,7 @@ ast* pass::optscope() {
 ast* pass::optvardecls() {
     ast* ret = ast::make_block({}, c, tt.TYPELESS);
     
-    while (is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_VAR)) {
+    while (is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_REF)) {
         ret->block.elems.push_back(vardecl());
         
         // TODO err
@@ -924,7 +926,7 @@ ast* pass::forstmt() {
     
     ast* ret = ast::make_binary({grammar::KW_FOR}, tok, tt.TYPELESS);
     ast* decl{nullptr};
-    if (is_keyword(grammar::KW_LET) || require_keyword(grammar::KW_VAR)) {
+    if (is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_REF) || require_keyword(grammar::KW_VAR)) {
         decl = vardecl();
     } else {
         // TODO err
@@ -1290,11 +1292,11 @@ ast* pass::importstmt() {
     // TODO Path search shenanigans
     
     if (fs::exists(imprt)) {
-        nnmodule* m = p.get_or_add(fs::absolute(imprt));
-        if (m != &mod) {
-            p.add_pass_task(m, pass_type::TOKEN_TO_AST);
-            mod.add_dependency(m);
-        } else {
+        std::string abs = fs::absolute(imprt);
+        nnmodule* m = p.get(abs);
+        if (!m) {
+            p.parse_file_task(abs, &mod);
+        } else if (m == &mod) {
             mod.errors.push_back({ret, ss::get() << "Cannot import self" << ss::end()});
         }
     } else {
@@ -1404,6 +1406,7 @@ ast* pass::namespacescope() {
                 break;
             case grammar::KW_DEF: [[fallthrough]];
             case grammar::KW_VAR: [[fallthrough]];
+            case grammar::KW_REF: [[fallthrough]];
             case grammar::KW_LET:
                 ret->block.elems.push_back(declstmt());
                 break;
@@ -1459,14 +1462,14 @@ ast* pass::inferrable_type() {
 ast* pass::declstmt() {
     if (is_keyword(grammar::KW_DEF)) {
         return defstmt();
-    } else if (is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_LET)) {
+    } else if (is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_REF)) {
         ast* ret = vardecl();
         
         if (require_symbol(grammar::SEMICOLON)) next(); // ;
         
         return ret;
     } else {
-        ASSERT(false, "Expected 'def', 'var' or 'let'");
+        ASSERT(false, "Expected 'def', 'var', 'let' or 'ref'");
         return nullptr; // aaaa
     }
 }
@@ -1518,14 +1521,14 @@ ast* pass::maybe_identifier() {
 }
 
 ast* pass::vardecl() {
-    if (is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_LET)) {
+    if (is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_REF)) {
         token* tok = next();
-        grammar::symbol sym = (grammar::symbol) tok->value; // var let
+        grammar::symbol sym = (grammar::symbol) tok->value; // var let ref
         
         return ast::make_unary({sym, simplevardecl()}, tok, tt.TYPELESS);
         
     } else {
-        ASSERT(false, "Expected 'var' or 'let'");
+        ASSERT(false, "Expected 'var', 'let' or 'ref'");
         return nullptr; // nu >:(
     }
 }
@@ -1805,6 +1808,11 @@ ast* pass::funcparam() {
         ret->binary.sym = grammar::KW_VAR;
         ret->tok = tok;
         declarator = true;
+    } else if (is_keyword(grammar::KW_REF)) {
+        token* tok = next(); // ref
+        ret->binary.sym = grammar::KW_REF;
+        ret->tok = tok;
+        declarator = true;
     } else {
         ret->binary.sym = grammar::KW_VAR;
     }
@@ -1872,6 +1880,11 @@ ast* pass::funcret(bool let) {
         ret->binary.sym = grammar::KW_VAR;
         ret->tok = tok;
         declarator = true;
+    } else if (is_keyword(grammar::KW_REF)) {
+        token* tok = next(); // ref
+        ret->binary.sym = grammar::KW_REF;
+        ret->tok = tok;
+        declarator = true;
     } else {
         ret->binary.sym = let ? grammar::KW_LET : grammar::KW_VAR;
     }
@@ -1909,23 +1922,6 @@ ast* pass::funcret(bool let) {
     return ret;
 }
 
-
-ast* pass::structtypelit() {
-    ASSERT(is_keyword(grammar::KW_STRUCT), "Expected 'struct'");
-    
-    token* tok = next(); // struct
-    
-    ast* ret = ast::make_binary({grammar::KW_STRUCT}, tok, tt.TYPE);
-    ret->binary.left = maybe_identifier();
-    
-    if (is_symbol(grammar::OBRACE)) {
-        ret->binary.right = structscope();
-    } else {
-        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
-    }
-    
-    return ret;
-}
 
 ast* pass::structtypelitdef() {
     ASSERT(is_keyword(grammar::KW_STRUCT), "Expected 'struct'");
@@ -1967,7 +1963,8 @@ ast* pass::structscope() {
                     ret->block.elems.push_back(defstmt());
                     break;
                 case grammar::KW_VAR: [[fallthrough]];
-                case grammar::KW_LET: {
+                case grammar::KW_LET: [[fallthrough]];
+                case grammar::KW_REF: {
                     ret->block.elems.push_back(structvardecl());
                     
                     // TODO err
@@ -1994,8 +1991,8 @@ ast* pass::structscope() {
 }
 
 ast* pass::structvardecl() {
-    ASSERT(is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_VAR), "Expected 'var' or 'let'");
-    token* tok = next(); // var let
+    ASSERT(is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_REF), "Expected 'var', 'let' or 'ref'");
+    token* tok = next(); // var let ref
     
     ast* vardecl = ast::make_binary({grammar::KW_DEF}, tok, tt.TYPELESS);
     ast* left = vardecl->binary.left = ast::make_block({}, tok, tt.TYPELESS); 
@@ -2051,23 +2048,6 @@ ast* pass::structvardecl() {
 }
 
 
-ast* pass::uniontypelit() {
-    ASSERT(is_keyword(grammar::KW_UNION), "Expected 'union'");
-    
-    token* tok = next(); // union
-    
-    ast* ret = ast::make_binary({grammar::KW_UNION}, tok, tt.TYPE);
-    ret->binary.left = maybe_identifier();
-    
-    if (is_symbol(grammar::OBRACE)) {
-        ret->binary.right = unionscope();
-    } else {
-        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
-    }
-    
-    return ret;
-}
-
 ast* pass::uniontypelitdef() {
     ASSERT(is_keyword(grammar::KW_UNION), "Expected 'union'");
     
@@ -2108,7 +2088,8 @@ ast* pass::unionscope() {
                 ret->block.elems.push_back(defstmt());
                 break;
             case grammar::KW_VAR: [[fallthrough]];
-            case grammar::KW_LET: {
+            case grammar::KW_LET: [[fallthrough]];
+            case grammar::KW_REF: {
                 ret->block.elems.push_back(vardecl());
                 
                 // TODO err
@@ -2127,23 +2108,6 @@ ast* pass::unionscope() {
     
     // TODO err
     if (require_symbol(grammar::CBRACE)) next();
-    
-    return ret;
-}
-
-ast* pass::enumtypelit() {
-    ASSERT(is_keyword(grammar::KW_ENUM), "Expected 'enum'");
-    
-    token* tok = next(); // enum
-    
-    ast* ret = ast::make_binary({grammar::KW_ENUM}, tok, tt.TYPE);
-    ret->binary.left = maybe_identifier();
-    
-    if (is_symbol(grammar::OBRACE)) {
-        ret->binary.right = enumscope();
-    } else {
-        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
-    }
     
     return ret;
 }
@@ -2217,10 +2181,11 @@ ast* pass::tupletypelit() {
     ast* ret = ast::make_binary({grammar::KW_TUPLE}, tok, tt.TYPE);
     ret->binary.left = maybe_identifier();
     
+    // TODO err
     if (is_symbol(grammar::OPAREN)) {
         ret->binary.right = tupletypes();
     } else {
-        ret->binary.right = ast::make_none({}, tok, tt.TYPELESS);
+        ret->binary.right = make_error_ast(c);
     }
     
     return ret;
@@ -2262,7 +2227,7 @@ ast* pass::tupletypes() {
     }
     
     // TODO err
-    if (require_symbol(grammar::OPAREN)) next();
+    if (require_symbol(grammar::CPAREN)) next();
     
     return ret;
 }
@@ -2297,9 +2262,6 @@ ast* pass::typelit_nofunc() {
         case grammar::KW_E64: t = tt.E64; break;
         case grammar::KW_TYPE: t = tt.TYPE; break;
         case grammar::KW_ANY: t = tt.ANY; break;
-        case grammar::KW_STRUCT: return structtypelit();
-        case grammar::KW_UNION: return uniontypelit();
-        case grammar::KW_ENUM: return enumtypelit();
         case grammar::KW_TUPLE: return tupletypelit();
         default:
             ast* ret = make_error_ast(next());

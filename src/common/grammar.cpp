@@ -31,6 +31,7 @@ dict<std::string, u64> grammar::string_to_symbol {
     {"infer", (u64) symbol::KW_INFER},
     {"var", (u64) symbol::KW_VAR},
     {"let", (u64) symbol::KW_LET},
+    {"ref", (u64) symbol::KW_REF},
     {"def", (u64) symbol::KW_DEF},
     {"const", (u64) symbol::KW_CONST},
     {"volat", (u64) symbol::KW_VOLAT},

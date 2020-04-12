@@ -17,7 +17,7 @@ namespace grammar {
         KW_C32, KW_TYPE,
         KW_ANY, KW_FUN, KW_STRUCT, KW_UNION,
         KW_ENUM, KW_TUPLE, 
-        KW_INFER, KW_VAR, KW_LET, KW_DEF, KW_CONST,
+        KW_INFER, KW_VAR, KW_LET, KW_REF, KW_DEF, KW_CONST,
         KW_VOLAT, 
         
         KW_IF, KW_ELSE, KW_FOR, KW_LOOP, KW_WHILE, 

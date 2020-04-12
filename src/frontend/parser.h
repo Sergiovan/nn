@@ -18,9 +18,12 @@ class symbol_table;
 enum class pass_type {
     ERROR, 
     NO_PASS,
-    TOKEN_TO_AST,
-    TYPES_AND_ST,
-    CONSTANT_PROPAGATION,
+    
+    FILE_TO_AST,
+    
+    AST_TO_LLVM,
+    AST_TO_IR,
+    
     
     LAST
 };
@@ -46,26 +49,12 @@ public:
     std::vector<module_error> warnings{};
     std::vector<module_error> errors{};
     std::vector<nnmodule*> dependencies{};
-    
-    pass_type get_current();
-    pass_type get_target();
-    void update_current(pass_type pass);
-    void update_target(pass_type pass);
+
     void print_errors();
-    
-    bool is_active();
-    void activate(thread_pool::promise p);
-    void deactivate();
-    bool wait_for_value();
-    void wait_and_activate(thread_pool::promise p);
     
     void add_dependency(nnmodule* dep);
 private:
     parser& p;
-    
-    pass_type target_pass{pass_type::NO_PASS};
-    pass_type passed{pass_type::NO_PASS};
-    thread_pool::promise pr{nullptr};
     
     std::mutex lock{};
     std::condition_variable cond{}; // Module activated or deactivated
@@ -73,25 +62,23 @@ private:
 
 class parser {
 public:    
+    using promise = thread_pool::promise;
+    
     parser();
     ~parser();
     
     nnmodule* parse(const std::string& filename);
-    nnmodule* add_pass_task(nnmodule* mod, pass_type n);
+    promise parse_file_task(nnmodule* mod);
+    promise parse_file_task(const std::string& filename, nnmodule* from);
+    promise parse_ast_task(ast* node);
     
     nnmodule* get();
     nnmodule* get(const std::string& filename);
     nnmodule* get_or_add(const std::string& filename);
 private:
-    using promise = thread_pool::promise;
     
     // Full parse
-    bool _parse(nnmodule& mod);
-    // Individual passes
-    promise pass_task(nnmodule& mod);
-    
-    bool pass_sync(nnmodule& mod);
-    bool pass(nnmodule& mod, promise s);
+    bool _parse(nnmodule* mod);
     
     thread_pool task_manager{8};
     
@@ -99,5 +86,5 @@ private:
     symbol_table* root_st{nullptr};
     dict<std::string, nnmodule*> modules{};
     
-    static constexpr u64 pass_amount{(u64) pass_type::LAST};
+    std::mutex lock{};
 };

@@ -63,6 +63,7 @@ infer => nntype(infer, t=type)
 
 var => N/A
 let => N/A
+ref => N/A
 def => N/A
 
 const => N/A
@@ -159,7 +160,7 @@ identifier_literal => iden(nullptr)
 
 number_lit => value(decimal_number, t=u64|f32|f64)
 char_lit => value(char_lit, t=c32)
-string_lit => strubg(string_lit, t=[n]c8)
+string_lit => string(string_lit, t=[n]c8)
 marked_brack => N/A
 marked_brace => N/A
 marked_paren => N/A
@@ -236,7 +237,7 @@ defstmt => unary(def, funcdef|structtypelitdef|uniontypelitdef|enumtypelitdef|tu
 
 maybe_identifier => identifier|zero(placeholder)
 
-vardecl => unary(var|let, simplevardecl)
+vardecl => unary(var|let|ref, simplevardecl)
 simplevardecl => binary(def, 
     (decls) block(xs=binary(def, 
         (names) block(xs=identifier|zero(placeholder)), 
@@ -245,6 +246,7 @@ simplevardecl => binary(def,
     (values) assignment|none
 ) ; Simple my ass
 
+functype => binary(fun, (name?) maybe_identifier, (type) functypesig)
 funclit_or_type => funclit|binary(fun, (name?) maybe_identifier, (type) functypesig)
 funclit => compound(xs=[(capture) capture_group, (name?) maybe_identifier, (type) functypesig, (body) scope], t=NONE_FUNCTION)
 funcdef => compound(xs=[(capture?) capture_group|zero(SP_CAPTURE), (name) identifier, (type) functypesig, (body) scope], t=NONE_FUNCTION)
@@ -255,13 +257,12 @@ functypesig => binary(:,
     (returns) unary(->|=>, nntype(infer, t=type)|compound(xs=return))
 )
 
-param => binary(var|let, 
+param => binary(var|let|ref, 
     (namevalue) binary(=, (name?) maybe_identifier|expression[identifier], (value?) expression|none), 
     (type) binary(:|::, (type) _type, (spread) zero(spread)|none)
 )
-return => binary(var|let, (name?) maybe_identifier|expression[identifier], (type) inferrable_type)
+return => binary(var|let|ref, (name?) maybe_identifier|expression[identifier], (type) inferrable_type)
 
-structtypelit => binary(struct, (name?) maybe_identifier, (body?) structscope|none)
 structtypelitdef => binary(struct, (name) identifier, (body) structscope)
 
 structscope => block(xs=defstmt|structvardecl)
@@ -275,20 +276,18 @@ structvardecl => binary(def,
 
 # Unions should get better
 
-uniontypelit => binary(union, (name?) maybe_identifier, (body?) unionscope|none)
 uniontypelitdef => binary(union, (name) identifier, (body) unionscope)
 unionscope => block(xs=defstmt|vardecl)
 
-enumtypelit => binary(enum, (name?) maybe_identifier, (body?) enumscope|none)
 enumtypelitdef => binary(enum, (name) identifier, (body) enumscope)
 enumscope => block(xs=binary(SP_NAMED, (name) identifier, (value?) expression|none))
 
-tupletypelit => binary(tuple, (name?) maybe_identifier, (body?) tupletypes|none)
+tupletypelit => binary(tuple, (name?) maybe_identifier, (body) tupletypes)
 tupletypelitdef => binary(tuple, (name) identifier, (body) tupletypes)
 tupletypes => block(xs=_type)
 
 typelit => N/A ; Not used
-typelit_nofunc => u0|u1|u8|u16|u32|u64|s8|s16|s32|s64|f32|f64|c8|c16|c32|type|any|structtypelit|uniontypelit|enumtypelit|tupletypelit
+typelit_nofunc => u0|u1|u8|u16|u32|u64|s8|s16|s32|s64|f32|f64|c8|c16|c32|kwtype|any|tupletypelit
 
 assignment => block(xs=expression)
 assstmt => binary(=, (assignees) block(xs=expression), (values) block(xs=expression)) ; Or any other op-assign operator

@@ -22,8 +22,10 @@ struct symbol_variable {
     
     bool defined : 1;
     bool compiletime : 1;
+    bool reference : 1;
     bool modified : 1;
     bool used : 1;
+    bool this_arg : 1;
 }; 
 
 struct symbol_overload {
@@ -74,10 +76,10 @@ struct symbol {
 
 class symbol_table {
 public:
-    symbol_table();
+    symbol_table(symbol* owner = nullptr);
     ~symbol_table();
     
-    symbol_table* make_child();
+    symbol_table* make_child(symbol* owner = nullptr);
     
     symbol* get(const std::string& name);
     std::pair<symbol_table*, symbol*> find(const std::string& name);
@@ -87,7 +89,8 @@ public:
     symbol* add_borrowed(const std::string& name, symbol* sym);
     
     symbol* add_undefined(const std::string& name, type* t); // HAS to be compiletime
-    symbol* add_primitive(const std::string& name, type* t, ast* value, bool defined = true, bool compiletime = false);
+    symbol* add_primitive(const std::string& name, type* t, ast* value, bool defined = true, 
+                          bool compiletime = false, bool reference = false);
     symbol* add_type(const std::string& name, type* t, ast* value, symbol_table* st);
 //     symbol* add_function(const std::string& name, type* t, ast* value, symbol_table* st); // Overloadable
     symbol* add_namespace(const std::string& name);
@@ -98,6 +101,8 @@ public:
     
     // Returns first offending element
     symbol* borrow(symbol_table* o);
+    
+    symbol* get_owner();
     
 private:
     symbol_table* parent{nullptr};
