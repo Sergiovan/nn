@@ -30,5 +30,14 @@
                 "path": "./syntaxes/nn.tmLanguage.json"
             }
         ]
+    },
+    "scripts": {
+        "build": "vsce package",
+        "debug": "code --extensionDevelopmentPath=${workspaceRoot}"
+    },
+    "repository": {
+        "type" : "git",
+        "url" : "https://github.com/Sergiovan/nn.git",
+        "directory": "other/vs_code_extensions/nn_syntax/nn/"
     }
 }

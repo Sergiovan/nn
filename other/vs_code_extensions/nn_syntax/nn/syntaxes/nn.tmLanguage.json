@@ -185,7 +185,7 @@
 			},
 			{
 				"name": "keyword.declarator.$0.nn",
-				"match": "\\b(var|let|def)\\b"
+				"match": "\\b(var|let|ref|def)\\b"
 			},
 			{
 				"name": "storage.type.$0.nn",
