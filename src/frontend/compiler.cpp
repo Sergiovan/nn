@@ -1,12 +1,12 @@
-#include "frontend/parser.h"
+#include "frontend/compiler.h"
 
-#include "parser_passes/token_to_ast_pass.h"
+#include "frontend/compilers/file_parser.h"
 
 #include "common/logger.h"
 #include "common/util.h"
 #include "common/symbol_table.h"
 
-nnmodule::nnmodule(parser& p, const std::string& filename) : ts{filename}, p{p} {
+nnmodule::nnmodule(compiler& p, const std::string& filename) : ts{filename}, c{p} {
     namespace fs = std::filesystem;
     
     fs::path path{filename};
@@ -38,23 +38,23 @@ void nnmodule::add_dependency(nnmodule* dep) {
     dependencies.push_back(dep);
 }
 
-parser::parser() { // TODO give number
+compiler::compiler() { // TODO give number
     
 }
 
-parser::~parser() {    
+compiler::~compiler() {    
     for (auto& [n, m] : modules) {
         ASSERT(m, "Module was null");
         delete m;
     }
 }
 
-nnmodule* parser::parse(const std::string& filename) {
+nnmodule* compiler::compile(const std::string& filename) {
     nnmodule* mod = get_or_add(filename);
     root = mod;
     root_st = mod->st;
     
-    bool res = _parse(mod);
+    bool res = compile_file(mod);
     
     if (res) {
         logger::info() << "Parsing succeeded"; 
@@ -63,12 +63,12 @@ nnmodule* parser::parse(const std::string& filename) {
     return mod;
 }
 
-parser::promise parser::parse_file_task(nnmodule* mod) {    
+compiler::promise compiler::parse_file_task(nnmodule* mod) {    
     auto [_, p] = task_manager.add_task([=](promise s) -> bool {
         if (s->is_stopped()) { 
             return false;
         }
-        token_to_ast_pass pass{*this, *mod};
+        file_parser pass{*this, *mod};
         if (!pass.read() || !pass.pass()) {
             mod->print_errors();
             return false;
@@ -80,7 +80,7 @@ parser::promise parser::parse_file_task(nnmodule* mod) {
 }
 
 
-parser::promise parser::parse_file_task(const std::string& filename, nnmodule* from) {
+compiler::promise compiler::parse_file_task(const std::string& filename, nnmodule* from) {
     std::lock_guard lg{lock};
     nnmodule* mod = get_or_add(filename);
     if (mod) { // Already exists, pff
@@ -94,28 +94,34 @@ parser::promise parser::parse_file_task(const std::string& filename, nnmodule* f
         if (s->is_stopped()) { 
             return false;
         }
-        token_to_ast_pass pass{*this, *mod};
-        if (!pass.read() || !pass.pass()) {
-            mod->print_errors();
-            return false;
-        }
-        return true;
+        return parse_file(mod);
     });
     
     return p;
 }
 
-parser::promise parser::parse_ast_task(ast* node) {
-    (void) node;
-    return {};
+struct compiler::frnd {
+    static void parse_ast_wrapper(void* _p) {
+        parse_ast_args* pa = (parse_ast_args*) _p;
+        bool res = pa->c->compile_ast(pa->node, pa->st, pa->sym);
+        if (!res) {
+            logger::error() << "Parsing of node " << pa->node->to_simple_string() << " failed";
+        }
+    }
+};
+
+void compiler::compile_ast_task(ast* node, symbol_table* st, symbol* sym) {
+    parse_ast_args* args = new parse_ast_args{this, node, st, sym}; // TODO This leaks
+    
+    fiber_manager.queue_task({compiler::frnd::parse_ast_wrapper, args});
 }
 
 
-nnmodule* parser::get() {
+nnmodule* compiler::get() {
     return root;
 }
 
-nnmodule* parser::get(const std::string& filename) {
+nnmodule* compiler::get(const std::string& filename) {
     if (auto it = modules.find(std::filesystem::absolute(filename)); it == modules.end()) {
         return nullptr;
     } else {
@@ -123,7 +129,7 @@ nnmodule* parser::get(const std::string& filename) {
     }
 }
 
-nnmodule* parser::get_or_add(const std::string& filename) {
+nnmodule* compiler::get_or_add(const std::string& filename) {
     if (auto it = modules.find(filename); it == modules.end()) {
         nnmodule* mod = new nnmodule{*this, filename};
         return modules[mod->abs_loc] = mod;
@@ -132,11 +138,23 @@ nnmodule* parser::get_or_add(const std::string& filename) {
     }
 }
 
-bool parser::_parse(nnmodule* mod) {
-    
+bool compiler::compile_file(nnmodule* mod) {
     promise p = parse_file_task(mod);
     
     task_manager.start();
     
     return p->get();
+}
+
+bool compiler::parse_file(nnmodule* mod) {
+    file_parser pass{*this, *mod};
+    if (!pass.read() || !pass.pass()) {
+        mod->print_errors();
+        return false;
+    }
+    return true;
+}
+
+bool compiler::compile_ast(ast* node, symbol_table* st, symbol* sym) {
+    
 }

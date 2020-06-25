@@ -274,7 +274,7 @@ return = (declarator?, maybe_identifier, rettype | inferrable_type) ;
 structtypelitdef = struct, identifier_literal, structscope ;
 
 structscope = obrace, (note*, (structvardecl, semicolon | defstmt))*, cbrace ;
-structvardecl = declarator, ((maybe_identifier; comma)+, (((colon | doublecolon), cexpression)?; comma), assignment? ;
+structvardecl = declarator, (maybe_identifier, ((colon | doublecolon), inferrable_type)?; comma)+, assignment? ;
 
 # Unions should get better
 

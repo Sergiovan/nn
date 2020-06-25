@@ -1,13 +1,13 @@
 #pragma once
 
-#include "frontend/parser.h"
+#include "frontend/compiler.h"
 #include "common/ast.h"
 
 #include <unordered_set>
 
-class token_to_ast_pass {
+class file_parser {
 public:
-    token_to_ast_pass(parser& p, nnmodule& mod);
+    file_parser(compiler& p, nnmodule& mod);
     
     bool read();
     bool pass();
@@ -83,7 +83,7 @@ private:
     
 //     ast* declarator();
     ast* _type();
-    ast* inferrable_type();
+    ast* inferrable_type(bool* is_infer = nullptr);
     
 //     ast* paramtype();
 //     ast* rettype();
@@ -93,8 +93,8 @@ private:
     
     ast* maybe_identifier();
     
-    ast* vardecl();
-    ast* simplevardecl();
+    ast* vardecl(bool special = false);
+    ast* simplevardecl(bool special = false);
     
     ast* functype();
     ast* funclit_or_type();
@@ -155,10 +155,10 @@ private:
     
     ast* make_error_ast(token* t);
     
-    parser& p;
+    compiler& comp;
     nnmodule& mod;
     type_table& tt;
-    // symbol_table& sym;
+
     token* c{nullptr};
     token* n{nullptr};
     list<ast> errors{};

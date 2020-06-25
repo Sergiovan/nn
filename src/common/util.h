@@ -73,3 +73,5 @@ void for_each(T& t, F&& f) {
 u64 parse_hex(const char* c, u8 max_len = 0xFF, u8* len = nullptr);
 u64 utf8_to_utf32(const char* c, u8* len = nullptr);
 u64 read_utf8(const char* c, u8& bytes, u8* len = nullptr);
+
+u64 align(u64 offset, u64 to);

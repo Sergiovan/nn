@@ -1,7 +1,8 @@
 #include "common/symbol_table.h"
 #include "common/type.h"
+#include "common/util.h"
 
-symbol::symbol() : tt{symbol_type::LABEL}, name{}, owner{nullptr}, label{} {
+symbol::symbol() : tt{symbol_type::LABEL}, name{}, owner{nullptr}, decl{nullptr}, label{} {
     
 }
 
@@ -49,33 +50,33 @@ symbol::~symbol() {
     }
 }
 
-symbol::symbol(symbol_type tt, const std::string& name, symbol_table* owner) 
-    : tt{tt}, name{name}, owner{owner} {
+symbol::symbol(symbol_type tt, const std::string& name, symbol_table* owner, ast* decl) 
+    : tt{tt}, name{name}, owner{owner}, decl{decl} {
     
 } 
 
-symbol::symbol(const std::string& name, const symbol_variable& variable) 
-    : tt{symbol_type::VARIABLE}, name{name}, owner{nullptr}, variable{variable} {
+symbol::symbol(const std::string& name, ast* decl, const symbol_variable& variable) 
+    : tt{symbol_type::VARIABLE}, name{name}, owner{nullptr}, decl{decl}, variable{variable} {
         
 }
 
-symbol::symbol(const std::string& name, const symbol_overload& overload) 
-    : tt{symbol_type::OVERLOAD}, name{name}, owner{nullptr}, overload{overload} {
+symbol::symbol(const std::string& name, ast* decl, const symbol_overload& overload) 
+    : tt{symbol_type::OVERLOAD}, name{name}, owner{nullptr}, decl{decl}, overload{overload} {
     
 }
 
-symbol::symbol(const std::string& name, const symbol_namespace& ns) 
-    : tt{symbol_type::NAMESPACE}, name{name}, owner{nullptr}, namespace_{ns} {
+symbol::symbol(const std::string& name, ast* decl, const symbol_namespace& ns) 
+    : tt{symbol_type::NAMESPACE}, name{name}, owner{nullptr}, decl{decl}, namespace_{ns} {
     
 }
 
-symbol::symbol(const std::string& name, const symbol_module& mod) 
-    : tt{symbol_type::MODULE}, name{name}, owner{nullptr}, mod{mod} {
+symbol::symbol(const std::string& name, ast* decl, const symbol_module& mod) 
+    : tt{symbol_type::MODULE}, name{name}, owner{nullptr}, decl{decl}, mod{mod} {
     
 }
 
-symbol::symbol(const std::string& name, const symbol_label& label) 
-    : tt{symbol_type::LABEL}, name{name}, owner{nullptr}, label{label} {
+symbol::symbol(const std::string& name, ast* decl, const symbol_label& label) 
+    : tt{symbol_type::LABEL}, name{name}, owner{nullptr}, decl{decl}, label{label} {
     
 }
 
@@ -172,16 +173,26 @@ symbol* symbol_table::add_borrowed(const std::string& name, symbol* sym) {
     }
 }
 
-symbol* symbol_table::add_undefined(const std::string& name, type* t) {
-    return add(name, new symbol(name, symbol_variable{t, nullptr, make_child(), false, true, false, false, false, false}));
+symbol* symbol_table::add_unnamed(type* t, ast* decl, bool defined, bool compiletime, bool reference, bool thisarg, bool member) {
+    return add_anonymous(new symbol(ss::get() << ":" << anonymous.size() << ss::end(), decl, 
+                                    symbol_variable{t, nullptr, nullptr, defined, compiletime, reference, false, false, thisarg, member}));
 }
 
-symbol* symbol_table::add_primitive(const std::string& name, type* t, ast* value, bool defined, bool compiletime, bool reference) {
-    return add(name, new symbol(name, symbol_variable{t, value, make_child(), defined, compiletime, reference, false, false, false}));
+symbol* symbol_table::add_undefined(const std::string& name, type* t, ast* decl) {
+    return add(name, new symbol(name, decl, symbol_variable{t, nullptr, nullptr, false, true, false}));
 }
 
-symbol* symbol_table::add_type(const std::string& name, type* t, ast* value, symbol_table* st) {
-    return add(name, new symbol(name, symbol_variable{t, value, st, true, true, false, false, false, false}));
+symbol* symbol_table::make_and_add_placeholder(const std::string& name, type* t, ast* decl) {
+    add_undefined(name, t, decl); // TODO Does this work?
+    return new symbol{name, decl, symbol_variable{t, nullptr, nullptr, false, true, false}};
+}
+
+symbol* symbol_table::add_primitive(const std::string& name, type* t, ast* decl, ast* value, bool defined, bool compiletime, bool reference, bool thisarg, bool member) {
+    return add(name, new symbol(name, decl, symbol_variable{t, value, nullptr, defined, compiletime, reference, false, false, thisarg, member}));
+}
+
+symbol* symbol_table::add_type(const std::string& name, type* t, ast* decl, ast* value, symbol_table* st) {
+    return add(name, new symbol(name, decl, symbol_variable{t, value, st, true, true, false}));
 }
 
 // symbol* symbol_table::add_function(const std::string& name, type* t, ast* value, symbol_table* st) {
@@ -243,16 +254,17 @@ symbol* symbol_table::add_type(const std::string& name, type* t, ast* value, sym
 //     }
 // }
 
-symbol* symbol_table::add_namespace(const std::string& name) {
-    return add(name, new symbol(name, symbol_namespace{make_child()}));
+symbol* symbol_table::add_namespace(const std::string& name, ast* decl) {
+    return add(name, new symbol(name, decl, symbol_namespace{make_child()}));
 }
 
-symbol* symbol_table::add_module(const std::string& name, nnmodule* mod) {
-    return add(name, new symbol(name, symbol_module{mod}));
+symbol* symbol_table::add_module(const std::string& name, ast* decl, nnmodule* mod) {
+    return add(name, new symbol(name, decl, symbol_module{mod}));
 }
 
-symbol* symbol_table::add_label(const std::string& name) {
-    return add(name, new symbol(name, symbol_label{}));
+symbol* symbol_table::add_label(const std::string& name, ast* decl)
+{
+    return add(name, new symbol(name, decl, symbol_label{}));
 }
 
 symbol* symbol_table::make_overload(const std::string& name) {
@@ -278,7 +290,7 @@ symbol* symbol_table::make_overload(const std::string& name) {
             
                 symbols.erase(it);
                 anonymous.push_back(sym);
-                symbol* ol = symbols[name] = new symbol{name, symbol_overload{}};
+                symbol* ol = symbols[name] = new symbol{name, nullptr, symbol_overload{}};
                 ol->owner = this;
                 ol->overload.syms.push_back(sym);
                 
@@ -291,7 +303,7 @@ symbol* symbol_table::make_overload(const std::string& name) {
                 
                 return ol;
             } else {
-                symbol* ol = symbols[name] = new symbol{name, symbol_overload{}};
+                symbol* ol = symbols[name] = new symbol{name, nullptr, symbol_overload{}};
                 ol->owner = this;
                 ol->overload.syms.push_back(sym);
                 

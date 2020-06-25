@@ -35,41 +35,49 @@ type_table::type_table() {
 
 type* type_table::add_primitive(const type_primitive& p, const bool _const, const bool volat) {
     type t {*this, types.size(), p, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
 type* type_table::add_pointer(const type_pointer& p, const bool _const, const bool volat) {
     type t {*this, types.size(), p, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
 type* type_table::add_array(const type_array& a, const bool _const, const bool volat) {
     type t {*this, types.size(), a, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
 type* type_table::add_compound(const type_compound& c, const bool _const, const bool volat) {
     type t {*this, types.size(), c, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
 type* type_table::add_supercompound(const type_supercompound& sc, type_type sct, const bool _const, const bool volat) {
     type t {*this, types.size(), sct, sc, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
 type* type_table::add_function(const type_function& f, const bool _const, const bool volat) {
     type t {*this, types.size(), f, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
 type* type_table::add_superfunction(const type_superfunction& sf, const bool _const, const bool volat) {
     type t {*this, types.size(), sf, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
 type* type_table::add_special(const type_special& s, const bool _const, const bool volat) {
     type t {*this, types.size(), s, _const, volat};
+    t.set_size();
     return get_or_add(&t);
 }
 
@@ -154,6 +162,7 @@ union param_flags {
         u8 reference : 1;
         u8 spread : 1;
         u8 generic : 1;
+        u8 binding : 1;
         u8 thisarg : 1;
     };
 };
@@ -315,6 +324,7 @@ std::string type_table::mangle(type* t) {
                 p.reference = tt.generic;
                 p.spread = tt.spread;
                 p.generic = tt.generic;
+                p.binding = tt.binding;
                 p.thisarg = tt.thisarg;
                 pflags.push_back(p);
             }
@@ -425,7 +435,7 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
                 ASSERT(tt[as_t[2 + i]], "Type id pointed nowhere");
                 param_flags flgs{(u8) (d[byte] & 0x1F)};
                 params.push_back(
-                    {tt[as_t[2 + i]], flgs.compiletime, flgs.reference, flgs.spread, flgs.generic, flgs.thisarg}
+                    {tt[as_t[2 + i]], flgs.compiletime, flgs.reference, flgs.spread, flgs.generic, flgs.binding, flgs.thisarg}
                 );
                 ++byte;
             }

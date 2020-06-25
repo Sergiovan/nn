@@ -14,12 +14,11 @@ Check [ROADMAP.md](ROADMAP.md) to see what's coming.
 
 ## Progress
 * Spec: Always in progress.
-* Lexer: First version.
-* Parser: In progress.
-    * Token to AST pass: First version.
-    * Types and Symbol Table pass: In progress.
-    * Constant propagation pass: In progress.
-* AST executor: Not started
-* IR Generator: Delayed indefinitely.
-* IR Optimizer: Delayed indefinitely. 
-* Assembler: Delayed indefinitely.
+* Compiler: In progress.
+    * File parser: First version.
+    * Ast compiler: In progress.
+    * Ast executor: Not started.
+    * LLVM: Not started.
+    * IR Generator: Delayed indefinitely.
+    * IR Optimizer: Delayed indefinitely. 
+    * Assembler: Delayed indefinitely.

@@ -58,8 +58,8 @@ struct type_compound {
 
 struct type_supercompound {
     type* comp;
-    u8 generic : 1;
-    u8 generated : 1;
+    bool generic {false};
+    bool generated {false};
     symbol_table* st{nullptr};
 };
 
@@ -69,6 +69,7 @@ struct param {
     u8 reference : 1;
     u8 spread : 1;
     u8 generic : 1;
+    u8 binding : 1;
     u8 thisarg : 1;
 };
 
@@ -86,7 +87,7 @@ struct type_function {
 
 struct param_info {
     std::string name;
-    u8 defaulted : 1;
+    bool defaulted {false};
     ast* value{nullptr};
 };
 
@@ -94,7 +95,7 @@ struct ret_info {
     std::string name;
 };
 
-struct type_superfunction {
+struct type_superfunction { // TODO Add extra data, like captures and stuff
     type* function;
     std::vector<param_info> params;
     std::vector<ret_info> rets;
@@ -112,6 +113,10 @@ struct type {
     
     u8 const_flag : 1;
     u8 volat_flag : 1;
+    u8 sized : 1;
+    
+    u64 size{0};
+    
     
     union {
         type_primitive primitive;
@@ -144,6 +149,8 @@ struct type {
     bool is_special(special_type tt);
     
     type* get_underlying();
+    
+    bool set_size();
     
     type(type_table& tt, u64 id, const type_primitive& primitive, bool _const, bool volat);
     type(type_table& tt, u64 id, const type_pointer& pointer, bool _const, bool volat);

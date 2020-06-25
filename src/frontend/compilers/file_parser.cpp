@@ -1,4 +1,4 @@
-#include "frontend/parser_passes/token_to_ast_pass.h"
+#include "frontend/compilers/file_parser.h"
 
 #include <cmath>
 #include <cstring>
@@ -6,9 +6,9 @@
 #include "common/util.h"
 #include "common/logger.h"
 
-using pass = token_to_ast_pass;
+using pass = file_parser;
 
-pass::token_to_ast_pass(parser& p, nnmodule& mod) : p{p}, mod{mod}, tt{mod.tt} {
+pass::file_parser(compiler& p, nnmodule& mod) : comp{p}, mod{mod}, tt{mod.tt} {
     using namespace grammar;
     
     constexpr std::array<grammar::symbol, 16> pre {{
@@ -927,7 +927,7 @@ ast* pass::forstmt() {
     ast* ret = ast::make_binary({grammar::KW_FOR}, tok, tt.TYPELESS);
     ast* decl{nullptr};
     if (is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_REF) || require_keyword(grammar::KW_VAR)) {
-        decl = vardecl();
+        decl = vardecl(true);
     } else {
         // TODO err
         decl = make_error_ast(c);
@@ -1293,9 +1293,9 @@ ast* pass::importstmt() {
     
     if (fs::exists(imprt)) {
         std::string abs = fs::absolute(imprt);
-        nnmodule* m = p.get(abs);
+        nnmodule* m = comp.get(abs);
         if (!m) {
-            p.parse_file_task(abs, &mod);
+            comp.parse_file_task(abs, &mod);
         } else if (m == &mod) {
             mod.errors.push_back({ret, ss::get() << "Cannot import self" << ss::end()});
         }
@@ -1435,17 +1435,30 @@ ast* pass::namespacescope() {
 ast* pass::_type() {
     token* tok = c;
     ast* t = expression();
-    return ast::make_unary({grammar::COLON, t}, tok, tt.TYPE);
+    ast* ret = ast::make_unary({grammar::COLON, t}, tok, tt.TYPE);
+    ret->compiled = t->compiled; // If it's trivial, this is also just that
+    return ret;
 }
 
-ast* pass::inferrable_type() {
+ast* pass::inferrable_type(bool* is_infer) {
     token* tok = c;
     
     if (is_keyword(grammar::KW_INFER)) {
-        return ast::make_unary({grammar::COLON, ast::make_nntype({tt.INFER}, c, tt.INFER)}, c, tt.TYPE);
+        next(); // infer
+        ast* ret = ast::make_unary({grammar::COLON, ast::make_nntype({tt.INFER}, tok, tt.INFER)}, c, tt.TYPE);
+        ret->compiled = ret->unary.node;
+        if (is_infer) {
+            *is_infer = true;
+        }
+        return ret;
     } else {
         ast* t = expression();
-        return ast::make_unary({grammar::COLON, t}, tok, tt.TYPE);
+        ast* ret = ast::make_unary({grammar::COLON, t}, tok, tt.TYPE);
+        ret->compiled = t->compiled; // Same as above
+        if (is_infer) {
+            *is_infer = false;
+        }
+        return ret;
     }
 }
 
@@ -1520,12 +1533,12 @@ ast* pass::maybe_identifier() {
     }
 }
 
-ast* pass::vardecl() {
+ast* pass::vardecl(bool special) {
     if (is_keyword(grammar::KW_VAR) || is_keyword(grammar::KW_LET) || is_keyword(grammar::KW_REF)) {
         token* tok = next();
         grammar::symbol sym = (grammar::symbol) tok->value; // var let ref
         
-        return ast::make_unary({sym, simplevardecl()}, tok, tt.TYPELESS);
+        return ast::make_unary({sym, simplevardecl(special)}, tok, tt.TYPELESS);
         
     } else {
         ASSERT(false, "Expected 'var', 'let' or 'ref'");
@@ -1533,54 +1546,95 @@ ast* pass::vardecl() {
     }
 }
 
-ast* pass::simplevardecl() {
+ast* pass::simplevardecl(bool special) {
     ast* ret = ast::make_binary({grammar::KW_DEF}, c, tt.TYPELESS);
-    ast* left = ret->binary.left = ast::make_block({}, c, tt.TYPELESS); 
+    ast* left = ret->binary.left = ast::make_block({}, c, tt.TYPELESS);
+    bool any_infer{false}, named{false}, typed{false};
     do {
         left->block.elems.push_back(
             ast::make_binary({grammar::KW_DEF, ast::make_block({}, c, tt.TYPELESS)}, c, tt.TYPELESS)
         );
         ast* group = left->block.elems.tail;
         ast* block = group->binary.left;
+        named = false;
+        typed = false;
         do {
             if (is(token_type::IDENTIFIER)) {
                 block->block.elems.push_back(identifier());
+                named = true;
             } else if (is_keyword(grammar::KW_PLACEHOLDER)) {
                 token* tok = next(); // _
                 block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, tok, tt.TYPELESS));
+                named = true;
             } else if (is_symbol(grammar::COLON)) {
+                bool is_infer{false};
                 token* tok = next(); // :
-                group->binary.right = inferrable_type();
+                group->binary.right = inferrable_type(&is_infer);
                 group->binary.right->unary.sym = grammar::COLON;
                 group->binary.right->tok = tok;
+                typed = true;
+                any_infer = is_infer;
                 break;
             } else if (is_symbol(grammar::ASSIGN)) {
                 token* tok = c;
                 group->binary.right = ast::make_unary({grammar::COLON, 
                     ast::make_nntype({tt.INFER}, tok, tt.TYPE)}, tok, tt.TYPELESS);
+                if (!named && !typed) {
+                    // TODO error
+                    ast* err = make_error_ast(c);
+                    block->block.at_end.push_back(err);
+                    mod.errors.push_back({err, "Cannot assign to unnamed untyped variable(s)"});
+                }
+                typed = true;
+                any_infer = true;
                 goto out_while;
             } else {
+                // TODO Semicolon error
                 require_symbol(grammar::COMMA);
                 block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS));
             }
         } while (is_symbol(grammar::COMMA) && next()); // ,
         
         if (is_symbol(grammar::COLON)) {
-            next(); // :
-            group->binary.right = inferrable_type();
-        } else {
+            bool is_infer{false};
+            token* colon = next(); // :
+            ast* typ = inferrable_type(&is_infer);
+            if (!typed) {
+                group->binary.right = typ;
+                typed = true;
+                any_infer = is_infer;
+            } else {
+                ast* err = make_error_ast(colon);
+                block->block.at_end.push_back(err);
+                mod.errors.push_back({err, "Already gave a type"});
+            }
+        } else if (!typed) {
             group->binary.right = ast::make_unary({grammar::COLON, 
                 ast::make_nntype({tt.INFER}, c, tt.TYPE)}, c, tt.TYPELESS);
+            typed = true;
+            any_infer = true;
+            if (!named) {
+                ast* err = make_error_ast(c);
+                block->block.at_end.push_back(err);
+                mod.errors.push_back({err, "Unnamed untyped variable"});
+            }
         }
         // We're here after a type, but there could be more shit
     } while (is_symbol(grammar::COMMA) && next()); // ,
     
     out_while:
     
+    // TODO Extra colon error
+    
     if (is_symbol(grammar::ASSIGN)) {
         ret->binary.right = assignment();
     } else {
         ret->binary.right = ast::make_none({}, c, tt.TYPELESS);
+        if (any_infer && !special) {
+            ast* err = make_error_ast(c);
+            left->block.at_end.push_back(err);
+            mod.errors.push_back({err, "Must assign to inferred types"});
+        }
     }
     
     return ret;
@@ -1836,7 +1890,13 @@ ast* pass::funcparam() {
         ast* first = expression();
         
         if (is_symbol(grammar::DCOLON) || is_symbol(grammar::COLON)) {
+            
             left->binary.left = first; // It's the name
+            if (first->tt != ast_type::IDENTIFIER) {
+                // TODO err
+                mod.errors.push_back({first, "Paramter name must be an identifier"});
+            } 
+            
             right->binary.sym = (grammar::symbol) next()->value; // ::
         } else {
             left->binary.left = ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS);
@@ -1904,6 +1964,12 @@ ast* pass::funcret(bool let) {
             
             if (is_symbol(grammar::COLON)) {
                 ret->binary.left = first;
+                
+                if (first->tt != ast_type::IDENTIFIER) {
+                    // TODO err
+                    mod.errors.push_back({first, "Return name must be an identifier"});
+                } 
+                
             } else {
                 ret->binary.left = ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS);
                 ret->binary.right = first;
@@ -1995,42 +2061,78 @@ ast* pass::structvardecl() {
     token* tok = next(); // var let ref
     
     ast* vardecl = ast::make_binary({grammar::KW_DEF}, tok, tt.TYPELESS);
-    ast* left = vardecl->binary.left = ast::make_block({}, tok, tt.TYPELESS); 
+    ast* left = vardecl->binary.left = ast::make_block({}, tok, tt.TYPELESS);
+    bool any_infer{false}, named{false}, typed{false};
     do {
         left->block.elems.push_back(
             ast::make_binary({grammar::KW_DEF, ast::make_block({}, c, tt.TYPELESS)}, c, tt.TYPELESS)
         );
         ast* group = left->block.elems.tail;
         ast* block = group->binary.left;
+        named = false;
+        typed = false;
         do {
             if (is(token_type::IDENTIFIER)) {
                 block->block.elems.push_back(identifier());
+                named = true;
             } else if (is_keyword(grammar::KW_PLACEHOLDER)) {
                 token* tok = next(); // _
                 block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, tok, tt.TYPELESS));
+                named = true;
             } else if (is_symbol(grammar::COLON) || is_symbol(grammar::DCOLON)) {
+                bool is_infer{false};
                 token* tok = next(); // : ::
-                group->binary.right = _type();
+                group->binary.right = inferrable_type(&is_infer);
                 group->binary.right->unary.sym = (grammar::symbol) tok->value;
                 group->binary.right->tok = tok;
+                typed = true;
+                any_infer = is_infer; // TODO DCOLON + INFER error
                 break;
             } else if (is_symbol(grammar::ASSIGN)) {
                 token* tok = c;
                 group->binary.right = ast::make_unary({grammar::COLON, 
                     ast::make_nntype({tt.INFER}, tok, tt.TYPE)}, tok, tt.TYPELESS);
+                if (!named && !typed) {
+                    // TODO error
+                    ast* err = make_error_ast(c);
+                    block->block.at_end.push_back(err);
+                    mod.errors.push_back({err, "Cannot assign to unnamed untyped variable(s)"});
+                }
+                typed = true;
+                any_infer = true;
                 goto out_while;
             } else {
+                // TODO Semicolon error
                 require_symbol(grammar::COMMA);
                 block->block.elems.push_back(ast::make_zero({grammar::KW_PLACEHOLDER}, c, tt.TYPELESS));
             }
         } while (is_symbol(grammar::COMMA) && next()); // ,
         
         if (is_symbol(grammar::COLON) || is_symbol(grammar::DCOLON)) {
+            bool is_infer{false};
             token* tok = next(); // : ::
-            group->binary.right = _type();
-            group->binary.right->unary.sym = (grammar::symbol) tok->value;
-            group->binary.right->tok = tok;
-            break;
+            ast* typ = inferrable_type(&is_infer);
+            if (!typed) {
+                group->binary.right = typ;
+                group->binary.right->unary.sym = (grammar::symbol) tok->value;
+                group->binary.right->tok = tok;
+                typed = true;
+                any_infer = is_infer;
+            } else {
+                ast* err = make_error_ast(tok);
+                block->block.at_end.push_back(err);
+                mod.errors.push_back({err, "Already gave a type"});
+            }
+        } else if (!typed) {
+            group->binary.right = ast::make_unary({grammar::COLON, 
+                ast::make_nntype({tt.INFER}, c, tt.TYPE)}, c, tt.TYPELESS);
+            typed = true;
+            any_infer = true;
+            if (!named) {
+                ast* err = make_error_ast(c);
+                block->block.at_end.push_back(err);
+                mod.errors.push_back({err, "Unnamed untyped variable"});
+            }
         }
         
         // We're here after a type, but there could be more shit
@@ -2042,6 +2144,11 @@ ast* pass::structvardecl() {
         vardecl->binary.right = assignment();
     } else {
         vardecl->binary.right = ast::make_none({}, c, tt.TYPELESS);
+        if (any_infer) {
+            ast* err = make_error_ast(c);
+            left->block.at_end.push_back(err);
+            mod.errors.push_back({err, "Must assign to inferred types"});
+        }
     }
     
     return vardecl;
@@ -2968,8 +3075,9 @@ ast* pass::identifierexpr() {
 ast* pass::parenexpr() {
     ASSERT(is_symbol(grammar::OPAREN), "Expected (");
     token* tok = next(); // (
-    ast* ret = ast::make_unary({grammar::CPAREN, expression()}, tok, tt.NONE);
-    
+    ast* exp = expression();
+    ast* ret = ast::make_unary({grammar::CPAREN, exp}, tok, tt.NONE);
+    ret->compiled = exp->compiled;
     // TODO err
     if (require_symbol(grammar::CPAREN)) next(); // )
     

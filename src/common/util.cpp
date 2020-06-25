@@ -185,3 +185,12 @@ u64 read_utf8(const char* c, u8& bytes, u8* plen) {
     
     return *reinterpret_cast<u32*>(chars);
 }
+
+u64 align(u64 offset, u64 to) {
+    ASSERT(to > 0, "Invalid alignment");
+    constexpr std::array<u8, 9> ceil_2{{1, 1, 2, 4, 4, 8, 8, 8, 8}};
+    to = to > 8 ? 8 : to;            // 0  1  2  3  4  5  6  7  8 
+    to = ceil_2[to];
+    u8 rem = offset & (to - 1); // Works because power of 2
+    return offset + ((to - rem) & ~((rem == 0) - 1));
+}

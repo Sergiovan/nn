@@ -11,8 +11,10 @@
 #include "common/defs.h"
 
 #include "common/threading/thread_pool.h"
+#include "common/fibers/fiber_pool.h"
 
 struct ast;
+struct symbol;
 class symbol_table;
 
 enum class pass_type {
@@ -24,7 +26,6 @@ enum class pass_type {
     AST_TO_LLVM,
     AST_TO_IR,
     
-    
     LAST
 };
 
@@ -33,11 +34,11 @@ struct module_error {
     std::string message;
 };
 
-class parser;
+class compiler;
 
 class nnmodule {
 public:
-    nnmodule(parser& p, const std::string& filename);
+    nnmodule(compiler& p, const std::string& filename);
     ~nnmodule();
     
     token_stream ts;
@@ -54,37 +55,49 @@ public:
     
     void add_dependency(nnmodule* dep);
 private:
-    parser& p;
+    compiler& c;
     
     std::mutex lock{};
     std::condition_variable cond{}; // Module activated or deactivated
 };
 
-class parser {
+class compiler {
 public:    
     using promise = thread_pool::promise;
     
-    parser();
-    ~parser();
+    struct parse_ast_args {
+        compiler* c;
+        ast* node;
+        symbol_table* st;
+        symbol* sym;
+    };
     
-    nnmodule* parse(const std::string& filename);
+    compiler();
+    ~compiler();
+    
+    nnmodule* compile(const std::string& filename);
     promise parse_file_task(nnmodule* mod);
     promise parse_file_task(const std::string& filename, nnmodule* from);
-    promise parse_ast_task(ast* node);
+    void compile_ast_task(ast* node, symbol_table* st, symbol* sym);
     
     nnmodule* get();
     nnmodule* get(const std::string& filename);
     nnmodule* get_or_add(const std::string& filename);
 private:
-    
-    // Full parse
-    bool _parse(nnmodule* mod);
+    // Full compile
+    bool compile_file(nnmodule* mod);
+    bool parse_file(nnmodule* mod);
+    bool compile_ast(ast* node, symbol_table* st, symbol* sym);
     
     thread_pool task_manager{8};
+    fiber_pool fiber_manager{};
     
     nnmodule* root{nullptr};
     symbol_table* root_st{nullptr};
     dict<std::string, nnmodule*> modules{};
     
     std::mutex lock{};
+    
+    struct frnd;
+    friend frnd;
 };

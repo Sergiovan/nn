@@ -154,11 +154,18 @@ ast::~ast() {
         default:
             break;
     }
+    
+    if (compiled) {
+        delete compiled;
+    }
 }
 
 ast ast::clone() const {
     ast ret{};
     ret.tt = tt;
+    ret.tok = tok;
+    ret.t = t;
+    
     switch (tt) {
         case ast_type::NONE:
             break;
@@ -189,6 +196,14 @@ ast ast::clone() const {
         case ast_type::IDENTIFIER:
             ret.iden = iden.clone();
             break;
+    }
+    
+    ret.precedence = precedence;
+    ret.inhprecedence = inhprecedence;
+    ret.compiletime = compiletime;
+    
+    if (compiled) {
+        ret.compiled = new ast{compiled->clone()};
     }
     
     return ret;
@@ -242,6 +257,7 @@ ast* ast::make_none(const ast_none& n, token* tok, type* t) {
     ast* ret = new ast{ast_type::NONE, tok, t};
     ret->none = n;
     ret->compiletime = true;
+    ret->compiled = ret;
     return ret;
 }
 
@@ -267,6 +283,7 @@ ast* ast::make_value(const ast_value& v, token* tok, type* t) {
     ast* ret = new ast{ast_type::VALUE, tok, t};
     ret->value = v;
     ret->compiletime = true;
+    ret->compiled = ret;
     return ret;
 }
 
@@ -274,12 +291,14 @@ ast* ast::make_string(const ast_string& s, token* tok, type* t) {
     ast* ret = new ast{ast_type::STRING, tok, t};
     ret->string = s;
     ret->compiletime = true;
+    ret->compiled = ret;
     return ret;
 }
 
 ast* ast::make_compound(const ast_compound& c, token* tok, type* t) {
     ast* ret = new ast{ast_type::COMPOUND, tok, t};
     ret->compound = c;
+    ret->compiled = ret; // TODO Is this correct?
     return ret;
 }
 
@@ -287,6 +306,7 @@ ast* ast::make_nntype(const ast_nntype& t, token* tok, type* typ) {
     ast* ret = new ast{ast_type::TYPE, tok, typ};
     ret->nntype = t;
     ret->compiletime = true;
+    ret->compiled = ret;
     return ret;
 }
 
@@ -299,6 +319,7 @@ ast* ast::make_block(const ast_block& c, token* tok, type* t) {
 ast* ast::make_iden(const ast_iden& i, token* tok, type* t) {
     ast* ret = new ast{ast_type::IDENTIFIER, tok, t};
     ret->iden = i;
+    ret->compiled = ret;
     return ret;
 }
 

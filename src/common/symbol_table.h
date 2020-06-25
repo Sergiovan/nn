@@ -20,18 +20,28 @@ struct symbol_variable {
     ast* value;
     symbol_table* st;
     
-    bool defined : 1;
-    bool compiletime : 1;
-    bool reference : 1;
-    bool modified : 1;
-    bool used : 1;
-    bool this_arg : 1;
+    bool defined;
+    bool compiletime;
+    bool reference;
+    bool modified {false};
+    bool used {false};
+    bool thisarg {false};
+    bool member {false};
+    
+    // Returns
+    bool is_return {false};
+    
+    // Functions only
+    bool infer_ret {false};
+    
+    u64 order{0};
 }; 
 
 struct symbol_overload {
     std::vector<symbol*> syms;
 };
 
+// TODO Merge into variables lazily
 struct symbol_namespace {
     symbol_table* st;
 };
@@ -48,6 +58,7 @@ struct symbol {
     symbol_type tt;
     std::string name;
     symbol_table* owner;
+    ast* decl;
     
     union {
         symbol_variable variable;
@@ -60,12 +71,12 @@ struct symbol {
     symbol();
     symbol(const symbol& o);
     ~symbol();
-    symbol(symbol_type tt, const std::string& name, symbol_table* owner);
-    symbol(const std::string& name, const symbol_variable& variable);
-    symbol(const std::string& name, const symbol_overload& overload);
-    symbol(const std::string& name, const symbol_namespace& ns);
-    symbol(const std::string& name, const symbol_module& mod);
-    symbol(const std::string& name, const symbol_label& label);
+    symbol(symbol_type tt, const std::string& name, symbol_table* owner, ast* decl);
+    symbol(const std::string& name, ast* decl, const symbol_variable& variable);
+    symbol(const std::string& name, ast* decl, const symbol_overload& overload);
+    symbol(const std::string& name, ast* decl, const symbol_namespace& ns);
+    symbol(const std::string& name, ast* decl, const symbol_module& mod);
+    symbol(const std::string& name, ast* decl, const symbol_label& label);
     
     bool is_variable();
     bool is_overload();
@@ -81,21 +92,29 @@ public:
     
     symbol_table* make_child(symbol* owner = nullptr);
     
+    // Only searches this st
     symbol* get(const std::string& name);
+    // Searches parent sts too
     std::pair<symbol_table*, symbol*> find(const std::string& name);
     
     symbol* add(const std::string& name, symbol* sym);
     symbol* add_anonymous(symbol* sym);
     symbol* add_borrowed(const std::string& name, symbol* sym);
     
-    symbol* add_undefined(const std::string& name, type* t); // HAS to be compiletime
-    symbol* add_primitive(const std::string& name, type* t, ast* value, bool defined = true, 
-                          bool compiletime = false, bool reference = false);
-    symbol* add_type(const std::string& name, type* t, ast* value, symbol_table* st);
+    symbol* add_unnamed(type* t, ast* decl, bool defined = true, bool compiletime = false, 
+                        bool reference = false, 
+                        bool thisarg = false, bool member = false); // For counting purposes
+    
+    symbol* add_undefined(const std::string& name, type* t, ast* decl); // HAS to be compiletime
+    symbol* make_and_add_placeholder(const std::string& name, type* t, ast* decl); // Also has to be compiletime
+    symbol* add_primitive(const std::string& name, type* t, ast* decl, ast* value, bool defined = true, 
+                          bool compiletime = false, bool reference = false, bool thisarg = false, 
+                          bool member = false);
+    symbol* add_type(const std::string& name, type* t, ast* decl, ast* value, symbol_table* st);
 //     symbol* add_function(const std::string& name, type* t, ast* value, symbol_table* st); // Overloadable
-    symbol* add_namespace(const std::string& name);
-    symbol* add_module(const std::string& name, nnmodule* mod);
-    symbol* add_label(const std::string& name);
+    symbol* add_namespace(const std::string& name, ast* decl);
+    symbol* add_module(const std::string& name, ast* decl, nnmodule* mod);
+    symbol* add_label(const std::string& name, ast* decl);
     
     symbol* make_overload(const std::string& name);
     

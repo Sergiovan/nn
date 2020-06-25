@@ -113,6 +113,8 @@ struct ast : public list_node<ast> {
     
     bool compiletime{false}; // The value of this is known at compiletime
     
+    ast* compiled{nullptr};
+    
     ast();
     ast(ast_type tt, token* tok, type* t);
     ~ast();

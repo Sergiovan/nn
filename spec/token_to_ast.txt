@@ -233,7 +233,7 @@ paramtype => N/A
 rettype => N/A
 
 declstmt => defstmt|vardecl
-defstmt => unary(def, funcdef|structtypelitdef|uniontypelitdef|enumtypelitdef|tupletypelitdef)
+defstmt => unary(def, funcdef|structtypelitdef|uniontypelitdef|enumtypelitdef|tupletypelitdef, t=TYPELESS)
 
 maybe_identifier => identifier|zero(placeholder)
 
@@ -263,7 +263,7 @@ param => binary(var|let|ref,
 )
 return => binary(var|let|ref, (name?) maybe_identifier|expression[identifier], (type) inferrable_type)
 
-structtypelitdef => binary(struct, (name) identifier, (body) structscope)
+structtypelitdef => binary(struct, (name) identifier, (body) structscope, t=TYPE)
 
 structscope => block(xs=defstmt|structvardecl)
 structvardecl => binary(def, 
@@ -276,13 +276,13 @@ structvardecl => binary(def,
 
 # Unions should get better
 
-uniontypelitdef => binary(union, (name) identifier, (body) unionscope)
+uniontypelitdef => binary(union, (name) identifier, (body) unionscope, t=TYPE)
 unionscope => block(xs=defstmt|vardecl)
 
-enumtypelitdef => binary(enum, (name) identifier, (body) enumscope)
+enumtypelitdef => binary(enum, (name) identifier, (body) enumscope, t=TYPE)
 enumscope => block(xs=binary(SP_NAMED, (name) identifier, (value?) expression|none))
 
-tupletypelit => binary(tuple, (name?) maybe_identifier, (body) tupletypes)
+tupletypelit => binary(tuple, (name?) maybe_identifier, (body) tupletypes, t=TYPE)
 tupletypelitdef => binary(tuple, (name) identifier, (body) tupletypes)
 tupletypes => block(xs=_type)
 

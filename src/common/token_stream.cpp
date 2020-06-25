@@ -34,23 +34,23 @@ void token_stream::read() {
             ss << "File " << name << " could not be found.";
             push_back(new token {
                 {nullptr, nullptr},
-                .content = ss.str(),
-                .tt = token_type::ERROR,
-                .value = 0,
-                .f = *this,
-                .index = 0,
-                .line = 1,
-                .column = 1
+                ss.str(),
+                token_type::ERROR,
+                0,
+                *this,
+                0,
+                1,
+                1
             });
             push_back(new token {
                 {nullptr, nullptr},
-                .content = "",
-                .tt = token_type::END_OF_FILE,
-                .value = 0,
-                .f = *this,
-                .index = 0,
-                .line = 1,
-                .column = 1
+                "",
+                token_type::END_OF_FILE,
+                0,
+                *this,
+                0,
+                1,
+                1
             });
             return;
         }
@@ -75,13 +75,13 @@ void token_stream::read() {
     
     push_back(new token {
         {nullptr, nullptr},
-        .content = "",
-        .tt = token_type::END_OF_FILE,
-        .value = 0,
-        .f = *this,
-        .index = contentptr,
-        .line = line + 1,
-        .column = 0
+        "",
+        token_type::END_OF_FILE,
+        0,
+        *this,
+        contentptr,
+        1,
+        0
     });
 }
 
@@ -94,13 +94,13 @@ void token_stream::split(token* tok, u64 at) {
     ASSERT(tok->tt != token_type::NEWLINE && tok->tt != token_type::COMMENT, "Illegal split");
     token* ntok = new token {
         {nullptr, nullptr},
-        .content = tok->content.substr(at),
-        .tt = tok->tt,
-        .value = tok->value,
-        .f = *this,
-        .index = tok->index + at,
-        .line = tok->line,
-        .column = tok->column + at
+        tok->content.substr(at),
+        tok->tt,
+        tok->value,
+        *this,
+        tok->index + at,
+        tok->line,
+        tok->column + at
     };
     
     insert_after(ntok, tok);
@@ -207,13 +207,13 @@ void token_stream::read_one() {
             }
             token* t = new token { // Manually to avoid issu
                 {nullptr, nullptr},
-                .content = std::string{buffer, buffer + buffptr},
-                .tt = token_type::COMMENT,
-                .value = 0,
-                .f = *this,
-                .index = start,
-                .line = line,
-                .column = rstart
+                std::string{buffer, buffer + buffptr},
+                token_type::COMMENT,
+                0,
+                *this,
+                start,
+                line,
+                rstart
             };
             push_back(t);
             return;
@@ -712,12 +712,12 @@ void token_stream::add(char c) {
 token* token_stream::create(token_type tt, u64 start, u64 value) {
     return new token {
         {nullptr, nullptr},
-        .content = std::string{buffer, buffer + buffptr},
-        .tt = tt,
-        .value = value,
-        .f = *this,
-        .index = start,
-        .line = line,
-        .column = start - columnstart
+        std::string{buffer, buffer + buffptr},
+        tt,
+        value,
+        *this,
+        start,
+        line,
+        start - columnstart
     };
 }

@@ -56,7 +56,7 @@ tp::promise tp::thread::start(task f, promise pr) {
     current = pr;
     
     active = true;
-    t = std::thread{[=](){
+    t = std::thread{[=, this](){
         bool r = f(current);
         pr->set_value(r);
         

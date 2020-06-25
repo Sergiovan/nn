@@ -3,10 +3,10 @@
 
 #include "common/token_stream.h"
 
-#include "frontend/parser.h"
+#include "frontend/compiler.h"
 #include "common/ast.h"
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv) {    
     std::ios_base::sync_with_stdio(false);
     
     if (argc < 2) {
@@ -16,8 +16,8 @@ int main(int argc, char** argv) {
     
     logger::info() << "Program start";
     
-    parser p{};
-    auto m = p.parse(argv[1]);
+    compiler c{};
+    auto m = c.compile(argv[1]);
     
     logger::info() << "Program end";
     

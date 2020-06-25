@@ -2,6 +2,9 @@
 
 #include <sstream>
 #include <iomanip>
+#include <cmath>
+
+#include "common/util.h"
 
 bool type::is_primitive() {
     return tt == type_type::PRIMITIVE;
@@ -106,46 +109,144 @@ type* type::get_underlying() {
     }
 }
 
+bool type::set_size() {
+    ASSERT(!sized, "Type already had a size");
+    switch (tt) {
+        case type_type::PRIMITIVE:
+            switch (primitive.tt) {
+                case primitive_type::SIGNED: [[fallthrough]];
+                case primitive_type::BOOLEAN: [[fallthrough]];
+                case primitive_type::UNSIGNED: [[fallthrough]];
+                case primitive_type::FLOATING: [[fallthrough]];
+                case primitive_type::CHARACTER: [[fallthrough]];
+                case primitive_type::ERROR: [[fallthrough]];
+                case primitive_type::TYPE: [[fallthrough]];
+                case primitive_type::ANY: 
+                    size = std::ceil((float) primitive.bits / 8.f);
+                    sized = 1;
+                    return true;
+                case primitive_type::VOID:
+                    size = 0;
+                    sized = 1;
+                    return true;
+                default:
+                    ASSERT(false, "Invalid primitive type");
+                    return false;
+            }
+        case type_type::POINTER:
+            size = 8;
+            sized = 1;
+            return true;
+        case type_type::ARRAY:
+            if (array.sized) {
+                if (!array.at->sized && !array.at->set_size()) {
+                    return false;
+                }
+                size = 8 + array.size * array.at->size; // TODO ???
+            } else {
+                size = 16; // Size + data pointer
+            }
+            sized = 1;
+            return true;
+        case type_type::COMPOUND: {
+            u64 buff_size{0};
+            for (auto t : compound.elems) {
+                if (!t->sized && !t->set_size()) {
+                    return false;
+                }
+                buff_size += align(buff_size, t->size) + t->size; // Ignore bits for now...
+            }
+            size = buff_size;
+            sized = 1;
+            return true;
+        }
+        case type_type::STRUCT: [[fallthrough]];
+        case type_type::TUPLE:
+            if (!scompound.comp->sized && !scompound.comp->set_size()) {
+                return false;
+            }
+            size = scompound.comp->size;
+            sized = 1;
+            return true;
+        case type_type::ENUM: 
+            if (!scompound.comp->sized) {
+                scompound.comp->set_size();
+            }
+            size = scompound.comp->size;
+            sized = 1;
+            return true;
+        case type_type::UNION:
+            if (!scompound.comp->sized && !scompound.comp->set_size()) {
+                return false;
+            }
+            sized = 1;
+            for (auto t : compound.elems) {
+                size = size > t->size ? size : t->size;
+            }
+            return true;
+        case type_type::FUNCTION: [[fallthrough]];
+        case type_type::SUPERFUNCTION: 
+            size = 16; // TODO
+            sized = 1;
+            return true;
+        case type_type::SPECIAL:
+            sized = 0;
+            size = 0;
+            return true;
+        default:
+            ASSERT(false, "Invalid type type");
+            return false;
+    }
+}
+
 type::type(type_table& tt, u64 id, const type_primitive& primitive, bool _const, bool volat) 
-: table{tt}, id{id}, tt{type_type::PRIMITIVE}, const_flag{_const}, volat_flag{volat}, primitive{primitive} {
+: table{tt}, id{id}, tt{type_type::PRIMITIVE}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, primitive{primitive} {
     
 }
 
 type::type(type_table& tt, u64 id, const type_pointer& pointer, bool _const, bool volat) 
-: table{tt}, id{id}, tt{type_type::POINTER}, const_flag{_const}, volat_flag{volat}, pointer{pointer} {
+: table{tt}, id{id}, tt{type_type::POINTER}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, pointer{pointer} {
     
 }
 
 type::type(type_table& tt, u64 id, const type_array& array, bool _const, bool volat) 
-: table{tt}, id{id}, tt{type_type::ARRAY}, const_flag{_const}, volat_flag{volat}, array{array} {
+: table{tt}, id{id}, tt{type_type::ARRAY}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, array{array} {
     
 }
 
 type::type(type_table& tt, u64 id, const type_compound& compound, bool _const, bool volat) 
-: table{tt}, id{id}, tt{type_type::COMPOUND}, const_flag{_const}, volat_flag{volat}, compound{compound} {
+: table{tt}, id{id}, tt{type_type::COMPOUND}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, compound{compound} {
     
 }
 
-type::type(type_table& tt, u64 id, type_type ttt, const type_supercompound& scompound, bool _const, bool volat) 
-: table{tt}, id{id}, tt{ttt}, const_flag{_const}, volat_flag{volat}, scompound{scompound} {
+type::type(type_table& tt, u64 id, type_type ttt, const type_supercompound& scompound, 
+           bool _const, bool volat) 
+: table{tt}, id{id}, tt{ttt}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, scompound{scompound} {
     
 }
 
 type::type(type_table& tt, u64 id, const type_function& function, bool _const, bool volat) 
-: table{tt}, id{id}, tt{type_type::FUNCTION}, const_flag{_const}, volat_flag{volat}, function{function} {
+: table{tt}, id{id}, tt{type_type::FUNCTION}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, function{function} {
     
 }
 
 type::type(type_table& tt, u64 id, const type_superfunction& sfunction, bool _const, bool volat) 
-: table{tt}, id{id}, tt{type_type::SUPERFUNCTION}, const_flag{_const}, volat_flag{volat}, sfunction{sfunction} {
+: table{tt}, id{id}, tt{type_type::SUPERFUNCTION}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, sfunction{sfunction} {
     
 }
 
 type::type(type_table& tt, u64 id, const type_special& special, bool _const, bool volat) 
-: table{tt}, id{id}, tt{type_type::SPECIAL}, const_flag{_const}, volat_flag{volat}, special{special} {
+: table{tt}, id{id}, tt{type_type::SPECIAL}, const_flag{_const}, volat_flag{volat}, 
+    sized{0}, size{0}, special{special} {
     
 }
-
 
 type::~type() {
     switch (tt) {
@@ -164,7 +265,8 @@ type::~type() {
 }
 
 type::type(type&& o) 
-: table{o.table}, id{o.id}, tt{o.tt}, const_flag{o.const_flag}, volat_flag{o.volat_flag} {
+: table{o.table}, id{o.id}, tt{o.tt}, const_flag{o.const_flag}, volat_flag{o.volat_flag},
+  sized{o.sized}, size{o.size} {
     switch (tt) {
         case type_type::PRIMITIVE: {
             std::swap(primitive, o.primitive);
@@ -296,7 +398,7 @@ std::string type::to_string(bool simple) {
                 if (p.thisarg) {
                     ss << "this ";
                 }
-                if (p.generic) {
+                if (p.binding) {
                     ss << "::";
                 } else {
                     ss << ":";

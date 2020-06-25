@@ -64,6 +64,25 @@ def struct stuff {
 	}
 }
 
+var a = 1;
+var b, c = 2, 3;
+var d: u8, e = 2, "string";
+# var ;
+# var , ;
+# var , = 1, 2;
+var g: u8 = 1, 2;
+var h: infer = 2;
+
+def struct errs {
+	var a = 1;
+	var b, c = 2, 3;
+	var d: u8, e = 4, "strong";
+	var f = 0;
+	var g: u8, :u8, :u16;
+	var h: infer = 2;
+
+}
+
 def union uname {
 	var a: s32 = 3;
 	var b: f32;

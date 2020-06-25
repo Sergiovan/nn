@@ -38,26 +38,20 @@ cmake-build-debug/
 **/CMakeLists.txt
 nbproject/
 
-proto/__pycache__/
+# IDE
+.kdev4/
+nn.kdev4
 
-proto/venv/
-
-proto/examples/
-
-\.proto2/proto/venv/
-
-\.proto2/proto/__pycache__/
-
-\.proto2/proto/examples/
-
-\.kdev4/
-
-nn
-
-nn\.kdev4
-
+# Output
+/nn
 lobj/
-
 *.generated*
 autogen.mk
+
+# VSCode
 .vscode/
+.vscodeignore
+*.vsix
+
+# npm
+package-lock.json
