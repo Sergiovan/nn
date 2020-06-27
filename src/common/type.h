@@ -81,12 +81,12 @@ struct ret {
 
 // Names and default values are __not__ part of the function type
 struct type_function {
-    std::vector<param> params;
-    std::vector<ret> rets;
+    std::vector<param> params{};
+    std::vector<ret> rets{};
 };
 
 struct param_info {
-    std::string name;
+    std::string name{};
     bool defaulted {false};
     ast* value{nullptr};
 };
@@ -97,8 +97,8 @@ struct ret_info {
 
 struct type_superfunction { // TODO Add extra data, like captures and stuff
     type* function;
-    std::vector<param_info> params;
-    std::vector<ret_info> rets;
+    std::vector<param_info> params{};
+    std::vector<ret_info> rets{};
     symbol_table* st{nullptr};
 };
 

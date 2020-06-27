@@ -14,7 +14,7 @@ ast_compiler::ast_compiler(compiler& c, nnmodule& mod, ast* node)
 void ast_compiler::compile_root(ast* root, symbol_table* st, symbol* sym) {
     switch (root->tt) {
         case ast_type::UNARY:
-            ASSERT(root_node->unary.sym == grammar::KW_DEF, "Only definitions may be directly compiled");
+            ASSERT(root->unary.sym == grammar::KW_DEF, "Only definitions may be directly compiled");
             compile_def(root, st, sym);
             break;
         case ast_type::BLOCK:
@@ -26,9 +26,9 @@ void ast_compiler::compile_root(ast* root, symbol_table* st, symbol* sym) {
 }
 
 void ast_compiler::compile_def(ast* root, symbol_table* st, symbol* sym) {
-    ASSERT(root_node->tt == ast_type::UNARY && root_node->unary.sym == grammar::KW_DEF, "Node was not unary def");
+    ASSERT(root->tt == ast_type::UNARY && root->unary.sym == grammar::KW_DEF, "Node was not unary def");
     
-    ast* def = root_node->unary.node; // typelitdef
+    ast* def = root->unary.node; // typelitdef
     
     if (def->tt == ast_type::BINARY) {
         switch (def->binary.sym) {
@@ -85,7 +85,7 @@ void ast_compiler::compile_def(ast* root, symbol_table* st, symbol* sym) {
                 compile_enum(def->binary.right, sym->variable.st, sym);
                 
                 auto comp = type_supercompound{tt.add_compound(t.compound, false, false)};
-                nntype->nntype.t = tt.add_supercompound(comp, type_type::UNION, false, false);
+                nntype->nntype.t = tt.add_supercompound(comp, type_type::ENUM, false, false);
                 
                 size_loop(nntype->nntype.t);
                 sym->variable.defined = true;
@@ -425,14 +425,19 @@ ast* ast_compiler::get_compiletime_value(ast* node, symbol_table* st, symbol* sy
         default:
             return node;
     }
+    
+    return nullptr;
 }
 
 void ast_compiler::size_loop(type* t) {
     ASSERT(fiber::this_fiber() != nullptr, "Code needs to be called from inside fiber");
     
     u8 tries = 10; // TODO heuristcsss
+    bool stall = false;
     while (--tries && !t->sized && !t->set_size()) {
-        fiber::yield();
+        fiber::yield(stall);
+        stall = true;
+        
     }
     if (!tries) {
         fiber::crash(); // TODO :(
@@ -445,8 +450,10 @@ void ast_compiler::define_loop(symbol* sym) {
     
     
     u8 tries = 10; // TODO heuristcsss
+    bool stall = false;
     while (--tries && !sym->variable.defined) {
-        fiber::yield();
+        fiber::yield(stall);
+        stall = true;
     }
     if (!tries) {
         fiber::crash(); // TODO :(

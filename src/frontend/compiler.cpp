@@ -1,6 +1,7 @@
 #include "frontend/compiler.h"
 
 #include "frontend/compilers/file_parser.h"
+#include "frontend/compilers/ast_compiler.h"
 
 #include "common/logger.h"
 #include "common/util.h"
@@ -47,6 +48,10 @@ compiler::~compiler() {
         ASSERT(m, "Module was null");
         delete m;
     }
+    
+    if (ast_comp) {
+        delete ast_comp;
+    }
 }
 
 nnmodule* compiler::compile(const std::string& filename) {
@@ -58,6 +63,12 @@ nnmodule* compiler::compile(const std::string& filename) {
     
     if (res) {
         logger::info() << "Parsing succeeded"; 
+    }
+    
+    res = compile_ast(mod);
+    
+    if (res) {
+        logger::info() << "Ast compilation succeeded";
     }
     
     return mod;
@@ -155,6 +166,14 @@ bool compiler::parse_file(nnmodule* mod) {
     return true;
 }
 
-bool compiler::compile_ast(ast* node, symbol_table* st, symbol* sym) {
+bool compiler::compile_ast(nnmodule* mod) {
+    ast_comp = new ast_compiler{*this, *mod, mod->root};
     
+    compile_ast_task(mod->root, mod->st, nullptr);
+    
+    return fiber_manager.run();
+}
+
+bool compiler::compile_ast(ast* node, symbol_table* st, symbol* sym) {
+    ast_comp->compile_root(node, st, sym);
 }

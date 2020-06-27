@@ -10,7 +10,7 @@ public:
     static constexpr u32 stack_size = 8 << 10;
     
     static fiber* this_fiber();
-    static bool yield();
+    static bool yield(bool stall = false);
     static bool crash();
     
     fiber();
@@ -22,6 +22,7 @@ public:
     
     bool ready();
     bool running();
+    bool stalled();
     bool callable();
     bool done();
     bool crashed();
@@ -33,7 +34,7 @@ private:
     bool _yield();
     void clean();
     
-    enum {PREINIT, READY, RUNNING, DONE, CRASHED} state{PREINIT};
+    enum {PREINIT, READY, RUNNING, STALLED, DONE, CRASHED} state{PREINIT};
     
     fiber_func fun{nullptr};
     fiber_args args{nullptr};

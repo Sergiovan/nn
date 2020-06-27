@@ -10,10 +10,14 @@ fiber* fiber::this_fiber() {
     return running_fiber;
 }
 
-bool fiber::yield() {
+bool fiber::yield(bool stall) {
     fiber* f = this_fiber();
     ASSERT(f, "Not in a fiber");
     ASSERT(f->state > PREINIT, "Fiber not ready to yield");
+    
+    if (stall) {
+        f->state = STALLED;
+    }
     
     return f->_yield();
 }
@@ -61,6 +65,7 @@ bool fiber::call() {
     
     fiber* prev = this_fiber();
     running_fiber = this;
+    running_fiber->state = RUNNING;
     int res = swapcontext(&from_context, &this_context);
     running_fiber = prev;
     
@@ -93,7 +98,6 @@ bool fiber::crashed() {
 }
 
 void fiber::call_fiber() {
-    running_fiber->state = RUNNING;
     running_fiber->fun(running_fiber->args);
     running_fiber->clean();
 }

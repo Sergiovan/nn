@@ -288,6 +288,8 @@ std::string type_table::mangle(type* t) {
                 ids.push_back(tt->id);
                 max_len = max_len > required[__builtin_clz(tt->id)] ? max_len : required[__builtin_clz(tt->id)];
             }
+            flags.len = max_len;
+            mangled.resize(8 + ids.size() * flags.len);
             add(max_len, ids);
             break;
         }
@@ -336,6 +338,8 @@ std::string type_table::mangle(type* t) {
                 r.reference = tt.reference;
                 rflags.push_back(r);
             }
+            flags.len = max_len;
+            mangled.resize(8 + (flags.len * reservesize) + pflags.size() + ((rflags.size() + 3) / 4));
             add(max_len, ids);
             
             u64 byte = 8 + reservesize;

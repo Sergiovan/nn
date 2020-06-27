@@ -8,7 +8,7 @@ LDLIBS=-lpthread -lstdc++fs
 INCLUDEDIR=$(shell pwd)/src
 INCLUDEFLAGS=$(patsubst %, -I%, $(realpath $(INCLUDEDIR)))
 
-CXXFLAGS =-std=c++2a -Wall -Wextra $(INCLUDEFLAGS)
+CXXFLAGS =-std=c++17 -Wall -Wextra $(INCLUDEFLAGS)
 CXXDFLAGS=-g -O0 -DDEBUG
 CXXRFLAGS=-O2
 

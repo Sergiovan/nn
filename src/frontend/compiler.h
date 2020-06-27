@@ -16,6 +16,7 @@
 struct ast;
 struct symbol;
 class symbol_table;
+class ast_compiler;
 
 enum class pass_type {
     ERROR, 
@@ -87,6 +88,7 @@ private:
     // Full compile
     bool compile_file(nnmodule* mod);
     bool parse_file(nnmodule* mod);
+    bool compile_ast(nnmodule* mod);
     bool compile_ast(ast* node, symbol_table* st, symbol* sym);
     
     thread_pool task_manager{8};
@@ -95,6 +97,7 @@ private:
     nnmodule* root{nullptr};
     symbol_table* root_st{nullptr};
     dict<std::string, nnmodule*> modules{};
+    ast_compiler* ast_comp{nullptr};
     
     std::mutex lock{};
     

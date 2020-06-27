@@ -281,7 +281,6 @@ type::type(type&& o)
             break;
         }
         case type_type::COMPOUND: {
-            compound = type_compound{};
             std::swap(compound, o.compound);
             break;
         }
@@ -293,12 +292,10 @@ type::type(type&& o)
             break;
         }        
         case type_type::FUNCTION: {
-            function = type_function{};
             std::swap(function, o.function);
             break;
         }
         case type_type::SUPERFUNCTION: {
-            sfunction = type_superfunction{};
             std::swap(sfunction, o.sfunction);
             break;
         }
@@ -307,6 +304,7 @@ type::type(type&& o)
             break;
         }
     }
+    o.tt = type_type::SPECIAL; // Call no destructors
 }
 
 std::string type::to_string(bool simple) {
