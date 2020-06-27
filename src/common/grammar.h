@@ -32,6 +32,7 @@ namespace grammar {
         KW_PLACEHOLDER, KW_SIZEOF, KW_TYPEOF, KW_TYPEINFO,
         
         KW_YIELD, KW_MATCH, KW_DYNAMIC, KW_STATIC, KW_AND, KW_OR, 
+        KW_ASM,
         
         
         ADD, SHARED_PTR = ADD, 

@@ -79,6 +79,7 @@ dict<std::string, u64> grammar::string_to_symbol {
     {"static", (u64) symbol::KW_STATIC},
     {"and", (u64) symbol::KW_AND},
     {"or", (u64) symbol::KW_OR},
+    {"asm", (u64) symbol::KW_ASM},
 
     {"+", (u64) symbol::ADD},
     {"-", (u64) symbol::SUB},
