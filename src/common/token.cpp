@@ -2,6 +2,32 @@
 
 #include <iomanip>
 #include "common/token_stream.h"
+#include <sstream>
+
+
+token* token::leftmost(token* a, token* b) {
+    return a->index < b->index ? a : b;
+}
+
+token* token::rightmost(token* a, token* b) {
+    return a->index > b->index ? a : b;
+}
+
+std::string token::text_between(token* a, token* b) {
+    token* first = leftmost(a, b), *last = rightmost(a, b)->next;
+    token* c = first;
+    
+    std::stringstream ss{};
+    
+    while (c != last) {
+        ss << c->content;
+        
+        c = c->next;
+    }
+    
+    return ss.str();
+}
+
 
 std::ostream& operator<<(std::ostream& os, const token_type& tt) {
     switch (tt) {

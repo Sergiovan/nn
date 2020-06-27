@@ -146,6 +146,10 @@ struct ast : public list_node<ast> {
     
     std::string to_simple_string();
     std::string to_string(bool recursive = false, u64 level = 0);
+    token* get_leftmost_token();
+    token* get_rightmost_token();
+    
+    void print_with_context();
 };
 
 std::ostream& operator<<(std::ostream& os, ast_type t);

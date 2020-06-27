@@ -423,6 +423,62 @@ std::string ast::to_string(bool recursive, u64 level) {
     return ss.str();
 }
 
+token* ast::get_leftmost_token() {
+    switch (tt) {
+        case ast_type::NONE: [[fallthrough]];
+        case ast_type::ZERO: [[fallthrough]];
+        case ast_type::VALUE: [[fallthrough]];
+        case ast_type::STRING: [[fallthrough]];
+        case ast_type::TYPE: [[fallthrough]];
+        case ast_type::IDENTIFIER:
+            return tok;
+        case ast_type::UNARY:
+            return token::leftmost(tok, unary.node->get_leftmost_token());
+        case ast_type::BINARY: { 
+            token* ll = binary.left->get_leftmost_token();
+            token* rl = binary.right->get_leftmost_token();
+            return token::leftmost(tok, token::leftmost(ll, rl));
+        }
+        case ast_type::COMPOUND: {
+            token* leftmost = tok;
+            for (auto elem : compound.elems) {
+                leftmost = token::leftmost(leftmost, elem->get_leftmost_token());
+            }
+            return leftmost;
+        }
+        case ast_type::BLOCK:
+            return tok;
+    }
+}
+
+token* ast::get_rightmost_token() {
+    switch (tt) {
+        case ast_type::NONE: [[fallthrough]];
+        case ast_type::ZERO: [[fallthrough]];
+        case ast_type::VALUE: [[fallthrough]];
+        case ast_type::STRING: [[fallthrough]];
+        case ast_type::TYPE: [[fallthrough]];
+        case ast_type::IDENTIFIER:
+            return tok;
+        case ast_type::UNARY:
+            return token::rightmost(tok, unary.node->get_rightmost_token());
+        case ast_type::BINARY:{ 
+            token* lr = binary.left->get_rightmost_token();
+            token* rr = binary.right->get_rightmost_token();
+            return token::rightmost(tok, token::rightmost(lr, rr));
+        }
+        case ast_type::COMPOUND: {
+            token* rightmost = tok;
+            for (auto elem : compound.elems) {
+                rightmost = token::rightmost(rightmost, elem->get_rightmost_token());
+            }
+            return rightmost;
+        }
+        case ast_type::BLOCK:
+            return tok;
+    }
+}
+
 std::ostream& operator<<(std::ostream& os, ast_type t) {
     switch (t) {
         case ast_type::NONE:

@@ -4,6 +4,7 @@
 #include "common/ast.h"
 #include "common/symbol_table.h"
 #include "common/type_table.h"
+#include "common/logger.h"
 
 ast_compiler::ast_compiler(compiler& c, nnmodule& mod, ast* node) 
     : comp{c}, mod{mod}, root_node{node}, tt{mod.tt}, root_st{*mod.st} {
@@ -414,6 +415,8 @@ ast* ast_compiler::get_compiletime_value(ast* node, symbol_table* st, symbol* sy
         return node->compiled;
     }
     
+    logger::error() << "get_compiletime_value() not implemented for " << node->to_simple_string() 
+                    << " ~ " << token::text_between(node->get_leftmost_token(), node->get_rightmost_token());
     ASSERT(false, "Not implemented");
     
     switch (node->tt) {

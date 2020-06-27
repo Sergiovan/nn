@@ -23,6 +23,7 @@ void _logger::print(const logger_instance& instance) {
     std::cout << "[" << std::setfill('0') << std::setw(10) 
               << duration_cast<microseconds>(steady_clock::now() - start).count()
               << "µs]" << " " << instance.ss.str() << "\n";
+    std::cout.flush();
 }
 
 logger_instance::logger_instance(_logger& logger) : logger{logger} {}

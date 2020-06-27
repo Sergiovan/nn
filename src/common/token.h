@@ -29,6 +29,10 @@ struct token : public list_node<token> {
     
     token* alternate_next{nullptr};
     token* alternate_prev{nullptr};
+    
+    static token* leftmost(token* a, token* b);
+    static token* rightmost(token* a, token* b);
+    static std::string text_between(token* a, token* b);
 };
 
 std::ostream& operator<<(std::ostream& os, const token_type& tt);

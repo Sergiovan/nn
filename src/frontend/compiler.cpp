@@ -3,6 +3,7 @@
 #include "frontend/compilers/file_parser.h"
 #include "frontend/compilers/ast_compiler.h"
 
+#include "common/token.h"
 #include "common/logger.h"
 #include "common/util.h"
 #include "common/symbol_table.h"
@@ -27,9 +28,10 @@ nnmodule::~nnmodule() {
 }
 
 void nnmodule::print_errors() {
-    for (auto& [t, e] : errors) {
+    for (auto& [a, e] : errors) {
         logger::error() << e;
-        logger::info() << "@ " << *(t->tok);
+        token* t = a->tok;
+        logger::info() << "@ " << t->line + 1 << ":" << t->column + 1 << " ~ " << token::text_between(a->get_leftmost_token(), a->get_rightmost_token());
     }
 }
 
@@ -117,6 +119,7 @@ struct compiler::frnd {
         bool res = pa->c->compile_ast(pa->node, pa->st, pa->sym);
         if (!res) {
             logger::error() << "Parsing of node " << pa->node->to_simple_string() << " failed";
+            logger::error() << token::text_between(pa->node->get_leftmost_token(), pa->node->get_rightmost_token());
         }
     }
 };
@@ -176,4 +179,5 @@ bool compiler::compile_ast(nnmodule* mod) {
 
 bool compiler::compile_ast(ast* node, symbol_table* st, symbol* sym) {
     ast_comp->compile_root(node, st, sym);
+    return true;
 }
