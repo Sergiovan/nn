@@ -1,0 +1,20 @@
+# Weak casting
+
+`u0` casts to and from nothing
+Nothing can be cast to `---` or `infer`
+Everything else casts to itself (NO-OP)
+Everything except for `null` can be cast to `any` (Makes any object)
+Everything except for `null` and `---` can be cast to `infer` (Type inference, compile-time only)
+Everything except for `type`, `array`, `struct`, `tuple` and `fun` can be cast to `u1` (0, null and empty any are falsy, everything else is truthy)
+Unsigneds can be upcast (NO-OP)
+Signeds can be upcast (NO-OP)
+Characters can be upcast (NO-OP)
+Null can be cast to `ptr`, `uptr` and `sptr` (0 with ptr type)
+
+# Strong casting (In addition to weak casting rules)
+All numbers can be cast to each other (downcasting truncates)
+All charactes can be cast to each other (downcasting truncats)
+Characters, errors, pointers and types can be cast to unsigneds and viceversa. (as-is conversion)
+`any` can be cast to anything (Unboxes value as if it were valid)
+`uptr` can be cast to `ptr` (Takes a copy of the pointer that won't self-destruct)
+`sptr` can be cast to `wptr` and viceversa (sptr->wptr makes a weak pointer, wptr->sptr locks the weak pointer, null if sptr is gone)
