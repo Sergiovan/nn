@@ -32,6 +32,9 @@ public:
     type* array_of(type* t, bool _const = false, bool volat = false);
     type* sized_array_of(type* t, u64 size, bool _const = false, bool volat = false);
     
+    bool can_convert_strong(type* from, type* to);
+    bool can_convert_weak(type* from, type* to);
+    
     type* U0;
     type* U1;
     type* U8;

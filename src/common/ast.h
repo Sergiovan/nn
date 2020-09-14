@@ -119,7 +119,7 @@ struct ast : public list_node<ast> {
     ast(ast_type tt, token* tok, type* t);
     ~ast();
     
-    ast clone() const;
+    ast* clone() const;
     
     bool is_none();
     bool is_zero();

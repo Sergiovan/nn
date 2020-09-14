@@ -16,23 +16,23 @@ enum class symbol_type {
 };
 
 struct symbol_variable {
-    type* t;
-    ast* value;
-    symbol_table* st;
+    type* t; // Variable type
+    ast* value; // Variable default value
+    symbol_table* st; // Variable inner symbol table
     
-    bool defined;
-    bool compiletime;
-    bool reference;
-    bool modified {false};
-    bool used {false};
-    bool thisarg {false};
-    bool member {false};
-    
-    // Returns
-    bool is_return {false};
+    bool defined; // If the variable has been defined yet
+    bool compiletime; // If the variable is always available at compiletime
+    bool reference; // If the variable is a reference
+    bool modified {false}; // If the value of this variable has been modified after initialization
+    bool used {false}; // If the value of this variable has been read or written to after initialization
+    bool thisarg {false}; // If this is this
+    bool member {false}; // If this is a member variable
     
     // Functions only
-    bool infer_ret {false};
+    bool infer_ret {false}; // If the return is entirely inferred
+    // bool add_e64 {false}; // If the return needs to have an e64 added // NOTE Removed, all errors explicit or inferred
+    // Returns
+    bool is_return {false}; // If this is a return variable name
     
     u64 order{0};
 }; 

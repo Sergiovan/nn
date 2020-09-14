@@ -59,7 +59,7 @@ def struct name {
 def struct stuff {
 	ref b: tuple (u8, u8, u8);
 
-	def fun gib(-> ref b: tuple (u8, u8, u8)) {
+	def fun gib(-> ref : tuple (u8, u8, u8)) {
 		return b;
 	}
 }
@@ -94,7 +94,7 @@ def enum cutlery {
 
 $main
 #> #> Yay, comments! <# <#
-def fun main(arg: [][]u8 -> :s32) { 
+def fun main(arg: [][]u8 -> :s32, :e64) { 
 	var arr: []s32 = '[1, 2, 3, 4, 5, 6];
     
 	defer if ~arg > 2 {
@@ -139,7 +139,7 @@ def fun main(arg: [][]u8 -> :s32) {
 	using _c.*;
 	c = TINY_ONE_POINT_FORK;
 
-	def fun bar(-> :s32) {
+	def fun bar(-> :s32, :e64) {
 		raise X_2;
 	}
     

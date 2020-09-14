@@ -77,7 +77,7 @@ nnmodule* compiler::compile(const std::string& filename) {
 }
 
 compiler::promise compiler::parse_file_task(nnmodule* mod) {    
-    auto [_, p] = task_manager.add_task([=](promise s) -> bool {
+    auto [_, p] = task_manager.add_task([=, this](promise s) -> bool {
         if (s->is_stopped()) { 
             return false;
         }
@@ -103,7 +103,7 @@ compiler::promise compiler::parse_file_task(const std::string& filename, nnmodul
         from->add_dependency(mod);
     }
     
-    auto [_, p] = task_manager.add_task([=](promise s) -> bool {
+    auto [_, p] = task_manager.add_task([=, this](promise s) -> bool {
         if (s->is_stopped()) { 
             return false;
         }

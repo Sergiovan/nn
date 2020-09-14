@@ -137,6 +137,86 @@ type* type_table::sized_array_of(type* t, u64 size, bool _const, bool volat) {
     return add_array({t, true, size}, _const, volat);
 }
 
+
+// TODO This should be done with maps/tables, hmm
+bool type_table::can_convert_strong(type* from, type* to) {
+    if (to == U1 && !from->is_compound() && !from->is_function() && from != TYPE) { // Keep an eye on this one
+        return true;
+    }
+    
+    if ((to->is_primitive(primitive_type::SIGNED) || to->is_primitive(primitive_type::UNSIGNED) || to->is_primitive(primitive_type::FLOATING)) &&
+        (from->is_primitive(primitive_type::SIGNED) || from->is_primitive(primitive_type::UNSIGNED) || from->is_primitive(primitive_type::FLOATING))) {
+        return true;
+    }
+    
+    if (to->is_primitive(primitive_type::CHARACTER) && from->is_primitive(primitive_type::CHARACTER)) {
+        return true;
+    }
+    
+    if (to->is_primitive(primitive_type::UNSIGNED) && (from->is_primitive(primitive_type::CHARACTER) || from == E64 || from == TYPE || from->is_pointer())) {
+        return true;
+    }
+    
+    if (from->is_primitive(primitive_type::UNSIGNED) && (to->is_primitive(primitive_type::CHARACTER) || to == E64 || to == TYPE || to->is_pointer())) {
+        return true;
+    }
+    
+    if (from == ANY && to != NOTHING && to != INFER && to != U0) {
+        return true;
+    }
+    
+    if (from->is_pointer() && to->is_pointer(pointer_type::NAKED) && from->pointer.at == to->pointer.at) {
+        return true;
+    }
+    
+    if (((from->is_pointer(pointer_type::SHARED) && to->is_pointer(pointer_type::WEAK)) || 
+        (from->is_pointer(pointer_type::WEAK) && to->is_pointer(pointer_type::SHARED))) && from->pointer.at == to->pointer.at) {
+        return true;
+    }
+    
+    if (from->is_pointer(pointer_type::NAKED) && to->is_pointer(pointer_type::NAKED) && (from->pointer.at == U8 || to->pointer.at == U8)) {
+        return true;
+    }
+    
+    return can_convert_weak(from, to);
+}
+
+bool type_table::can_convert_weak(type* from, type* to) {
+    if (from == to) {
+        return true;
+    }
+    
+    if (from == U0 || to == U0 || to == NOTHING) {
+        return false;
+    }
+    
+    if (to == ANY && from != NULL_) {
+        return true;
+    }
+    
+    if (to == INFER && from != NULL_ && from != NOTHING) {
+        return true;
+    }
+    
+    if (to->is_primitive(primitive_type::UNSIGNED) && from->is_primitive(primitive_type::UNSIGNED) && to->primitive.bits >= from->primitive.bits) {
+        return true;
+    }
+    
+    if (to->is_primitive(primitive_type::SIGNED) && from->is_primitive(primitive_type::SIGNED) && to->primitive.bits >= from->primitive.bits) {
+        return true;
+    }
+    
+    if (to->is_primitive(primitive_type::CHARACTER) && from->is_primitive(primitive_type::CHARACTER) && to->primitive.bits >= from->primitive.bits) {
+        return true;
+    }
+    
+    if (from == NULL_ && to->is_pointer() && !to->is_pointer(pointer_type::WEAK)) {
+        return true;
+    }
+    
+    return false;
+}
+
 type* type_table::add(type* t) {
     type* nt = new type{std::move(*t)};
     nt->id = types.size();
@@ -402,7 +482,7 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
         case type_type::ARRAY: {
             ASSERT(tt[as_t[0]], "Type id pointed nowhere");
             ASSERT(tt[as_t[1]], "Type id pointed nowhere");
-            dest->array = type_array{tt[as_t[1]], tt[as_t[0]], d[sizeof(T) * 2] > 0};
+            dest->array = type_array{tt[as_t[1]], (bool) tt[as_t[0]], d[sizeof(T) * 2] > 0};
             break;
         }
         case type_type::COMPOUND: {

@@ -1149,7 +1149,9 @@ ast* pass::returnstmt() {
     token* tok = next(); // return
     
     ast* ret = ast::make_unary({grammar::KW_RETURN, ast::make_block({}, tok, tt.TYPELESS)}, tok, tt.TYPELESS);
-    if (!is_symbol(grammar::SEMICOLON)) {
+    if (is_keyword(grammar::KW_U0)) {
+        next(); // u0
+    } else if (!is_symbol(grammar::SEMICOLON)) {
         ret->unary.node->block.elems.push_back(expression());
         
         while (is_symbol(grammar::COMMA)) {
@@ -1744,6 +1746,7 @@ ast* pass::funcdef() {
         ret->compound.elems.push_back(make_error_ast(c));
     }
     
+    // TODO Declarations without definitions
     if (require_symbol(grammar::OBRACE)) {
         ret->compound.elems.push_back(scope());
     } else {

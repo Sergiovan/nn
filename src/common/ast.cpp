@@ -18,10 +18,10 @@ void delete_list(list<ast> l) {
 
 list<ast> clone_list(list<ast> l) {
     list<ast> ret;
-    ret.head = ast::make(l.head->clone());
+    ret.head = l.head->clone();
     ast* n = ret.head, *c = l.head;
     while (c->next) {
-        n->next = ast::make(c->next->clone());
+        n->next = c->next->clone();
         n->next->prev = n;
         n = n->next;
         c = c->next;
@@ -45,7 +45,7 @@ void ast_unary::clean() {
 }
 
 ast_unary ast_unary::clone() const {
-    return {sym, ast::make(node->clone()), post};
+    return {sym, node->clone(), post};
 }
 
 void ast_binary::clean() {
@@ -56,7 +56,7 @@ void ast_binary::clean() {
 }
 
 ast_binary ast_binary::clone() const {
-    return {sym, ast::make(left->clone()), ast::make(right->clone())};
+    return {sym, left->clone(), right->clone()};
 }
 
 ast_value ast_value::clone() const {
@@ -155,55 +155,59 @@ ast::~ast() {
             break;
     }
     
-    if (compiled) {
+    if (compiled && compiled != this) {
         delete compiled;
     }
 }
 
-ast ast::clone() const {
-    ast ret{};
-    ret.tt = tt;
-    ret.tok = tok;
-    ret.t = t;
+ast* ast::clone() const {
+    ast* ret = new ast{};
+    ret->tt = tt;
+    ret->tok = tok;
+    ret->t = t;
     
     switch (tt) {
         case ast_type::NONE:
             break;
         case ast_type::ZERO:
-            ret.zero = zero.clone();
+            ret->zero = zero.clone();
             break;
         case ast_type::UNARY:
-            ret.unary = unary.clone();
+            ret->unary = unary.clone();
             break;
         case ast_type::BINARY:
-            ret.binary = binary.clone();
+            ret->binary = binary.clone();
             break;
         case ast_type::VALUE:
-            ret.value = value.clone();
+            ret->value = value.clone();
             break;
         case ast_type::STRING:
-            ret.string = string.clone();
+            ret->string = string.clone();
             break;
         case ast_type::COMPOUND:
-            ret.compound = compound.clone();
+            ret->compound = compound.clone();
             break;
         case ast_type::TYPE:
-            ret.nntype = nntype.clone();
+            ret->nntype = nntype.clone();
             break;
         case ast_type::BLOCK:
-            ret.block = block.clone();
+            ret->block = block.clone();
             break;
         case ast_type::IDENTIFIER:
-            ret.iden = iden.clone();
+            ret->iden = iden.clone();
             break;
     }
     
-    ret.precedence = precedence;
-    ret.inhprecedence = inhprecedence;
-    ret.compiletime = compiletime;
+    ret->precedence = precedence;
+    ret->inhprecedence = inhprecedence;
+    ret->compiletime = compiletime;
     
     if (compiled) {
-        ret.compiled = new ast{compiled->clone()};
+        if (compiled == this) {
+            ret->compiled = ret;
+        } else {
+            ret->compiled = compiled->clone();
+        }
     }
     
     return ret;
@@ -250,7 +254,7 @@ bool ast::is_iden() {
 }
 
 ast* ast::make(const ast& o) {
-    return new ast{o.clone()};
+    return o.clone();
 }
 
 ast* ast::make_none(const ast_none& n, token* tok, type* t) {
@@ -298,7 +302,6 @@ ast* ast::make_string(const ast_string& s, token* tok, type* t) {
 ast* ast::make_compound(const ast_compound& c, token* tok, type* t) {
     ast* ret = new ast{ast_type::COMPOUND, tok, t};
     ret->compound = c;
-    ret->compiled = ret; // TODO Is this correct?
     return ret;
 }
 
@@ -446,7 +449,8 @@ token* ast::get_leftmost_token() {
             }
             return leftmost;
         }
-        case ast_type::BLOCK:
+        case ast_type::BLOCK: [[fallthrough]];
+        default:
             return tok;
     }
 }
@@ -474,7 +478,8 @@ token* ast::get_rightmost_token() {
             }
             return rightmost;
         }
-        case ast_type::BLOCK:
+        case ast_type::BLOCK: [[fallthrough]];
+        default:
             return tok;
     }
 }

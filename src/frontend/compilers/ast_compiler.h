@@ -1,7 +1,7 @@
 #pragma once
 
 class compiler;
-struct nnmodule;
+class nnmodule;
 struct ast;
 struct type;
 class type_table;
@@ -22,6 +22,10 @@ private:
     void compile_block(ast* root, symbol_table* st, symbol* sym, comp_func f);
     
     void compile(ast* node, symbol_table* st, symbol* sym);
+    void compile_zero(ast* node, symbol_table* st, symbol* sym);
+    void compile_unary(ast* node, symbol_table* st, symbol* sym);
+    void compile_binary(ast* node, symbol_table* st, symbol* sym);
+    void compile_compound(ast* node, symbol_table* st, symbol* sym);
     void compile_struct(ast* node, symbol_table* st, symbol* sym);
     void compile_enum(ast* node, symbol_table* st, symbol* sym);
     void compile_tuple(ast* node, symbol_table* st, symbol* sym);
