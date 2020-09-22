@@ -68,6 +68,7 @@ public:
     
     struct parse_ast_args {
         compiler* c;
+        nnmodule* mod;
         ast* node;
         symbol_table* st;
         symbol* sym;
@@ -79,7 +80,7 @@ public:
     nnmodule* compile(const std::string& filename);
     promise parse_file_task(nnmodule* mod);
     promise parse_file_task(const std::string& filename, nnmodule* from);
-    void compile_ast_task(ast* node, symbol_table* st, symbol* sym);
+    void compile_ast_task(nnmodule* mod, ast* node, symbol_table* st, symbol* sym);
     
     nnmodule* get();
     nnmodule* get(const std::string& filename);
@@ -89,7 +90,7 @@ private:
     bool compile_file(nnmodule* mod);
     bool parse_file(nnmodule* mod);
     bool compile_ast(nnmodule* mod);
-    bool compile_ast(ast* node, symbol_table* st, symbol* sym);
+    bool compile_ast(nnmodule* mod, ast* node, symbol_table* st, symbol* sym);
     
     thread_pool task_manager{8};
     fiber_pool fiber_manager{};
@@ -97,7 +98,6 @@ private:
     nnmodule* root{nullptr};
     symbol_table* root_st{nullptr};
     dict<std::string, nnmodule*> modules{};
-    ast_compiler* ast_comp{nullptr};
     
     std::mutex lock{};
     

@@ -140,77 +140,115 @@ type* type_table::sized_array_of(type* t, u64 size, bool _const, bool volat) {
 
 // TODO This should be done with maps/tables, hmm
 bool type_table::can_convert_strong(type* from, type* to) {
+    // All primitives and non-types cast to boolean
     if (to == U1 && !from->is_compound() && !from->is_function() && from != TYPE) { // Keep an eye on this one
         return true;
     }
     
+    // All numbers cast between themselves
     if ((to->is_primitive(primitive_type::SIGNED) || to->is_primitive(primitive_type::UNSIGNED) || to->is_primitive(primitive_type::FLOATING)) &&
         (from->is_primitive(primitive_type::SIGNED) || from->is_primitive(primitive_type::UNSIGNED) || from->is_primitive(primitive_type::FLOATING))) {
         return true;
     }
     
+    // All characters cast between themselves
     if (to->is_primitive(primitive_type::CHARACTER) && from->is_primitive(primitive_type::CHARACTER)) {
         return true;
     }
     
+    // Characters, errors, types and pointers all cast to unsigneds
     if (to->is_primitive(primitive_type::UNSIGNED) && (from->is_primitive(primitive_type::CHARACTER) || from == E64 || from == TYPE || from->is_pointer())) {
         return true;
     }
     
+    // Unsigneds cast to characters, errors, types and pointers
     if (from->is_primitive(primitive_type::UNSIGNED) && (to->is_primitive(primitive_type::CHARACTER) || to == E64 || to == TYPE || to->is_pointer())) {
         return true;
     }
     
+    // ANY casts to anything except NOTHING, INFER and U0
     if (from == ANY && to != NOTHING && to != INFER && to != U0) {
         return true;
     }
     
+    // Pointers cast to naked pointers to the same type
     if (from->is_pointer() && to->is_pointer(pointer_type::NAKED) && from->pointer.at == to->pointer.at) {
         return true;
     }
     
+    // Weak and shared pointers cast between themselves as long as they point to the same type
     if (((from->is_pointer(pointer_type::SHARED) && to->is_pointer(pointer_type::WEAK)) || 
         (from->is_pointer(pointer_type::WEAK) && to->is_pointer(pointer_type::SHARED))) && from->pointer.at == to->pointer.at) {
         return true;
     }
     
+    // Naked pointers can always cast from and to naked pointers to U8
     if (from->is_pointer(pointer_type::NAKED) && to->is_pointer(pointer_type::NAKED) && (from->pointer.at == U8 || to->pointer.at == U8)) {
         return true;
     }
     
+    // Arrays can always cast between themselves as long as they point to the same type
+    if (from->is_array() && to->is_array() && from->array.at == to->array.at) {
+        return true;
+    }
+    
+    // All weak type conversions apply
     return can_convert_weak(from, to);
 }
 
 bool type_table::can_convert_weak(type* from, type* to) {
+    // Everything casts to itself
     if (from == to) {
         return true;
     }
     
+    // GENERIC casts to everything and from everything by default
+    if (from->is_special(special_type::GENERIC) || to->is_special(special_type::GENERIC)) {
+        return true; // TODO ???
+    }
+    
+    // GENERIC_UNKNOWN casts to everything and from everything by default
+    if (from->is_special(special_type::GENERIC_UNKNOWN) || to->is_special(special_type::GENERIC_UNKNOWN)) {
+        return true;
+    }
+    
+    // U0 doesn't cast to anything, and you cannot cast to NOTHING
     if (from == U0 || to == U0 || to == NOTHING) {
         return false;
     }
     
+    // Anything except null casts to ANY
     if (to == ANY && from != NULL_) {
         return true;
     }
     
+    // Anything with a proper type casts to INFER
     if (to == INFER && from != NULL_ && from != NOTHING) {
         return true;
     }
     
+    // Unsigned values upcast
     if (to->is_primitive(primitive_type::UNSIGNED) && from->is_primitive(primitive_type::UNSIGNED) && to->primitive.bits >= from->primitive.bits) {
         return true;
     }
     
+    // Signed values upcast
     if (to->is_primitive(primitive_type::SIGNED) && from->is_primitive(primitive_type::SIGNED) && to->primitive.bits >= from->primitive.bits) {
         return true;
     }
     
+    // Characters upcast
     if (to->is_primitive(primitive_type::CHARACTER) && from->is_primitive(primitive_type::CHARACTER) && to->primitive.bits >= from->primitive.bits) {
         return true;
     }
     
+    // null casts to any pointer except weak
     if (from == NULL_ && to->is_pointer() && !to->is_pointer(pointer_type::WEAK)) {
+        return true;
+    }
+    
+    // Sized arrays cast to unsized arrays
+    if (from->is_array(true) && to->is_array(false) && from->array.at == to->array.at) {
         return true;
     }
     

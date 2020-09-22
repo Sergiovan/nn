@@ -29,9 +29,15 @@ enum class pointer_type : u8 {
 };
 
 enum class special_type : u8 {
-    INFER, GENERIC, NOTHING, TYPELESS, NONE, 
+    INFER, // Becomes whatever type is assigned to it
+    GENERIC, GENERIC_UNKNOWN, // Selected at compiletime. GENERIC_UNKNOWN is the result of operations that use GENERIC inside a generic function or type
+    NOTHING, // Does not initialize to 0
+    TYPELESS, // Has no type
+    NONE, // Has undecided type
     NONE_ARRAY, NONE_STRUCT, NONE_TUPLE,
-    NONE_FUNCTION, NULL_, ERROR_TYPE
+    NONE_FUNCTION, 
+    NULL_, // Null pointer type
+    ERROR_TYPE // Type error
 };
 
 struct type;
@@ -58,8 +64,8 @@ struct type_compound {
 
 struct type_supercompound {
     type* comp;
-    bool generic {false};
-    bool generated {false};
+    bool generic {false}; // Any members are generic
+    bool generated {false}; // Compound type was generated at compiletime by instantiating generic compound
     symbol_table* st{nullptr};
 };
 
@@ -99,6 +105,8 @@ struct type_superfunction { // TODO Add extra data, like captures and stuff
     type* function;
     std::vector<param_info> params{};
     std::vector<ret_info> rets{};
+    bool generic{false}; // Any parameters are generic
+    bool generated{false}; // Function type was created at compile-time by calling generic function
     symbol_table* st{nullptr};
 };
 

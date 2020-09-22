@@ -50,10 +50,6 @@ compiler::~compiler() {
         ASSERT(m, "Module was null");
         delete m;
     }
-    
-    if (ast_comp) {
-        delete ast_comp;
-    }
 }
 
 nnmodule* compiler::compile(const std::string& filename) {
@@ -116,16 +112,17 @@ compiler::promise compiler::parse_file_task(const std::string& filename, nnmodul
 struct compiler::frnd {
     static void parse_ast_wrapper(void* _p) {
         parse_ast_args* pa = (parse_ast_args*) _p;
-        bool res = pa->c->compile_ast(pa->node, pa->st, pa->sym);
+        bool res = pa->c->compile_ast(pa->mod, pa->node, pa->st, pa->sym);
         if (!res) {
             logger::error() << "Parsing of node " << pa->node->to_simple_string() << " failed";
             logger::error() << token::text_between(pa->node->get_leftmost_token(), pa->node->get_rightmost_token());
         }
+        delete pa;
     }
 };
 
-void compiler::compile_ast_task(ast* node, symbol_table* st, symbol* sym) {
-    parse_ast_args* args = new parse_ast_args{this, node, st, sym}; // TODO This leaks
+void compiler::compile_ast_task(nnmodule* mod, ast* node, symbol_table* st, symbol* sym) {
+    parse_ast_args* args = new parse_ast_args{this, mod, node, st, sym}; // Deleted after wrapper is done
     
     fiber_manager.queue_task({compiler::frnd::parse_ast_wrapper, args});
 }
@@ -169,15 +166,14 @@ bool compiler::parse_file(nnmodule* mod) {
     return true;
 }
 
-bool compiler::compile_ast(nnmodule* mod) {
-    ast_comp = new ast_compiler{*this, *mod, mod->root};
-    
-    compile_ast_task(mod->root, mod->st, nullptr);
+bool compiler::compile_ast(nnmodule* mod) {    
+    compile_ast_task(mod, mod->root, mod->st, nullptr);
     
     return fiber_manager.run();
 }
 
-bool compiler::compile_ast(ast* node, symbol_table* st, symbol* sym) {
-    ast_comp->compile_root(node, st, sym);
+bool compiler::compile_ast(nnmodule* mod, ast* node, symbol_table* st, symbol* sym) {
+    auto comp = ast_compiler{*this, *mod, node, st, sym};
+    comp.compile_root();
     return true;
 }

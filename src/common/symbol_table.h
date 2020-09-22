@@ -31,6 +31,7 @@ struct symbol_variable {
     // Functions only
     bool infer_ret {false}; // If the return is entirely inferred
     // bool add_e64 {false}; // If the return needs to have an e64 added // NOTE Removed, all errors explicit or inferred
+    
     // Returns
     bool is_return {false}; // If this is a return variable name
     
