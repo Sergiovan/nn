@@ -19,6 +19,7 @@ struct symbol_variable {
     type* t; // Variable type
     ast* value; // Variable default value
     symbol_table* st; // Variable inner symbol table
+    // For functions: Holds named e64 values and labels
     
     bool defined; // If the variable has been defined yet
     bool compiletime; // If the variable is always available at compiletime
@@ -31,6 +32,7 @@ struct symbol_variable {
     // Functions only
     bool infer_ret {false}; // If the return is entirely inferred
     // bool add_e64 {false}; // If the return needs to have an e64 added // NOTE Removed, all errors explicit or inferred
+    ast* gotos{nullptr};
     
     // Returns
     bool is_return {false}; // If this is a return variable name

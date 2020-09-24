@@ -183,8 +183,9 @@ symbol* symbol_table::add_undefined(const std::string& name, type* t, ast* decl)
 }
 
 symbol* symbol_table::make_and_add_placeholder(const std::string& name, type* t, ast* decl) {
-    add_undefined(name, t, decl); // TODO Does this work?
-    return new symbol{name, decl, symbol_variable{t, nullptr, nullptr, false, true, false}};
+    return add_undefined(name, t, decl); // TODO Does this work?
+    // TODO ???
+    // return new symbol{name, decl, symbol_variable{t, nullptr, nullptr, false, true, false}};
 }
 
 symbol* symbol_table::add_primitive(const std::string& name, type* t, ast* decl, ast* value, bool defined, bool compiletime, bool reference, bool thisarg, bool member) {

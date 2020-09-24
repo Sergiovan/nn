@@ -1,13 +1,16 @@
 #include "frontend/compilers/ast_compiler.h"
 
+#include <algorithm>
+
 #include "frontend/compiler.h"
 #include "common/ast.h"
 #include "common/symbol_table.h"
 #include "common/type_table.h"
 #include "common/logger.h"
+#include "common/util.h"
 
 ast_compiler::ast_compiler(compiler& c, nnmodule& mod, ast* node, symbol_table* st, symbol* sym) 
-    : comp{c}, mod{mod}, root_node{node}, tt{mod.tt}, root_st{*mod.st}, st{*st}, root_sym{sym} {
+    : comp{c}, mod{mod}, root_node{node}, tt{mod.tt}, mod_st{*mod.st}, root_st{*st}, root_sym{sym} {
 
 }
 
@@ -37,8 +40,8 @@ void ast_compiler::compile_def(ast* root) {
             case grammar::KW_STRUCT: { // Structs
                 ASSERT(!def->binary.left->is_zero(), "Name was placeholder"); // TODO Allow placeholder names and anonymous structs
                 // Add undefined symbol with struct name, for fibers fibers fibers
-                auto* sym = st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
-                sym->variable.st = root_st.make_child(sym);
+                auto* sym = root_st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
+                sym->variable.st = mod_st.make_child(sym);
                 
                 // Make a new type for the struct, we'll pass it along to the upcoming compilation functions as-if it were a real type already
                 type t{tt, 0, type_compound{{}}, false, false};
@@ -68,8 +71,8 @@ void ast_compiler::compile_def(ast* root) {
             case grammar::KW_UNION: {
                 // Same as struct, but with unions
                 ASSERT(!def->binary.left->is_zero(), "Name was placeholder");
-                auto* sym = st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
-                sym->variable.st = root_st.make_child(sym);
+                auto* sym = root_st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
+                sym->variable.st = mod_st.make_child(sym);
                 
                 type t{tt, 0, type_compound{{}}, false, false};
                 type_supercompound sc{&t, false, false};
@@ -93,8 +96,8 @@ void ast_compiler::compile_def(ast* root) {
             case grammar::KW_ENUM: {
                 // Same as struct, except the enum block has its own compilation function
                 ASSERT(!def->binary.left->is_zero(), "Name was placeholder");
-                auto* sym = st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
-                sym->variable.st = root_st.make_child(sym);
+                auto* sym = root_st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
+                sym->variable.st = mod_st.make_child(sym);
                 
                 type t{tt, 0, type_compound{{}}, false, false};
                 type_supercompound sc{&t, false, false};
@@ -118,7 +121,7 @@ void ast_compiler::compile_def(ast* root) {
             case grammar::KW_TUPLE: {
                 // Same as struct, except the tuple block has its own compilation function
                 ASSERT(!def->binary.left->is_zero(), "Name was placeholder");
-                auto* sym = st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
+                auto* sym = root_st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
                 sym->variable.st = nullptr;
                 
                 type t{tt, 0, type_compound{{}}, false, false};
@@ -169,25 +172,25 @@ void ast_compiler::compile_def(ast* root) {
         
         // TODO Can be something other than variable?
         if (method) {
-            nsym = st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
+            nsym = root_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
         } else {
             // Non-methods _always_ go in the root ST.
             // TODO fix scoping being the root_st instead of local
-            nsym = root_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
+            nsym = mod_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
         }
         
         // All functions have their own scope, thus their own symbol table
-        symbol_table* ftable = root_st.make_child(nsym);
+        symbol_table* ftable = mod_st.make_child(nsym);
         
         // The internal symbol table is distinct from the inner block symbol table
         // used for e64 values
-        nsym->variable.st = root_st.make_child(nsym);
+        nsym->variable.st = mod_st.make_child(nsym);
         
         // This type will eventually be filled with parameters and other shenanigans
         type t{tt, 0, type_function{}, false, false};
         
         // Actual function type
-        type_superfunction sf{&t, {}, {}, false, false, root_st.make_child()};
+        type_superfunction sf{&t, {}, {}, false, false, mod_st.make_child()};
         
         type sft{tt, 0, sf, false, false};
         
@@ -314,7 +317,7 @@ void ast_compiler::compile_def(ast* root) {
                 // TODO Errors
                 mod.errors.push_back({ctv, "Not a compiletime value"});
                 pt = tt.ERROR_TYPE;
-            } else if (ctv->tt != ast_type::TYPE) {
+            } else if (!ctv->is_nntype()) {
                 // TODO Errors
                 mod.errors.push_back({ctv, "Not a type"});
                 pt = tt.ERROR_TYPE;
@@ -417,8 +420,28 @@ void ast_compiler::compile_def(ast* root) {
         
         ASSERT(body->is_block(), "Function body was not a block");
         
+        // Set up goto fund, for lost gotos
+        nsym->variable.gotos = ast::make_block({}, nullptr, tt.NONE);
+        
         sub_compiler.compile_block(body, &ast_compiler::compile_function); // After this returns entire function is done
         
+        if (nsym->variable.gotos->block.elems.count) {
+            for (auto goto_ast : nsym->variable.gotos->block.elems) {
+                ASSERT(goto_ast->is_unary(), "Goto statement was not unary");
+                ASSERT(goto_ast->unary.node->is_iden(), "Goto value wasn't identifier");
+                auto label = nsym->variable.st->get(goto_ast->unary.node->tok->content);
+                if (!label) {
+                    mod.errors.push_back({goto_ast, "Goto without label"});
+                    continue;
+                }
+                goto_ast->unary.node->iden.s = label;
+            }
+        }
+        
+        nsym->variable.gotos->block.elems.head = nullptr; // These asts are not owned...
+        delete nsym->variable.gotos;
+        nsym->variable.gotos = nullptr;
+    
         if (any_infer) {
             // Check and/or fix inferences
             bool had_error = false;
@@ -454,19 +477,29 @@ void ast_compiler::compile_def(ast* root) {
     }
 }
 
+void ast_compiler::compile_block(ast* root) {
+    compile_block(root, &ast_compiler::compile);
+}
+
 void ast_compiler::compile_block(ast* root, comp_func f) {
     ASSERT(root->tt == ast_type::BLOCK, "Node was not a block");
     
+    bool need_yield = false;
+    
     for (auto node : root->block.elems) {
         if (node->tt == ast_type::UNARY && node->unary.sym == grammar::KW_DEF) {
-            comp.compile_ast_task(&mod, node, &st, root_sym);
+            comp.compile_ast_task(&mod, node, &root_st, root_sym);
+            need_yield = true;
         } 
     }
     
     // We've set all nodes to compile, give them time to add themselves to the symbol table
-    fiber::yield();
+    if (need_yield) {
+        fiber::yield();
+    }
     // Names should not necessarily be complete now, but they're definitely "declared"
     
+    block_node = root;
     for (auto node : root->block.elems) {
         if (node->tt != ast_type::UNARY || node->unary.sym != grammar::KW_DEF) {
             (this->*f)(node);
@@ -501,8 +534,8 @@ void ast_compiler::compile(ast* node) {
             compile_compound(node);
             break;
         case ast_type::BLOCK:
-            ast_compiler sub_compiler{comp, mod, node, st.make_child(), root_sym};
-            sub_compiler.compile_block(node, &ast_compiler::compile);
+            ast_compiler sub_compiler{comp, mod, node, root_st.make_child(), root_sym};
+            sub_compiler.compile_block(node);
             return;
     }
     
@@ -636,7 +669,7 @@ void ast_compiler::compile_unary(ast* node) {
                         mod.errors.push_back({ename, "Value raised was not e64"});
                     }
                 } else {
-                    symbol* e64 = root_sym->variable.st->find(ename->tok->content).second; 
+                    symbol* e64 = root_sym->variable.st->get(ename->tok->content); 
                     if (!e64) {
                         e64 = root_sym->variable.st->add_primitive(ename->tok->content, tt.E64, node, nullptr, true, true);
                     }
@@ -654,27 +687,184 @@ void ast_compiler::compile_unary(ast* node) {
             node->compiled = node;
             break;
         }
+        case grammar::KW_GOTO: {
+            ASSERT(unary.node->is_iden(), "Goto without iden");
+            auto label = root_sym->variable.st->get(unary.node->tok->content);
+            if (!label) {
+                root_sym->variable.gotos->block.elems.push_back(node);
+            } else {
+                unary.node->iden.s = label;
+            }
+            node->compiled = node;
+            break;
+        }
+        case grammar::KW_LABEL: {
+            ASSERT(unary.node->is_iden(), "Label without iden");
+            auto label = root_sym->variable.st->get(unary.node->tok->content);
+            if (label) {
+                mod.errors.push_back({node, "Variable with this name already exists"});
+            } else {
+                root_sym->variable.st->add_label(unary.node->tok->content, node);
+            }
+            node->compiled = node;
+            break;
+        }
+        case grammar::KW_DEFER: {
+            compile(unary.node); // Compile whatever expression this is tbh
+            block_node->block.at_end.push_front(unary.node);
+            node->compiled = node;
+            break;
+        }
+        case grammar::COLON: [[fallthrough]];
+        case grammar::DCOLON : {
+            // Only types?
+            compile(unary.node);
+            node->compiled = unary.node->compiled; // The value of this is just the value of the type
+            node->compile_owned = false;
+            break;
+        }
+        case grammar::KW_VAR: [[fallthrough]];
+        case grammar::KW_LET: [[fallthrough]];
+        case grammar::KW_REF: {
+            ASSERT(unary.node->is_binary(), "Unary node is not a simplevardecl");
+            auto& assignment = unary.node->binary;
+            ASSERT(assignment.left->is_block(), "Declarations were not a block");
+            auto& decls = assignment.left->block;
+            
+            std::vector<symbol*> declared_syms{};
+            std::vector<ast*> values{};
+            
+            for (auto decl_block : decls.elems) {
+                ASSERT(decl_block->is_binary(), "Declaration block was not a name-type binary");
+                ASSERT(decl_block->binary.left->is_block(), "Declaration names were not a block");
+                auto& names = decl_block->binary.left->block;
+                auto block_type_ast = decl_block->binary.right;
+            
+                compile(block_type_ast);
+                ast* ctv = get_compiletime_value(block_type_ast);
+                type* block_type = nullptr;
+                
+                if (!ctv) {
+                    mod.errors.push_back({ctv, "Not a compiletime value"});
+                    block_type = tt.ERROR_TYPE;
+                } else if (!ctv->is_nntype()) {
+                    mod.errors.push_back({ctv, "Not a type"});
+                    block_type = tt.ERROR_TYPE;
+                } else {
+                    block_type = ctv->nntype.t;
+                }
+                
+                for (auto name : names.elems) {
+                    symbol* sym = nullptr;
+                    if (name->is_zero() && name->zero.sym == grammar::KW_PLACEHOLDER) {
+                        sym = root_st.add_unnamed(block_type, decl_block, 
+                                                  false, unary.sym == grammar::KW_LET, 
+                                                  unary.sym == grammar::KW_REF, false, false);
+                    } else {
+                        ASSERT(name->is_iden(), "Name was not an identifier or a placeholder");
+                        sym = new symbol{
+                            name->tok->content, decl_block, symbol_variable{
+                                block_type, nullptr, nullptr, false, 
+                                unary.sym == grammar::KW_LET, 
+                                unary.sym == grammar::KW_REF, 
+                                false, false, false, false
+                            }
+                        }; // Not added here to shadow previous declarations
+                        if (!sym) {
+                            mod.errors.push_back({name, "Variable already exists"});
+                            sym = root_st.get(name->tok->content);
+                        }
+                    }
+                    declared_syms.push_back(sym);
+                }
+            }
+            
+            bool last_is_compound{false};
+            if (!assignment.right->is_none()) {
+                ASSERT(assignment.right->is_block(), "Invalid assignment");
+                // u64 i{0}, j{0};
+                for (auto value : assignment.right->block.elems) {
+                    compile(value);
+                    
+                    type* value_type = value->t;
+                    
+                    if (value_type->is_compound()) {
+                        last_is_compound = true; // TODO Not good enough to prevent value overflow
+                        for (u64 i = 0; i < value_type->compound.elems.size(); ++i) {
+                            ast* selected_value = ast::make_binary({
+                                grammar::OSELECT, value, 
+                                ast::make_value({i}, value->tok, tt.U64)
+                            }, value->tok, value_type->compound.elems[i]);
+                            assignment.right->block.at_end.push_back(selected_value); // This ensures it'll be deleted
+                            values.push_back(selected_value);
+                        }
+                    } else {
+                        last_is_compound = false;
+                        values.push_back(value);
+                    }
+                    // ++i; ++j;
+                }
+            }
+            
+            u64 i = 0;
+            for (; i < declared_syms.size() && i < values.size(); ++i) {
+                if (!tt.can_convert_weak(values[i]->t, declared_syms[i]->variable.t)) {
+                    mod.errors.push_back({values[i], conversion_error(values[i]->t, declared_syms[i]->variable.t)});
+                } else {
+                    declared_syms[i]->variable.value = values[i];
+                    declared_syms[i]->variable.defined = true;
+                }
+            }
+            
+            if (i < declared_syms.size()) { // We ran out of values, zero the rest
+                for (; i < declared_syms.size(); ++i) {
+                    ast* selected_value = ast::make_value({0}, declared_syms[i]->decl->tok, declared_syms[i]->variable.t);
+                    assignment.right->block.at_end.push_back(selected_value);
+                    declared_syms[i]->variable.value = selected_value;
+                    declared_syms[i]->variable.defined = true;
+                }
+            } else if (i < values.size()) { // We ran out of syms, is this allowed?
+                if (!last_is_compound) {
+                    mod.errors.push_back({assignment.right, "Too many values provided"});
+                }
+            }
+            
+            // Everything accounted for, simplify
+            ast* simplified = ast::make_block({}, node->tok, tt.TYPELESS);
+            for (i = 0; i < declared_syms.size(); ++i) {
+                symbol* sym = declared_syms[i];
+                simplified->block.elems.push_back(ast::make_unary({
+                    grammar::KW_DEF, ast::make_iden({
+                        sym
+                    }, sym->decl->tok, sym->variable.t)
+                }, sym->decl->tok, sym->variable.t));
+            }
+            
+            node->compiled = simplified;
+            
+            break;
+        }
     }
 }
 
 void ast_compiler::compile_binary(ast* node) {
-    
+    (void) node;
 }
 
 void ast_compiler::compile_compound(ast* node) {
-    
+    (void) node;
 }
 
 void ast_compiler::compile_struct(ast* node) {
-    
+    (void) node;
 }
 
 void ast_compiler::compile_enum(ast* node) {
-    
+    (void) node;
 }
 
 void ast_compiler::compile_tuple(ast* node) {
-    
+    (void) node;
 }
 
 void ast_compiler::compile_function(ast* node) {
@@ -719,4 +909,9 @@ void ast_compiler::define_loop(symbol* sym) {
         fiber::crash(); // TODO :(
     }
 }
+
+std::string ast_compiler::conversion_error(type* from, type* to) {
+    return ss::get() << "Cannot convert " << from->to_string(true) << " to " << to->to_string(true) << ss::end();
+}
+
 

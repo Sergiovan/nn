@@ -132,6 +132,7 @@ dynamic = "dynamic" ;
 static = "static" ;
 and = "and" ;
 or = "or" ;
+gen = "gen"
 
 operator = (symbol, symbol?, symbol?, symbol? | sizeof | typeof | const | volat) ;
 prefix_operator = [[ Operators that function as pre-unary ]] ;

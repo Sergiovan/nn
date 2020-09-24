@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 class compiler;
 class nnmodule;
 struct ast;
@@ -36,13 +38,17 @@ private:
     void size_loop(type* t);
     void define_loop(symbol* sym);
     
+    std::string conversion_error(type* from, type* to);
+    
     compiler& comp;
     nnmodule& mod;
     
     ast* root_node;
     
     type_table& tt;
+    symbol_table& mod_st;
     symbol_table& root_st;
-    symbol_table& st;
     symbol* root_sym;
+    
+    ast* block_node;
 };

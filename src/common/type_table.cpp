@@ -212,6 +212,11 @@ bool type_table::can_convert_weak(type* from, type* to) {
         return true;
     }
     
+    // ERROR_TYPE propagates without generating extra errors
+    if (from == ERROR_TYPE || to == ERROR_TYPE) {
+        return true;
+    }
+    
     // U0 doesn't cast to anything, and you cannot cast to NOTHING
     if (from == U0 || to == U0 || to == NOTHING) {
         return false;

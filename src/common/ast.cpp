@@ -155,7 +155,7 @@ ast::~ast() {
             break;
     }
     
-    if (compiled && compiled != this) {
+    if (compiled && compiled != this && compile_owned) {
         delete compiled;
     }
 }

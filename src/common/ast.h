@@ -112,6 +112,7 @@ struct ast : public list_node<ast> {
     // Precedence -1 means stop exploring
     
     bool compiletime{false}; // The value of this is known at compiletime
+    bool compile_owned{true}; // This owns the compiled value
     
     ast* compiled{nullptr}; // If compilation results in simplification, it's put in here
     // ast* cvalue{nullptr}; // If compilation results in usable value, it's put in here

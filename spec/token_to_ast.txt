@@ -214,7 +214,7 @@ raisestmt => unary(raise, block(xs={expression, expression[string]}))
 gotostmt => unary(goto, identifier)
 labelstmt => unary(label, identifier)
 
-deferstmt => unary(defer, identifier)
+deferstmt => unary(defer, scopestmt)
 
 breakstmt => zero(break)
 continuestmt => zero(continue)
@@ -241,7 +241,7 @@ vardecl => unary(var|let|ref, simplevardecl)
 simplevardecl => binary(def, 
     (decls) block(xs=binary(def, 
         (names) block(xs=identifier|zero(placeholder)), 
-        (type) inferrable_type|unary(:, nntype(infer, t=type))
+        (type) inferrable_type)
     )), 
     (values) assignment|none
 ) ; Simple my ass
@@ -259,7 +259,7 @@ functypesig => binary(:,
 
 param => binary(var|let|ref, 
     (namevalue) binary(=, (name?) maybe_identifier|expression[identifier], (value?) expression|none), 
-    (type) binary(:|::, (type) _type, (spread) zero(spread)|none)
+    (type) binary(:|::, (type) cexpression[type], (spread) zero(spread)|none)
 )
 return => binary(var|let|ref, (name?) maybe_identifier|expression[identifier], (type) inferrable_type)
 
@@ -269,7 +269,7 @@ structscope => block(xs=defstmt|structvardecl)
 structvardecl => binary(def, 
     (decls) block(xs=binary(def, 
         (names) block(xs=identifier|zero(placeholder)), 
-        (type) _type|unary(:|::, nntype(infer, t=type))
+        (type) unary(:|::, (type) cexpression[type])|unary(:|::, nntype(infer, t=type))
     )), 
     (values) assignment|none
 ) ;

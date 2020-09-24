@@ -1,15 +1,16 @@
-yield keyword: For coroutines
+gen, yield keyword: For coroutines
 
 ===
-def fun generator(-> u64) {
+
+def gen generator(-> u64) {
     var i = 0;
     while true {
         yield i++;
     }
 }
 
-var gen = generator();
-print("{} {} {} {} {}", gen(), gen(), gen(), gen(), gen()); # Or something like that
+var nums = generator();
+print("{} {} {} {} {}", nums(), nums(), nums(), nums(), nums()); # Or something like that
 
 ===
 match keyword: For pattern matching
@@ -29,11 +30,10 @@ match list {
 }
 
 ===
-dyn(amic) keyword: Dynamic dispatch overloading
+dynamic keyword: Dynamic dispatch overloading
 
-===
 
-def fun to_string(var a: dyn -> str) {
+def fun to_string(var a: dynamic -> str) {
     return "Default";
 }
 
@@ -48,7 +48,7 @@ def fun to_string(var a: u64 -> str) {
 # Compiles to
 
 def fun to_string(var a: any) {
-    switch typeof a {
+    switch ~a {
         case str {
             return to_str(a as str);
         }
@@ -76,3 +76,7 @@ asm keyword: Embedded assembly
 asm [TBD] {
     [TBD]
 }
+
+=== 
+
+Copy vs Move

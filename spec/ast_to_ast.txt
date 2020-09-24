@@ -1,0 +1,3 @@
+vardecl => unary(var|let|ref, block(xs=unary(def, 
+    (decl) identifier
+))) # This works because identifiers all have their init value stored

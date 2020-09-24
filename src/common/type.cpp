@@ -465,6 +465,9 @@ std::string type::to_string(bool simple) {
                 case special_type::GENERIC:
                     ss << "generic '" << id;
                     break;
+                case special_type::GENERIC_UNKNOWN:
+                    ss << "generic unknown";
+                    break;
                 case special_type::NOTHING:
                     ss << "---";
                     break;
