@@ -31,13 +31,15 @@ enum class pointer_type : u8 {
 enum class special_type : u8 {
     INFER, // Becomes whatever type is assigned to it
     GENERIC, GENERIC_UNKNOWN, // Selected at compiletime. GENERIC_UNKNOWN is the result of operations that use GENERIC inside a generic function or type
+    GENERIC_COMPOUND, // GENERIC_COMPOUND is the result of spreading a generic
     NOTHING, // Does not initialize to 0
     TYPELESS, // Has no type
     NONE, // Has undecided type
     NONE_ARRAY, NONE_STRUCT, NONE_TUPLE,
     NONE_FUNCTION, 
     NULL_, // Null pointer type
-    ERROR_TYPE // Type error
+    ERROR_TYPE, // Type error
+    ERROR_COMPOUND, // Type error. ERROR_COMPOUND is the result of spreading a type error
 };
 
 struct type;
@@ -155,6 +157,7 @@ struct type {
     bool is_supertype();
     bool is_special();
     bool is_special(special_type tt);
+    bool is_generic();
     
     type* get_underlying();
     

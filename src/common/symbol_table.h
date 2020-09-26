@@ -31,8 +31,9 @@ struct symbol_variable {
     
     // Functions only
     bool infer_ret {false}; // If the return is entirely inferred
+    bool compiletime_call{false}; // If the function can be _called_ at compiletime (All functions are available at compiletime, as they're simply types)
     // bool add_e64 {false}; // If the return needs to have an e64 added // NOTE Removed, all errors explicit or inferred
-    ast* gotos{nullptr};
+    ast* gotos{nullptr}; // Stores gotos in the function that have not yet been handled. Temporary
     
     // Returns
     bool is_return {false}; // If this is a return variable name

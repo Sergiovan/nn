@@ -195,7 +195,7 @@ def fun main(arg: [][]u8 -> :s32, :e64) {
 		delete a;
 		delete b;
 		goto leave;
-		var c: *s32 = new 10: s32;
+		var c: *s32 = new 10: *s32;
 		var d: *s32, e: []s32 = new 1: *s32, new '[2, 3, 4, 5, 6]: [5]s32;
 		delete c, d;
 	}

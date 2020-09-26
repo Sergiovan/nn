@@ -116,7 +116,7 @@ dict<std::string, u64> grammar::string_to_symbol {
     {"++", (u64) symbol::INCREMENT},
     {"--", (u64) symbol::DECREMENT},
     {"::[", (u64) symbol::OSELECT},
-    {"~", (u64) symbol::LENGTH},
+    {"~", (u64) symbol::INFO},
 
 
     {":", (u64) symbol::COLON},

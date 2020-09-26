@@ -254,14 +254,14 @@ capture_group
 
 functypesig => binary(:, 
     (params) compound(xs=param), 
-    (returns) unary(->|=>, nntype(infer, t=type)|compound(xs=return))
+    (returns) unary(->|=>, nntype(infer, t=type)|compound(xs=funcreturn))
 )
 
 param => binary(var|let|ref, 
     (namevalue) binary(=, (name?) maybe_identifier|expression[identifier], (value?) expression|none), 
     (type) binary(:|::, (type) cexpression[type], (spread) zero(spread)|none)
 )
-return => binary(var|let|ref, (name?) maybe_identifier|expression[identifier], (type) inferrable_type)
+funcreturn => binary(var|let|ref, (name?) maybe_identifier|expression[identifier], (type) inferrable_type)
 
 structtypelitdef => binary(struct, (name) identifier, (body) structscope, t=TYPE)
 

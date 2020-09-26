@@ -29,11 +29,17 @@ public:
     type* get(const type_superfunction& sf, const bool _const, const bool volat);
     type* get(const type_special& s, const bool _const, const bool volat);
     
+    type* reflag(type* t, const bool _const, const bool volat);
+    type* pointer_to(type* t, pointer_type pt = pointer_type::NAKED, bool _const = false, bool volat = false);
     type* array_of(type* t, bool _const = false, bool volat = false);
     type* sized_array_of(type* t, u64 size, bool _const = false, bool volat = false);
     
     bool can_convert_strong(type* from, type* to);
     bool can_convert_weak(type* from, type* to);
+    
+    type* propagate_generic(type* t);
+    type* get_signed(u16 bits);
+    type* get_unsigned(u16 bits);
     
     type* U0;
     type* U1;
@@ -62,7 +68,10 @@ public:
     type* NONE_TUPLE;
     type* NONE_FUNCTION;
     type* NULL_;
+    type* GENERIC_UNKNOWN;
+    type* GENERIC_COMPOUND;
     type* ERROR_TYPE;
+    type* ERROR_COMPOUND;
 private:
     type* add(type* t);
     

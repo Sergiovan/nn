@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "common/util.h"
+#include "common/type_table.h"
 
 bool type::is_primitive() {
     return tt == type_type::PRIMITIVE;
@@ -93,6 +94,10 @@ bool type::is_special() {
 
 bool type::is_special(special_type tt) {
     return is_special() && special.tt == tt;
+}
+
+bool type::is_generic() {
+    return is_special() && (special.tt == special_type::GENERIC || special.tt == special_type::GENERIC_UNKNOWN);
 }
 
 type* type::get_underlying() {
@@ -468,6 +473,9 @@ std::string type::to_string(bool simple) {
                 case special_type::GENERIC_UNKNOWN:
                     ss << "generic unknown";
                     break;
+                case special_type::GENERIC_COMPOUND:
+                    ss << "generic compound";
+                    break;
                 case special_type::NOTHING:
                     ss << "---";
                     break;
@@ -494,6 +502,9 @@ std::string type::to_string(bool simple) {
                     break;
                 case special_type::ERROR_TYPE:
                     ss << "error";
+                    break;
+                case special_type::ERROR_COMPOUND:
+                    ss << "error compound";
                     break;
             }
             break;

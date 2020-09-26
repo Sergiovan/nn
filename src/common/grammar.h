@@ -51,7 +51,7 @@ namespace grammar {
         EQUALS, NEQUALS, 
         WEAK_PTR,
         INCREMENT, DECREMENT, OSELECT,
-        LENGTH,
+        INFO,
         
         COLON, CHOICE = COLON, DCOLON, DQUESTION, SEMICOLON, COMMA, PERIOD, 
         

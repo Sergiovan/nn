@@ -12,7 +12,7 @@ pass::file_parser(compiler& p, nnmodule& mod) : comp{p}, mod{mod}, tt{mod.tt} {
     using namespace grammar;
     
     constexpr std::array<grammar::symbol, 16> pre {{
-        SPREAD, INCREMENT, DECREMENT, SUB, LENGTH, NOT, LNOT, AT, POINTER, WEAK_PTR,
+        SPREAD, INCREMENT, DECREMENT, SUB, INFO, NOT, LNOT, AT, POINTER, WEAK_PTR,
         OBRACK, ADD, KW_TYPEOF, KW_SIZEOF, KW_CONST, KW_VOLAT
     }};
     

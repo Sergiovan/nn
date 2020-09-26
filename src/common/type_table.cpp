@@ -30,7 +30,10 @@ type_table::type_table() {
     NONE_TUPLE = add_special({special_type::NONE_TUPLE}, false, false);
     NONE_FUNCTION = add_special({special_type::NONE_FUNCTION}, false, false);
     NULL_ = add_special({special_type::NULL_}, false, false);
+    GENERIC_UNKNOWN = add_special({special_type::GENERIC_UNKNOWN}, false, false);
+    GENERIC_COMPOUND = add_special({special_type::GENERIC_COMPOUND}, false, false);
     ERROR_TYPE = add_special({special_type::ERROR_TYPE}, false, false);
+    ERROR_COMPOUND = add_special({special_type::ERROR_COMPOUND}, false, false);
 }
 
 type* type_table::add_primitive(const type_primitive& p, const bool _const, const bool volat) {
@@ -129,6 +132,54 @@ type* type_table::get(const type_special& s, const bool _const, const bool volat
     return get(&t);
 }
 
+type* type_table::reflag(type* t, const bool _const, const bool volat) {
+    type nt {*this, types.size(), type_primitive{}, _const, volat};
+    
+    switch (t->tt) {
+        case type_type::PRIMITIVE: {
+            nt.primitive = t->primitive;
+            break;
+        }
+        case type_type::POINTER: {
+            nt.pointer = t->pointer;
+            break;
+        }
+        case type_type::ARRAY: {
+            nt.array = t->array;
+            break;
+        }
+        case type_type::COMPOUND: {
+            nt.compound = t->compound;
+            break;
+        }
+        case type_type::STRUCT: [[fallthrough]];
+        case type_type::UNION: [[fallthrough]];
+        case type_type::ENUM: [[fallthrough]];
+        case type_type::TUPLE: {
+            nt.scompound = t->scompound;
+            break;
+        }        
+        case type_type::FUNCTION: {
+            nt.function = t->function;
+            break;
+        }
+        case type_type::SUPERFUNCTION: {
+            nt.sfunction = t->sfunction;
+            break;
+        }
+        case type_type::SPECIAL: {
+            nt.special = t->special;
+            break;
+        }
+    }
+    
+    return get_or_add(&nt);
+}
+
+type* type_table::pointer_to(type* t, pointer_type pt, bool _const, bool volat) {
+    return add_pointer({pt, t}, _const, volat);
+}
+
 type* type_table::array_of(type* t, bool _const, bool volat) {
     return add_array({t, false, 0}, _const, volat);
 }
@@ -208,7 +259,7 @@ bool type_table::can_convert_weak(type* from, type* to) {
     }
     
     // GENERIC_UNKNOWN casts to everything and from everything by default
-    if (from->is_special(special_type::GENERIC_UNKNOWN) || to->is_special(special_type::GENERIC_UNKNOWN)) {
+    if (from == GENERIC_UNKNOWN || to == GENERIC_UNKNOWN) {
         return true;
     }
     
@@ -258,6 +309,32 @@ bool type_table::can_convert_weak(type* from, type* to) {
     }
     
     return false;
+}
+
+type* type_table::propagate_generic(type* t) {
+    return t->is_generic() ? GENERIC_UNKNOWN : t;
+}
+
+type* type_table::get_signed(u16 bits) {
+    switch (bits) {
+        case 8: return S8;
+        case 16: return S16;
+        case 32: return S32;
+        case 64: return S64;
+        default:
+            return get(type_primitive{primitive_type::SIGNED, bits}, false, false);
+    }
+}
+
+type* type_table::get_unsigned(u16 bits) {
+    switch (bits) {
+        case 8: return U8;
+        case 16: return U16;
+        case 32: return U32;
+        case 64: return U64;
+        default:
+            return get(type_primitive{primitive_type::UNSIGNED, bits}, false, false);
+    }
 }
 
 type* type_table::add(type* t) {

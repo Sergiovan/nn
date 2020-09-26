@@ -64,6 +64,7 @@ void ast_compiler::compile_def(ast* root) {
                 // Determine the size of the struct. This could be unknown due to using other structs recursively
                 size_loop(nntype->nntype.t);
                 // We're done!
+                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -89,6 +90,7 @@ void ast_compiler::compile_def(ast* root) {
                 nntype->nntype.t = tt.add_supercompound(sc, type_type::UNION, false, false);
                 
                 size_loop(nntype->nntype.t);
+                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -114,6 +116,7 @@ void ast_compiler::compile_def(ast* root) {
                 nntype->nntype.t = tt.add_supercompound(sc, type_type::ENUM, false, false);
                 
                 size_loop(nntype->nntype.t);
+                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -139,6 +142,7 @@ void ast_compiler::compile_def(ast* root) {
                 nntype->nntype.t = tt.add_supercompound(sc, type_type::ENUM, false, false);
                 
                 size_loop(nntype->nntype.t);
+                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -346,7 +350,7 @@ void ast_compiler::compile_def(ast* root) {
         
         // Function type
         bool compiletime = returns->unary.sym == grammar::SRARROW;
-        nsym->variable.compiletime = compiletime;
+        nsym->variable.compiletime_call = compiletime;
         
         bool any_infer{false};
         
@@ -469,6 +473,7 @@ void ast_compiler::compile_def(ast* root) {
             type* rcf = tt.add_superfunction(sf, false, false);
             nsym->variable.t = rcf;
             
+            nsym->variable.compiletime = true;
             nsym->variable.defined = true;
         }
 
@@ -766,7 +771,7 @@ void ast_compiler::compile_unary(ast* node) {
                             name->tok->content, decl_block, symbol_variable{
                                 block_type, nullptr, nullptr, false, 
                                 unary.sym == grammar::KW_LET, 
-                                unary.sym == grammar::KW_REF, 
+                                unary.sym == grammar::KW_REF, // TODO Add checks for assignment to things without an address, const, etc
                                 false, false, false, false
                             }
                         }; // Not added here to shadow previous declarations
@@ -809,9 +814,28 @@ void ast_compiler::compile_unary(ast* node) {
             u64 i = 0;
             for (; i < declared_syms.size() && i < values.size(); ++i) {
                 if (!tt.can_convert_weak(values[i]->t, declared_syms[i]->variable.t)) {
-                    mod.errors.push_back({values[i], conversion_error(values[i]->t, declared_syms[i]->variable.t)});
+                    if (values[i]->t == tt.GENERIC_COMPOUND) {
+                        u64 j = i;
+                        for (; i < declared_syms.size(); ++i) {
+                            declared_syms[i]->variable.value = values[j];
+                            declared_syms[i]->variable.t = tt.GENERIC_UNKNOWN;
+                            declared_syms[i]->variable.defined = true;
+                        }
+                        last_is_compound = true;
+                    } else if (values[i]->t == tt.ERROR_COMPOUND) {
+                        u64 j = i;
+                        for (; i < declared_syms.size(); ++i) {
+                            declared_syms[i]->variable.value = values[j];
+                            declared_syms[i]->variable.t = tt.ERROR_TYPE;
+                            declared_syms[i]->variable.defined = true;
+                        }
+                        last_is_compound = true;
+                    } else {
+                        mod.errors.push_back({values[i], conversion_error(values[i]->t, declared_syms[i]->variable.t)});
+                    }
                 } else {
                     declared_syms[i]->variable.value = values[i];
+                    declared_syms[i]->variable.t = values[i]->t;
                     declared_syms[i]->variable.defined = true;
                 }
             }
@@ -821,6 +845,7 @@ void ast_compiler::compile_unary(ast* node) {
                     ast* selected_value = ast::make_value({0}, declared_syms[i]->decl->tok, declared_syms[i]->variable.t);
                     assignment.right->block.at_end.push_back(selected_value);
                     declared_syms[i]->variable.value = selected_value;
+                    declared_syms[i]->variable.t = selected_value->t;
                     declared_syms[i]->variable.defined = true;
                 }
             } else if (i < values.size()) { // We ran out of syms, is this allowed?
@@ -844,6 +869,266 @@ void ast_compiler::compile_unary(ast* node) {
             
             break;
         }
+        case grammar::KW_DELETE: {
+            ASSERT(unary.node->is_block(), "delete was not on a block");
+            auto& stmts = unary.node->block;
+            
+            for (auto stmt : stmts.elems) {
+                compile(stmt);
+                if (!stmt->compiled->t->is_pointer() && !stmt->compiled->t->is_array()) {
+                    mod.errors.push_back({stmt, "Cannot delete this"});
+                }
+            }
+            
+            node->compiled = node;
+            break;
+        }
+        case grammar::SPREAD: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t->is_supercompound()) {
+                node->t = expr->t->scompound.comp;
+            } else if (expr->t->is_compound()) {
+                node->t = expr->t; // TODO Hmmmmm
+            } else if (expr->t == tt.GENERIC_COMPOUND || expr->t == tt.GENERIC_UNKNOWN) {
+                node->t = tt.GENERIC_COMPOUND;
+            } else if (expr->t == tt.ERROR_COMPOUND || expr->t == tt.ERROR_TYPE) {
+                node->t = tt.ERROR_COMPOUND;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot spread"});
+                node->t = tt.ERROR_COMPOUND;
+            }
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break; 
+        }
+        case grammar::INCREMENT: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t->is_primitive(primitive_type::SIGNED) || expr->t->is_primitive(primitive_type::UNSIGNED) || 
+                expr->t->is_primitive(primitive_type::CHARACTER) || expr->t->is_pointer(pointer_type::NAKED) || expr->t->is_generic()) {
+                
+                node->t = tt.propagate_generic(expr->t);
+            } else {
+                mod.errors.push_back({unary.node, "Cannot increment"});
+                node->t = expr->t; // TODO Reasonable assumption?
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::DECREMENT: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t->is_primitive(primitive_type::SIGNED) || expr->t->is_primitive(primitive_type::UNSIGNED) || 
+                expr->t->is_primitive(primitive_type::CHARACTER) || expr->t->is_pointer(pointer_type::NAKED) || expr->t->is_generic()) {
+                
+                node->t = tt.propagate_generic(expr->t);
+            } else {
+                mod.errors.push_back({unary.node, "Cannot decrement"});
+                node->t = expr->t; // TODO Reasonable assumption?
+            }
+                
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::SUB: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t->is_primitive(primitive_type::SIGNED) || expr->t->is_primitive(primitive_type::UNSIGNED)) {
+                
+                node->t = tt.get_signed(expr->t->primitive.bits);
+            } else if (expr->t->is_primitive(primitive_type::FLOATING)) {
+                node->t = expr->t;
+            } else if (expr->t->is_generic()) {
+                node->t = tt.propagate_generic(expr->t);
+            } else {
+                mod.errors.push_back({unary.node, "Cannot negate"});
+                node->t = tt.ERROR_TYPE; // TODO Reasonable assumption?
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::INFO: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t->is_array()) {
+                node->compiletime = expr->t->array.sized;
+                node->t = tt.U64; // Length of array
+            } else if (expr->t == tt.ANY) {
+                node->t = tt.TYPE;
+            } else if (expr->t == tt.TYPE) {
+                // TODO Type info structs
+                logger::warn() << "Type info structs not implemented";
+            } else if (expr->t->is_generic()) {
+                node->t = tt.propagate_generic(expr->t);
+            } else {
+                mod.errors.push_back({unary.node, "Cannot negate"});
+                node->t = tt.ERROR_TYPE; // TODO Reasonable assumption?
+            }
+            
+            node->compiled = node;
+            break;
+        }
+        case grammar::NOT: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t->is_primitive(primitive_type::SIGNED) || expr->t->is_primitive(primitive_type::UNSIGNED) || 
+                expr->t->is_primitive(primitive_type::BOOLEAN) || expr->t->is_generic()) {
+                
+                node->t = tt.propagate_generic(expr->t);
+            } else {
+                mod.errors.push_back({unary.node, "Cannot apply not"});
+                node->t = expr->t; // TODO Reasonable assumption?
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::LNOT: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (tt.can_convert_strong(expr->t, tt.U1)) {
+                
+                node->t = tt.U1;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot apply logical not"});
+                node->t = tt.U1; // TODO Reasonable assumption?
+            }
+                
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::AT: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t->is_pointer() && expr->t->pointer.tt != pointer_type::WEAK) {
+                
+                node->t = expr->t->pointer.at;
+            } else if (expr->t == tt.TYPE) {
+                if (!expr->compiletime) {
+                    mod.errors.push_back({unary.node, "Dereferencing of types only available at compiletime"});
+                }
+                node->t = tt.TYPE;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot dereference"});
+                node->t = tt.ERROR_TYPE;
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::POINTER: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t == tt.TYPE && expr->compiletime) {
+                node->t = tt.TYPE;
+            } else {
+                // TODO Some constructs cannot be pointered to, not addressable?
+                node->t = tt.pointer_to(expr->t);
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::WEAK_PTR: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t == tt.TYPE && expr->compiletime) {
+                node->t = tt.TYPE;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot convert to weak pointer, cast from shared pointer instead"});
+                node->t = tt.pointer_to(expr->t, pointer_type::WEAK);
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::OBRACK: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t == tt.TYPE && expr->compiletime) {
+                node->t = tt.TYPE;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot have empty index"});
+                node->t = expr->t->is_array() ? expr->t->array.at : tt.ERROR_TYPE;
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::ADD: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t == tt.TYPE && expr->compiletime) {
+                node->t = tt.TYPE;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot convert to shared pointer, use new instead"});
+                node->t = tt.pointer_to(expr->t, pointer_type::WEAK);
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::KW_TYPEOF: {
+            compile(unary.node);
+            node->t = tt.TYPE;
+            
+            node->compiletime = true;
+            node->compiled = node;
+            break;
+        }
+        case grammar::KW_SIZEOF: {
+            compile(unary.node);
+            node->t = tt.U64;
+            
+            node->compiletime = true;
+            node->compiled = node;
+            break;
+        }
+        case grammar::KW_CONST: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t == tt.TYPE && expr->compiletime) {
+                node->t = tt.TYPE;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot convert to const"});
+                node->t = tt.reflag(expr->t, true, expr->t->volat_flag);
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        case grammar::KW_VOLAT: {
+            compile(unary.node);
+            ast* expr = unary.node->compiled;
+            if (expr->t == tt.TYPE && expr->compiletime) {
+                node->t = tt.TYPE;
+            } else {
+                mod.errors.push_back({unary.node, "Cannot convert to volat"});
+                node->t = tt.reflag(expr->t, expr->t->const_flag, true);
+            }
+            
+            node->compiletime = expr->compiletime;
+            node->compiled = node;
+            break;
+        }
+        default:
+            logger::error() << unary.sym << " is not a valid unary symbol";
+            ASSERT(false, "Invalid unary symbol");
+            break;
     }
 }
 
