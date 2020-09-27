@@ -45,7 +45,7 @@ void ast_compiler::compile_def(ast* root) {
                 
                 // Make a new type for the struct, we'll pass it along to the upcoming compilation functions as-if it were a real type already
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false};
+                type_supercompound sc{&t, false, false, sym->variable.st};
                 type sct{tt, 0, type_type::STRUCT, sc, false, false};
                 ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
@@ -76,7 +76,7 @@ void ast_compiler::compile_def(ast* root) {
                 sym->variable.st = mod_st.make_child(sym);
                 
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false};
+                type_supercompound sc{&t, false, false, sym->variable.st};
                 type sct{tt, 0, type_type::UNION, sc, false, false};
                 ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
@@ -102,7 +102,7 @@ void ast_compiler::compile_def(ast* root) {
                 sym->variable.st = mod_st.make_child(sym);
                 
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false};
+                type_supercompound sc{&t, false, false, sym->variable.st};
                 type sct{tt, 0, type_type::ENUM, sc, false, false};
                 ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
@@ -128,7 +128,7 @@ void ast_compiler::compile_def(ast* root) {
                 sym->variable.st = nullptr;
                 
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false};
+                type_supercompound sc{&t, false, false, sym->variable.st};
                 type sct{tt, 0, type_type::TUPLE, sc, false, false};
                 ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
@@ -194,7 +194,7 @@ void ast_compiler::compile_def(ast* root) {
         type t{tt, 0, type_function{}, false, false};
         
         // Actual function type
-        type_superfunction sf{&t, {}, {}, false, false, mod_st.make_child()};
+        type_superfunction sf{&t, {}, {}, false, false, nsym->variable.st};
         
         type sft{tt, 0, sf, false, false};
         
@@ -1125,6 +1125,14 @@ void ast_compiler::compile_unary(ast* node) {
             node->compiled = node;
             break;
         }
+        case grammar::OPAREN: {
+            compile(unary.node); // Easy every time
+            node->t = unary.node->compiled->t;
+            node->compiletime = unary.node->compiled->compiletime;
+            node->compiled = unary.node->compiled;
+            node->compile_owned = false;
+            break;
+        }
         default:
             logger::error() << unary.sym << " is not a valid unary symbol";
             ASSERT(false, "Invalid unary symbol");
@@ -1154,6 +1162,142 @@ void ast_compiler::compile_tuple(ast* node) {
 
 void ast_compiler::compile_function(ast* node) {
     compile(node);
+}
+
+void ast_compiler::compile_iden(ast* node) {
+    (void) node;
+}
+
+void ast_compiler::compile_function_call(ast* node, ast* first) {
+    (void) node;
+    (void) first;
+}
+
+void ast_compiler::compile_dot_expression(ast* node, bool allow_star) {
+    ASSERT(node->is_binary(), "Dot expression was not binary");
+    
+    std::vector<ast*> nodes{node};
+    ast* current{node};
+    
+    do {
+        if (!current->binary.right->is_binary() || 
+            current->binary.right->binary.sym != grammar::PERIOD) {
+            break;
+        }
+        nodes.push_back(current->binary.right);
+        current = current->binary.right;
+    } while (true);
+    
+    ast* last{nullptr};
+    ast* last_value{nullptr};
+    
+    for (auto it = nodes.rbegin(); it != nodes.rend(); ++it) {
+        ast* dot_node = *it;
+        auto& binary = dot_node->binary;
+        if (!last) {
+            // First entry
+            compile(binary.left);
+            last = binary.left;
+        }
+        
+        ast* iden = binary.right->get_leftmost(); // TODO Does this always work?
+        if (!iden->is_iden()) {
+            // This is allowed if: This is the last element, and it's a star, and stars are allowed
+            if ((it + 1) == nodes.rend() && 
+                iden->is_zero() && iden->zero.sym == grammar::MUL && allow_star) {
+                dot_node->compiled = dot_node;
+                dot_node->compiletime = true;
+                break;
+            }
+                
+            mod.errors.push_back({iden, "Expecting identifier"});
+            node->t = tt.ERROR_TYPE;
+            node->compiled = node;
+            return;
+        }
+        
+        type* last_t = last->compiled->t;
+        std::string& iden_name = iden->tok->content;
+        symbol* found {nullptr};
+        if (last_t->is_supertype()) {
+            last_value = last;
+            // Supertypes must have all their members defined by now at least
+            if (last_t->is_superfunction()) {
+                found = last_t->sfunction.st->get(iden_name);
+            } else if (last_t->is_supercompound()) {
+                found = last_t->scompound.st->get(iden_name);
+            }
+        } else if (last_t == tt.TYPE && last->compiled->compiletime) {
+            ast* rt = get_compiletime_value(last);
+            if (!rt->is_nntype() || !rt->nntype.t->is_supertype()) {
+                mod.errors.push_back({last, "Invalid type"});
+                node->t = tt.ERROR_TYPE;
+                node->compiled = node;
+                return;
+            }
+            
+            if (rt->nntype.t->is_superfunction()) {
+                found = rt->nntype.t->sfunction.st->get(iden_name);
+            } else if (rt->nntype.t->is_supercompound()) {
+                found = rt->nntype.t->scompound.st->get(iden_name);
+            }
+        } else if (last->compiled->is_iden()) {
+            if (last->compiled->iden.s->is_namespace()) {
+                found = last->compiled->iden.s->namespace_.st->get(iden_name);
+            } else if (last->compiled->iden.s->is_module()) {
+                found = last->compiled->iden.s->mod.mod->st->get(iden_name);
+            }
+        }
+        
+        if (!found) {
+            last_value = last;
+            found = root_st.find(iden_name).second;
+        }
+        
+        if (!found && last_t->is_pointer()) {
+            while (last_t->is_pointer()) {
+                last_t = last_t->pointer.at;
+            }
+            
+            if (last_t->is_supertype()) {
+                // Supertypes must have all their members defined by now at least
+                if (last_t->is_superfunction()) {
+                    found = last_t->sfunction.st->get(iden_name);
+                } else if (last_t->is_supercompound()) {
+                    found = last_t->scompound.st->get(iden_name);
+                }
+            }
+        }
+        
+        if (!found) {
+            mod.errors.push_back({iden, "Cannot find identifier"});
+            node->t = tt.ERROR_TYPE;
+            node->compiled = node;
+            return;
+        }
+        
+        iden->iden.s = found;
+        iden->compiled = iden;
+        iden->compiletime = last->compiled->compiletime && (found->is_variable() ? found->variable.compiletime : true);
+        
+        if (binary.right->is_binary() && binary.right->binary.sym == grammar::OPAREN) { // Function call
+            compile_function_call(binary.right, last_value);
+            last_value = nullptr;
+        } else {
+            compile(binary.right);
+        }
+        
+        last = dot_node;
+        dot_node->compiled = dot_node;
+        dot_node->t = binary.right->compiled->t;
+        dot_node->compiletime = binary.right->compiled->compiletime;
+    }
+    
+    node->t = node->binary.right->t;
+    node->compiletime = node->binary.right->compiletime;
+    node->compiled = node;
+    
+    return;
 }
 
 ast* ast_compiler::get_compiletime_value(ast* node) {    

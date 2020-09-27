@@ -210,7 +210,7 @@ reorder ~> ?. Given a generic combination type, reorders the elements in it.
 binary(op=reorder, l=expression, r=block(xs=new_order))
 
 dotexpr -> ?. Accesses elements inside other elements, or calls functions. Given the expression x.y, y is first searched first in x as an element, then x dereferenced, then x's type or dereferenced type, then a normal search is done to find a function of the same name that accepts x's type or a pointer to x's type as a first parameter.
-unary(op=dot, n=block(xs=elements))
+binary(op=dot, l=expression, r=expression)
 
 parenthesised expression -> ?. Value is the same as the expression without parenthesis. Only used for precedence calculations.
 unary(op=parens, n=expression)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <stack>
 
 class compiler;
 class nnmodule;
@@ -32,6 +33,10 @@ private:
     void compile_enum(ast* node);
     void compile_tuple(ast* node);
     void compile_function(ast* node);
+    void compile_iden(ast* node);
+    
+    void compile_function_call(ast* node, ast* first = nullptr);
+    void compile_dot_expression(ast* node, bool allow_star);
     
     ast* get_compiletime_value(ast* node);
     

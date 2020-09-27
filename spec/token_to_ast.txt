@@ -306,7 +306,7 @@ prefixexpr => unary(symbol, expression)|binary([, (size) expression|none, expres
 postfixexpr => infixexpr|unary(symbol, postfixexpr, post=true)
 infixexpr => dotexpr|binary(symbol, (lhs) dotexpr, (rhs) expression)
 
-dotexpr => postcircumfixexpr|unary(., block(xs={postcircumfixexpr...,zero(mul)?}))
+dotexpr => postcircumfixexpr|binary(., block(postcircumfixexpr, dotexpr|zero(mul)))
 
 postcircumfixexpr => literalexpr|binary('('|[|{, literalexpr, function_call|access|reorder)
 

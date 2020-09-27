@@ -68,7 +68,7 @@ struct type_supercompound {
     type* comp;
     bool generic {false}; // Any members are generic
     bool generated {false}; // Compound type was generated at compiletime by instantiating generic compound
-    symbol_table* st{nullptr};
+    symbol_table* st{nullptr}; // Copy of variable st, for convenience
 };
 
 struct param {
@@ -109,7 +109,7 @@ struct type_superfunction { // TODO Add extra data, like captures and stuff
     std::vector<ret_info> rets{};
     bool generic{false}; // Any parameters are generic
     bool generated{false}; // Function type was created at compile-time by calling generic function
-    symbol_table* st{nullptr};
+    symbol_table* st{nullptr}; // Copy of variable st, for convenience
 };
 
 struct type_special {

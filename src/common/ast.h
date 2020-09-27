@@ -148,6 +148,8 @@ struct ast : public list_node<ast> {
     
     std::string to_simple_string();
     std::string to_string(bool recursive = false, u64 level = 0);
+    ast* get_leftmost();
+    ast* get_rightmost();
     token* get_leftmost_token();
     token* get_rightmost_token();
     

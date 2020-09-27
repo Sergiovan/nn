@@ -2869,19 +2869,24 @@ ast* pass::dotexpr() {
     
     if (is_symbol(grammar::PERIOD)) {
         token* tok = next(); // .
-        ast* ret = ast::make_unary({grammar::PERIOD, ast::make_block({}, tok, tt.TYPELESS)}, tok, tt.NONE);
-        ast* block = ret->unary.node;
-        block->block.elems.push_back(postcircumfix);
+        ast* ret = ast::make_binary({grammar::PERIOD, postcircumfix}, tok, tt.NONE);
         
-        do {
-            if (is_symbol(grammar::MUL)) {
-                token* tok = next(); // *
-                block->block.elems.push_back(ast::make_zero({grammar::MUL}, tok, tt.NONE));
-                break;
+        if (is_symbol(grammar::MUL)) {
+            token* tok = next(); // *
+            ret->binary.right = ast::make_zero({grammar::MUL}, tok, tt.NONE);
+        } else {
+            ast* dot = dotexpr();
+            
+            if (dot->is_binary() && dot->binary.sym == grammar::PERIOD) {
+                // Rotate left (Is this left?)
+                
+                ret->binary.right = dot->binary.left;
+                dot->binary.left = ret;
+                
             } else {
-                block->block.elems.push_back(postcircumfixexpr());
+                ret->binary.right = dot;
             }
-        } while (is_symbol(grammar::PERIOD) && next());
+        }
         
         return ret; // Always precedence -1
     } else {
@@ -2892,26 +2897,31 @@ ast* pass::dotexpr() {
 ast* pass::postcircumfixexpr() {
     ast* literal = literalexpr(); // Everything below this always has precedence -1
     
+    
     while (is(token_type::SYMBOL)) {
+        bool require_reorder = false;
         s16 prec = -1;
         switch (c->value) {
             case grammar::OPAREN: {
                 literal = ast::make_binary({grammar::OPAREN, literal, function_call()}, c, tt.NONE);
                 prec = 0x3F;
+                require_reorder = true;
                 break;
             }
             case grammar::OBRACK: {
                 literal = ast::make_binary({grammar::OBRACK, literal, access()}, c, tt.NONE);
                 prec = 0x3F;
+                require_reorder = true;
                 break;
             }
             case grammar::OSELECT: {
                 literal = ast::make_binary({grammar::OSELECT, literal, reorder()}, c, tt.NONE);
                 prec = 0x3D;
+                require_reorder = true;
                 break;
             }
             default:
-                return literal;
+                return require_reorder ? reorder_binary(literal) : literal;
         }
         literal->precedence = prec;
         literal->inhprecedence = prec;
@@ -3122,7 +3132,7 @@ ast* pass::compound_identifier_simple() {
     ASSERT(is(token_type::IDENTIFIER), "Expected identifier");
     
     token* tok = c;
-    ast* ret = ast::make_unary({grammar::PERIOD, ast::make_block({}, tok, tt.TYPELESS)}, tok, tt.TYPELESS);
+    ast* ret = ast::make_unary({grammar::PERIOD, ast::make_block({}, tok, tt.TYPELESS), true}, tok, tt.TYPELESS);
     ast* block = ret->unary.node;
     
     do {

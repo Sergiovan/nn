@@ -322,7 +322,6 @@ ast* ast::make_block(const ast_block& c, token* tok, type* t) {
 ast* ast::make_iden(const ast_iden& i, token* tok, type* t) {
     ast* ret = new ast{ast_type::IDENTIFIER, tok, t};
     ret->iden = i;
-    ret->compiled = ret;
     return ret;
 }
 
@@ -424,6 +423,50 @@ std::string ast::to_string(bool recursive, u64 level) {
     }
     
     return ss.str();
+}
+
+ast* ast::get_leftmost() {
+    switch (tt) {
+        case ast_type::NONE: [[fallthrough]];
+        case ast_type::ZERO: [[fallthrough]];
+        case ast_type::VALUE: [[fallthrough]];
+        case ast_type::STRING: [[fallthrough]];
+        case ast_type::TYPE: [[fallthrough]];
+        case ast_type::IDENTIFIER:
+            return this;
+        case ast_type::UNARY:
+            return unary.post ? unary.node->get_leftmost() : this;
+        case ast_type::BINARY:
+            return binary.left->get_leftmost();
+        case ast_type::COMPOUND: 
+            return compound.elems.head;
+        case ast_type::BLOCK:
+            return block.elems.head;
+        default:
+            return this;
+    }
+}
+
+ast* ast::get_rightmost() {
+    switch (tt) {
+        case ast_type::NONE: [[fallthrough]];
+        case ast_type::ZERO: [[fallthrough]];
+        case ast_type::VALUE: [[fallthrough]];
+        case ast_type::STRING: [[fallthrough]];
+        case ast_type::TYPE: [[fallthrough]];
+        case ast_type::IDENTIFIER:
+            return this;
+        case ast_type::UNARY:
+            return unary.post ? this : unary.node->get_rightmost();
+        case ast_type::BINARY:
+            return binary.left->get_rightmost();
+        case ast_type::COMPOUND: 
+            return compound.elems.tail;
+        case ast_type::BLOCK:
+            return block.elems.tail;
+        default:
+            return this;
+    }
 }
 
 token* ast::get_leftmost_token() {
