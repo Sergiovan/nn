@@ -17,9 +17,10 @@ mangle length array size
 mangle length bytes pointed at id
 1 byte sized
 
-COMPOUND (mangle length * (1 + n))
+COMPOUND (mangle length * (1 + n) bytes + (n * 2) bits)
 mangle length compound size = n
 n * mangle length compound type id
+n * 2 bits compound flags
 
 SUPERCOMPOUND (mangle length)
 mangle length compound type id

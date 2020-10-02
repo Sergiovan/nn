@@ -155,11 +155,18 @@ bool type::set_size() {
             return true;
         case type_type::COMPOUND: {
             u64 buff_size{0};
-            for (auto t : compound.elems) {
-                if (!t->sized && !t->set_size()) {
-                    return false;
+            for (auto member : compound.members) {
+                u64 msize {0};
+                if (member.reference) {
+                            msize = 8;
+                } else {
+                    if (!member.t->sized && !member.t->set_size()) {
+                        return false;
+                    } else {
+                        msize = member.t->size;
+                    }
                 }
-                buff_size += align(buff_size, t->size) + t->size; // Ignore bits for now...
+                buff_size += align(buff_size, msize) + msize; // Ignore bits for now...
             }
             size = buff_size;
             sized = 1;
@@ -185,8 +192,9 @@ bool type::set_size() {
                 return false;
             }
             sized = 1;
-            for (auto t : compound.elems) {
-                size = size > t->size ? size : t->size;
+            // No references inside unions
+            for (auto member : compound.members) {
+                size = size > member.t->size ? size : member.t->size;
             }
             return true;
         case type_type::FUNCTION: [[fallthrough]];
@@ -382,8 +390,14 @@ std::string type::to_string(bool simple) {
             ss << "]" << array.at->to_string(true);
             break;
         case type_type::COMPOUND:
-            for (auto t : compound.elems) {
-                ss << ":" << t->to_string(true);
+            for (auto member : compound.members) {
+                if (member.compiletime) {
+                    ss << "let ";
+                }
+                if (member.reference) {
+                    ss << "ref ";
+                }
+                ss << ": " << member.t->to_string(true);
             }
             break;
         case type_type::STRUCT: [[fallthrough]];
@@ -397,6 +411,9 @@ std::string type::to_string(bool simple) {
             for (auto& p : function.params) {
                 if (p.compiletime) {
                     ss << "let ";
+                }
+                if (p.reference) {
+                    ss << "ref ";
                 }
                 if (p.thisarg) {
                     ss << "this ";
@@ -414,6 +431,9 @@ std::string type::to_string(bool simple) {
             }
             ss << "-> ";
             for (auto& r : function.rets) {
+                if (r.reference) {
+                    ss << "ref ";
+                }
                 if (r.compiletime) {
                     ss << "let ";
                 }
@@ -429,6 +449,9 @@ std::string type::to_string(bool simple) {
             for (u64 i = 0; i < sfunction.params.size(); ++i) {
                 auto& p = fn.params[i];
                 auto& sp = sfn.params[i];
+                if (p.reference) {
+                    ss << "ref ";
+                }
                 if (p.compiletime) {
                     ss << "let ";
                 }
@@ -454,6 +477,9 @@ std::string type::to_string(bool simple) {
             for (u64 i = 0; i < sfunction.rets.size(); ++i) {
                 auto& r = fn.rets[i];
                 auto& sr = sfn.rets[i];
+                if (r.reference) {
+                    ss << "ref ";
+                }
                 if (r.compiletime) {
                     ss << "let ";
                 }

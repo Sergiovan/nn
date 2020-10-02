@@ -829,11 +829,11 @@ void ast_compiler::compile_unary(ast* node) {
                     
                     if (value_type->is_compound()) {
                         last_is_compound = true; // TODO Not good enough to prevent value overflow
-                        for (u64 i = 0; i < value_type->compound.elems.size(); ++i) {
+                        for (u64 i = 0; i < value_type->compound.members.size(); ++i) {
                             ast* selected_value = ast::make_binary({
                                 grammar::OSELECT, value, 
                                 ast::make_value({i}, value->tok, tt.U64)
-                            }, value->tok, value_type->compound.elems[i]);
+                            }, value->tok, value_type->compound.members[i].t);
                             assignment.right->block.at_end.push_back(selected_value); // This ensures it'll be deleted
                             values.push_back(selected_value);
                         }

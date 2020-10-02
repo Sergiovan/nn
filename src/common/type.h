@@ -60,8 +60,14 @@ struct type_array {
     u64 size;
 };
 
+struct member {
+    type* t;
+    u8 compiletime : 1;
+    u8 reference : 1;
+};
+
 struct type_compound {
-    std::vector<type*> elems;
+    std::vector<member> members;
 };
 
 struct type_supercompound {

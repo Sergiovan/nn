@@ -399,6 +399,14 @@ union mangle_flags {
     };
 };
 
+union compound_flags {
+    u8 raw = 0;
+    struct {
+        u8 compiletime : 1;
+        u8 reference : 1;
+    };
+};
+
 union param_flags {
     u8 raw = 0;
     struct {
@@ -525,16 +533,38 @@ std::string type_table::mangle(type* t) {
         }
         case type_type::COMPOUND: {
             std::vector<u64> ids;
+            std::vector<compound_flags> cflags;
             u8 max_len = 0;
-            ids.reserve(t->compound.elems.size() + 1);
-            ids.push_back(t->compound.elems.size());
-            for (type* tt : t->compound.elems) {
-                ids.push_back(tt->id);
-                max_len = max_len > required[__builtin_clz(tt->id)] ? max_len : required[__builtin_clz(tt->id)];
+            u64 members = t->compound.members.size();
+            ids.reserve(members + 1);
+            cflags.reserve(((members * 2) + 1) / 8);
+            ids.push_back(members);
+            for (auto& member : t->compound.members) {
+                ids.push_back(member.t->id);
+                max_len = max_len > required[__builtin_clz(member.t->id)] ? max_len : required[__builtin_clz(member.t->id)]; 
+            
+                compound_flags& cf = cflags.emplace_back();
+                cf.compiletime = member.compiletime;
+                cf.reference = member.reference;
             }
             flags.len = max_len;
-            mangled.resize(8 + ids.size() * flags.len);
+            mangled.resize(8 + (1 + ids.size()) * flags.len + cflags.size());
             add(max_len, ids);
+            
+            u64 byte = 8 + (1 + members) * flags.len;
+            u8 bit = 0;
+            
+            std::memset(mangled.data() + byte, 0, mangled.length() - byte);
+            
+            for (auto& flags : cflags) {
+                mangled[byte] |= (flags.raw & 0x3) << bit;
+                bit += 2;
+                if (bit == 8) {
+                    bit = 0;
+                    ++byte;
+                }
+            }
+            
             break;
         }
         case type_type::STRUCT: [[fallthrough]];
@@ -586,7 +616,7 @@ std::string type_table::mangle(type* t) {
             mangled.resize(8 + (flags.len * reservesize) + pflags.size() + ((rflags.size() + 3) / 4));
             add(max_len, ids);
             
-            u64 byte = 8 + reservesize;
+            u64 byte = 8 + (flags.len * reservesize);
             u8 bit = 0;
             
             std::memset(mangled.data() + byte, 0, mangled.length() - byte);
@@ -651,11 +681,21 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
         }
         case type_type::COMPOUND: {
             u64 size = as_t[0];
-            std::vector<type*> ts;
+            std::vector<member> ts;
             ts.reserve(size);
+            
+            u64 byte = (size + 1) * sizeof(T);
+            u8 bit = 0;
+            
             for (u64 i = 0; i < size; ++i) {
                 ASSERT(tt[as_t[1 + i]], "Type id pointed nowhere");
-                ts.push_back(tt[as_t[1 + i]]);
+                compound_flags flgs{(u8) ((d[byte] >> bit) & 0x3)};
+                ts.push_back({tt[as_t[1 + i]], flgs.compiletime, flgs.reference});
+                bit += 2;
+                if (bit == 8) {
+                    bit = 0;
+                    ++byte;
+                }
             }
             dest->compound = type_compound{ts};
             break;
@@ -676,7 +716,7 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
             std::vector<ret> rets{};
             rets.reserve(rsize);
             
-            u64 byte = psize + rsize;
+            u64 byte = (2 + psize + rsize) * sizeof(T);
             u8 bit = 0;
             
             for (u64 i = 0; i < psize; ++i) {
