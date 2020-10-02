@@ -195,8 +195,8 @@ bool type::set_size() {
             sized = 1;
             return true;
         case type_type::SPECIAL:
-            sized = 0;
-            size = 0;
+            size = special.tt == special_type::NULL_ ? 8 : 1; // :D
+            sized = 1; // :S
             return true;
         default:
             ASSERT(false, "Invalid type type");

@@ -45,12 +45,13 @@ void ast_compiler::compile_def(ast* root) {
                 
                 // Make a new type for the struct, we'll pass it along to the upcoming compilation functions as-if it were a real type already
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false, sym->variable.st};
+                type_supercompound sc{tt.add_temp(t), false, false, sym->variable.st};
                 type sct{tt, 0, type_type::STRUCT, sc, false, false};
-                ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
+                ast* nntype = ast::make_nntype({tt.add_temp(sct)}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
                 sym->variable.value = nntype; // Unadded supercompound
                 sym->variable.t = tt.TYPE; // The new symbol is a type type, not a real variable
+                sym->variable.compiletime = true; // Types are always compiletime
                 
                 // Now that the name is in the ST, compile the struct statements (synchronously)
                 auto sub_compiler = ast_compiler{comp, mod, def->binary.right, sym->variable.st, sym};
@@ -58,13 +59,13 @@ void ast_compiler::compile_def(ast* root) {
                 
                 // We're done compiling the struct statements, so we make it a proper type
                 // The added member variables are taken into account
-                sc.comp = tt.add_compound(t.compound, false, false);
-                nntype->nntype.t = tt.add_supercompound(sc, type_type::STRUCT, false, false);
+                // Update the temporary we made, which might actually change the type
+                nntype->nntype.t->scompound.comp = tt.update_temp(nntype->nntype.t->scompound.comp);
+                nntype->nntype.t = tt.update_temp(nntype->nntype.t); // Always points to the same thing!
                 
                 // Determine the size of the struct. This could be unknown due to using other structs recursively
                 size_loop(nntype->nntype.t);
                 // We're done!
-                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -76,21 +77,21 @@ void ast_compiler::compile_def(ast* root) {
                 sym->variable.st = mod_st.make_child(sym);
                 
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false, sym->variable.st};
+                type_supercompound sc{tt.add_temp(t), false, false, sym->variable.st};
                 type sct{tt, 0, type_type::UNION, sc, false, false};
-                ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
+                ast* nntype = ast::make_nntype({tt.add_temp(sct)}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
                 sym->variable.value = nntype;
                 sym->variable.t = tt.TYPE;
+                sym->variable.compiletime = true;
                 
                 auto sub_compiler = ast_compiler{comp, mod, def->binary.right, sym->variable.st, sym};
                 sub_compiler.compile_block(def->binary.right, &ast_compiler::compile_struct);
                 
-                sc.comp = tt.add_compound(t.compound, false, false);
-                nntype->nntype.t = tt.add_supercompound(sc, type_type::UNION, false, false);
+                nntype->nntype.t->scompound.comp = tt.update_temp(nntype->nntype.t->scompound.comp);
+                nntype->nntype.t = tt.update_temp(nntype->nntype.t);
                 
                 size_loop(nntype->nntype.t);
-                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -102,21 +103,21 @@ void ast_compiler::compile_def(ast* root) {
                 sym->variable.st = mod_st.make_child(sym);
                 
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false, sym->variable.st};
+                type_supercompound sc{tt.add_temp(t), false, false, sym->variable.st};
                 type sct{tt, 0, type_type::ENUM, sc, false, false};
-                ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
+                ast* nntype = ast::make_nntype({tt.add_temp(sct)}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
                 sym->variable.value = nntype;
                 sym->variable.t = tt.TYPE;
+                sym->variable.compiletime = true;
                 
                 auto sub_compiler = ast_compiler{comp, mod, def->binary.right, sym->variable.st, sym};
                 sub_compiler.compile_enum(def->binary.right);
                 
-                sc.comp = tt.add_compound(t.compound, false, false);
-                nntype->nntype.t = tt.add_supercompound(sc, type_type::ENUM, false, false);
+                nntype->nntype.t->scompound.comp = tt.update_temp(nntype->nntype.t->scompound.comp);
+                nntype->nntype.t = tt.update_temp(nntype->nntype.t);
                 
                 size_loop(nntype->nntype.t);
-                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -128,21 +129,21 @@ void ast_compiler::compile_def(ast* root) {
                 sym->variable.st = nullptr;
                 
                 type t{tt, 0, type_compound{{}}, false, false};
-                type_supercompound sc{&t, false, false, sym->variable.st};
+                type_supercompound sc{tt.add_temp(t), false, false, sym->variable.st};
                 type sct{tt, 0, type_type::TUPLE, sc, false, false};
-                ast* nntype = ast::make_nntype({&sct}, def->tok, tt.TYPE); // Note it's not added to the type table
+                ast* nntype = ast::make_nntype({tt.add_temp(sct)}, def->tok, tt.TYPE); // Note it's not added to the type table
                 
                 sym->variable.value = nntype;
                 sym->variable.t = tt.TYPE;
+                sym->variable.compiletime = true;
                 
                 auto sub_compiler = ast_compiler{comp, mod, def->binary.right, sym->variable.st, sym};
                 sub_compiler.compile_tuple(def->binary.right);
                 
-                sc.comp = tt.add_compound(t.compound, false, false);
-                nntype->nntype.t = tt.add_supercompound(sc, type_type::ENUM, false, false);
+                nntype->nntype.t->scompound.comp = tt.update_temp(nntype->nntype.t->scompound.comp);
+                nntype->nntype.t = tt.update_temp(nntype->nntype.t);
                 
                 size_loop(nntype->nntype.t);
-                sym->variable.compiletime = true;
                 sym->variable.defined = true;
                 
                 break;
@@ -174,12 +175,11 @@ void ast_compiler::compile_def(ast* root) {
         // If this is a method, then the compilation symbol parent must be a type (struct, union, etc)
         bool method = root_sym && root_sym->is_variable() && root_sym->variable.t->is_primitive(primitive_type::TYPE); 
         
-        // TODO Can be something other than variable?
+        // TODO Overloads?
         if (method) {
             nsym = root_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
         } else {
             // Non-methods _always_ go in the root ST.
-            // TODO fix scoping being the root_st instead of local
             nsym = mod_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
         }
         
@@ -194,11 +194,11 @@ void ast_compiler::compile_def(ast* root) {
         type t{tt, 0, type_function{}, false, false};
         
         // Actual function type
-        type_superfunction sf{&t, {}, {}, false, false, nsym->variable.st};
+        type_superfunction sf{tt.add_temp(t), {}, {}, false, false, nsym->variable.st};
         
         type sft{tt, 0, sf, false, false};
         
-        ast* val = ast::make_nntype({&sft}, def->tok, tt.TYPE);
+        ast* val = ast::make_nntype({tt.add_temp(sft)}, def->tok, tt.TYPE);
         
         // To get compiletime values from function
         ast_compiler sub_compiler{comp, mod, nullptr, ftable, nsym};
@@ -268,10 +268,11 @@ void ast_compiler::compile_def(ast* root) {
             // Wait until the parent type has been defined
             // This works because methods have no influence on the parent type, so
             // it must eventually be defined, if nothing else breaks
-            define_loop(root_sym);
+            bool res = define_loop(root_sym);
+            type* thstype = res ? root_sym->variable.value->nntype.t : tt.ERROR_TYPE;
             
             // The parent type is now properly defined, so the type is also valid
-            add_param(grammar::KW_REF, "this", nullptr, false, root_sym->variable.value->nntype.t, false);
+            add_param(grammar::KW_REF, "this", nullptr, false, thstype, false); // First parameter, nothing else has been added uwu
             params.back().thisarg = true;
             
             // Just like normal parameters, add "this" to the function st
@@ -412,12 +413,15 @@ void ast_compiler::compile_def(ast* root) {
             }
         }
         
+        // Function types are always compiletime
+        nsym->variable.compiletime = true;
+        
         if (!any_infer) {
             // If nothing is inferred, the function's type is complete, else we have to wait
-            type* rf = tt.add_function(t.function, false, false);
-            sf.function = rf;
-            type* rcf = tt.add_superfunction(sf, false, false);
-            nsym->variable.t = rcf;
+            
+            val->nntype.t->sfunction.function = tt.update_temp(val->nntype.t->sfunction.function);
+            val->nntype.t = tt.update_temp(val->nntype.t);
+            nsym->variable.t = val->nntype.t;
             
             nsym->variable.defined = true;
         }
@@ -468,14 +472,14 @@ void ast_compiler::compile_def(ast* root) {
                 }
             }
             
-            type* rf = tt.add_function(t.function, false, false);
-            sf.function = rf;
-            type* rcf = tt.add_superfunction(sf, false, false);
-            nsym->variable.t = rcf;
+            val->nntype.t->sfunction.function = tt.update_temp(val->nntype.t->sfunction.function);
+            val->nntype.t = tt.update_temp(val->nntype.t);
+            nsym->variable.t = val->nntype.t;
             
-            nsym->variable.compiletime = true;
             nsym->variable.defined = true;
         }
+        
+        nsym->variable.call_ready = true;
 
     } else {
         ASSERT(false, "Invalid def target");
@@ -551,12 +555,42 @@ void ast_compiler::compile_zero(ast* node) {
     auto& zero = node->zero;
     switch (zero.sym) {
         case grammar::KW_PLACEHOLDER: [[fallthrough]];
-        case grammar::KW_THIS: [[fallthrough]];
         case grammar::KW_RAISE: [[fallthrough]];
         case grammar::KW_BREAK: [[fallthrough]];
         case grammar::KW_CONTINUE:
             node->compiled = node;
             break;
+        case grammar::KW_THIS: {
+            symbol* ths = root_st.find("this").second;
+            if (ths) {
+                if (ths->is_variable()) {
+                    ast* iden = ast::make_iden({ths}, node->tok, ths->variable.t);
+                    
+                    ASSERT(ths != root_sym, "this was the root symbol, somehow");
+                    
+                    bool res = true;
+                    if (!ths->variable.defined) {
+                        res = define_loop(ths); // This yields
+                    }
+                    
+                    iden->compiled = iden;
+                    iden->compiletime = ths->variable.compiletime;
+                    iden->t = res ? ths->variable.t : tt.ERROR_TYPE;
+                    node->compiled = iden;
+                    node->t = iden->t;
+                    
+                } else {
+                    mod.errors.push_back({node, "'this' is not a variable"});
+                    node->compiled = node;
+                    node->t = tt.ERROR_TYPE;
+                }
+            } else {
+                mod.errors.push_back({node, "'this' is not available"});
+                node->compiled = node;
+                node->t = tt.ERROR_TYPE;
+            }
+            break;
+        }
         default:
             logger::error() << node->to_simple_string();
             ASSERT(false, "Unknown zero node");
@@ -1165,7 +1199,32 @@ void ast_compiler::compile_function(ast* node) {
 }
 
 void ast_compiler::compile_iden(ast* node) {
-    (void) node;
+    ASSERT(node->is_iden(), "node was not identifier");
+    
+    std::string& sym_name = node->tok->content;
+    
+    auto [st, sym] = root_st.find(sym_name);
+    if (!sym) {
+        mod.errors.push_back({node, ss::get() << sym_name << " could not be found" << ss::end()});
+        node->compiled = node;
+        node->compiletime = false;
+    } else {
+        bool var = sym->is_variable();
+        bool res = true;
+        if (sym != root_sym && var && !sym->variable.defined) {
+            res = define_loop(sym); // Yields
+        }
+        
+        node->iden.s = sym;
+        node->compiled = node;
+        if (var) {
+            node->compiletime = sym->variable.compiletime;
+            node->t = res ? sym->variable.t : tt.ERROR_TYPE;
+        } else {
+            node->compiletime = true;
+            node->t = tt.TYPELESS;
+        }
+    }
 }
 
 void ast_compiler::compile_function_call(ast* node, ast* first) {
@@ -1276,9 +1335,16 @@ void ast_compiler::compile_dot_expression(ast* node, bool allow_star) {
             return;
         }
         
+        // Do not try to define the root_sym, just skip over that
+        bool res = true;
+        if (found != root_sym && found->is_variable() && !found->variable.defined) {
+            res = define_loop(found); // This yields
+        }
+        
         iden->iden.s = found;
         iden->compiled = iden;
         iden->compiletime = last->compiled->compiletime && (found->is_variable() ? found->variable.compiletime : true);
+        iden->t = res ? (found->is_variable() ? found->variable.t : tt.TYPELESS) : tt.ERROR_TYPE;
         
         if (binary.right->is_binary() && binary.right->binary.sym == grammar::OPAREN) { // Function call
             compile_function_call(binary.right, last_value);
@@ -1308,7 +1374,7 @@ ast* ast_compiler::get_compiletime_value(ast* node) {
     return nullptr;
 }
 
-void ast_compiler::size_loop(type* t) {
+bool ast_compiler::size_loop(type* t) {
     ASSERT(fiber::this_fiber() != nullptr, "Code needs to be called from inside fiber");
     
     u8 tries = 10; // TODO heuristcsss
@@ -1320,23 +1386,37 @@ void ast_compiler::size_loop(type* t) {
     }
     if (!tries) {
         fiber::crash(); // TODO :(
+        return false;
     }
+    return true;
 }
 
-void ast_compiler::define_loop(symbol* sym) {
+// TODO Figure out pointer/reference double recursive dependencies
+bool ast_compiler::define_loop(symbol* sym) {
     ASSERT(fiber::this_fiber() != nullptr, "Code needs to be called from inside fiber");
-    ASSERT(sym->tt == symbol_type::VARIABLE, "Only variables can be undefined");
+    ASSERT(sym->is_variable(), "Only variables can be undefined");
+    ASSERT(!root_sym || root_sym->is_variable(), "Root symbol was not a variable");
     
+    ast* iden {nullptr};
     
-    u8 tries = 10; // TODO heuristcsss
+    if (root_sym) {
+        iden = ast::make_iden({sym}, nullptr, tt.TYPELESS);
+        root_sym->variable.depends.push_back(iden);
+    }
+    
     bool stall = false;
-    while (--tries && !sym->variable.defined) {
+    bool res = true;
+    while ((res = (!sym->variable.defined && !sym->has_cyclical_dependency(sym)))) {
         fiber::yield(stall);
         stall = true;
     }
-    if (!tries) {
-        fiber::crash(); // TODO :(
+    
+    if (root_sym) {
+        root_sym->variable.depends.remove(iden);
+        delete iden;
     }
+    
+    return res;
 }
 
 std::string ast_compiler::conversion_error(type* from, type* to) {

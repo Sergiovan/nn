@@ -1,6 +1,9 @@
 #include "common/symbol_table.h"
 #include "common/type.h"
 #include "common/util.h"
+#include "common/ast.h"
+
+#include <algorithm>
 
 symbol::symbol() : tt{symbol_type::LABEL}, name{}, owner{nullptr}, decl{nullptr}, label{} {
     
@@ -98,6 +101,42 @@ bool symbol::is_module() {
 
 bool symbol::is_label() {
     return tt == symbol_type::LABEL;
+}
+
+using DFSTable = std::unordered_map<symbol*, std::pair<bool, bool>>;
+
+bool dfs(symbol* var, DFSTable& recursion_stack) {
+    if (!var->is_variable()) {
+        return false; // No cycles on non-variables
+    }
+    
+    if (!recursion_stack[var].first) {
+        recursion_stack[var] = {true, true};
+        
+        for (auto dependency : var->variable.depends) {
+            symbol* s = dependency->iden.s;
+            if (!recursion_stack[s].first && dfs(s, recursion_stack)) {
+                return true;
+            } else if (recursion_stack[var].second) {
+                return true;
+            }
+        }
+    }
+    
+    recursion_stack[var].second = false;
+    return false;
+}
+
+bool symbol::has_cyclical_dependency(symbol* sym) {
+    symbol* current {this};
+
+    if (!current->variable.depends.count) {
+        return false;
+    }
+    
+    DFSTable recursion_stack{}; // If a node has been visited / is being visited by the dfs algorithm
+    
+    return dfs(sym, recursion_stack); // Only one path traveled
 }
 
 symbol_table::symbol_table(symbol* owner) : owner{owner} {

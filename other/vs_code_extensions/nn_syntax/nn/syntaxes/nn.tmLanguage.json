@@ -75,7 +75,7 @@
 		"invalid": {
 			"patterns": [{
 				"name": "invalid.illegal",
-				"match": "\\b(and|or|match|yield|dynamic|static)\\b"
+				"match": "\\b(and|or|match|yield|gen|dynamic|static)\\b"
 			}]
 		},
 		"constant": {

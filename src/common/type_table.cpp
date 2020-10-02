@@ -84,6 +84,50 @@ type* type_table::add_special(const type_special& s, const bool _const, const bo
     return get_or_add(&t);
 }
 
+type* type_table::add_temp(type& t) {
+    type* nt = new type{std::move(*&t)};
+    nt->id = types.size();
+    types.push_back(nt);
+    // No mangle table
+    return nt;
+}
+
+// TODO Remove duplicates and keep open spots tracked
+type* type_table::update_temp(type* t) {
+    switch (t->tt) {
+        case type_type::PRIMITIVE: [[fallthrough]];
+        case type_type::SPECIAL: {
+            ASSERT(false, "Primitive and special types cannot be temporaries");
+            return nullptr;
+        }
+        case type_type::POINTER: [[fallthrough]];
+        case type_type::ARRAY: [[fallthrough]];
+        case type_type::STRUCT: [[fallthrough]];
+        case type_type::UNION: [[fallthrough]];
+        case type_type::ENUM: [[fallthrough]];
+        case type_type::TUPLE: [[fallthrough]];
+        case type_type::SUPERFUNCTION: {
+            mangle_table.insert({mangle(t), t});
+            return t;
+        }
+        case type_type::COMPOUND: [[fallthrough]];
+        case type_type::FUNCTION: {
+            std::string mangled = mangle(t);
+            if (mangle_table.count(mangled) > 0) { // Already exists...
+                types[t->id] = nullptr;
+                delete t;
+                return mangle_table[mangled];
+            } else {
+                mangle_table.insert({mangled, t});
+                return t;
+            }
+        }
+    }
+    
+    ASSERT(false, "Unknown type type");
+    return nullptr;
+}
+
 type* type_table::get(u64 id) const {
     return types[id];
 }

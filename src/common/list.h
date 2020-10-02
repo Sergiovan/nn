@@ -192,6 +192,7 @@ public:
             element->next = element->prev = nullptr;
         }
         --count;
+        return element;
     }
     
     fwd_iterator begin() {

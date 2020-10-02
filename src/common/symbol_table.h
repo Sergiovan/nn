@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/defs.h"
+#include "list.h"
 
 struct type;
 struct ast;
@@ -28,10 +29,13 @@ struct symbol_variable {
     bool used {false}; // If the value of this variable has been read or written to after initialization
     bool thisarg {false}; // If this is this
     bool member {false}; // If this is a member variable
+    bool undefined {false}; // Set to true if defining failed. For types this means there's a recursive cyclical dependency, usually
+    list<ast> depends {}; // Set to whichever symbols this is waiting on
     
     // Functions only
     bool infer_ret {false}; // If the return is entirely inferred
     bool compiletime_call{false}; // If the function can be _called_ at compiletime (All functions are available at compiletime, as they're simply types)
+    bool call_ready {false}; // If the function can be called, i.e. if it's been fully compiled, not just the type
     // bool add_e64 {false}; // If the return needs to have an e64 added // NOTE Removed, all errors explicit or inferred
     ast* gotos{nullptr}; // Stores gotos in the function that have not yet been handled. Temporary
     
@@ -87,6 +91,9 @@ struct symbol {
     bool is_namespace();
     bool is_module();
     bool is_label();
+    
+    // Checks if this node has a cyclical dependency on the path starting at from
+    bool has_cyclical_dependency(symbol* from);
 };
 
 class symbol_table {

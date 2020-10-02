@@ -40,8 +40,8 @@ private:
     
     ast* get_compiletime_value(ast* node);
     
-    void size_loop(type* t);
-    void define_loop(symbol* sym);
+    bool size_loop(type* t);
+    bool define_loop(symbol* sym);
     
     std::string conversion_error(type* from, type* to);
     

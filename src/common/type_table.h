@@ -17,6 +17,9 @@ public:
     type* add_superfunction(const type_superfunction& sf, const bool _const, const bool volat);
     type* add_special(const type_special& s, const bool _const, const bool volat);
     
+    type* add_temp(type& t);
+    type* update_temp(type* t);
+    
     type* get(u64 id) const;
     type* operator[](u64 id) const;
     
@@ -75,6 +78,8 @@ public:
 private:
     type* add(type* t);
     
+    // TODO Could this cause issues with supercompounds and superfunctions
+    // that point to the same thing?
     std::string mangle(type* t);
     type unmangle(const std::string& s);
     type* get(type* t);
