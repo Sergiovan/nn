@@ -127,7 +127,7 @@ bool type::set_size() {
                 case primitive_type::ERROR: [[fallthrough]];
                 case primitive_type::TYPE: [[fallthrough]];
                 case primitive_type::ANY: 
-                    size = std::ceil((float) primitive.bits / 8.f);
+                    size = (primitive.bits + 7) / 8;
                     sized = 1;
                     return true;
                 case primitive_type::VOID:
@@ -158,7 +158,7 @@ bool type::set_size() {
             for (auto member : compound.members) {
                 u64 msize {0};
                 if (member.reference) {
-                            msize = 8;
+                    msize = 8;
                 } else {
                     if (!member.t->sized && !member.t->set_size()) {
                         return false;

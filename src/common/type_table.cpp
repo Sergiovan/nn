@@ -385,7 +385,9 @@ type* type_table::add(type* t) {
     type* nt = new type{std::move(*t)};
     nt->id = types.size();
     types.push_back(nt);
-    mangle_table.insert({mangle(nt), nt});
+    if (!nt->is_supertype()) {
+        mangle_table.insert({mangle(nt), nt});
+    }
     return nt;
 }
 
@@ -571,6 +573,7 @@ std::string type_table::mangle(type* t) {
         case type_type::UNION: [[fallthrough]];
         case type_type::ENUM: [[fallthrough]];
         case type_type::TUPLE: {
+            ASSERT(false, "Cannot mangle supertypes");
             flags.len = required[__builtin_clz(t->scompound.comp->id)];
             mangled.resize(8 + flags.len);
             add1(flags.len, t->scompound.comp->id);
@@ -638,6 +641,7 @@ std::string type_table::mangle(type* t) {
             break;
         }
         case type_type::SUPERFUNCTION: {
+            ASSERT(false, "Cannot mangle supertypes");
             flags.len = required[__builtin_clz(t->sfunction.function->id)];
             mangled.resize(8 + flags.len);
             add1(flags.len, t->sfunction.function->id);
@@ -704,6 +708,7 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
         case type_type::UNION: [[fallthrough]];
         case type_type::ENUM: [[fallthrough]];
         case type_type::TUPLE: {
+            ASSERT(false, "Cannot mangle supertypes");
             ASSERT(tt[as_t[0]], "Type id pointed nowhere");
             dest->scompound = type_supercompound{tt[as_t[0]], false, false}; // TODO Generic/Generated
             break;
@@ -742,6 +747,7 @@ void unmangle_internal(type_table& tt, const char* d, type_type t, type* dest) {
             break;
         }
         case type_type::SUPERFUNCTION: {
+            ASSERT(false, "Cannot mangle supertypes");
             ASSERT(tt[as_t[0]], "Type id pointed nowhere");
             dest->sfunction = type_superfunction{tt[as_t[0]], {}, {}};
             break;
@@ -778,6 +784,7 @@ type type_table::unmangle(const std::string& s) {
 }
 
 type* type_table::get(type* t) {
+    ASSERT(!t->is_supertype(), "Cannot mangle supertypes");
     return mangle_table[mangle(t)];
 }
 
