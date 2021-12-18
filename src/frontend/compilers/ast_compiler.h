@@ -10,6 +10,7 @@ struct type;
 class type_table;
 struct symbol;
 class symbol_table;
+struct symbol_variable;
 
 class ast_compiler {
 public:
@@ -42,6 +43,7 @@ private:
     
     bool size_loop(type* t);
     bool define_loop(symbol* sym);
+    symbol* st_get_loop(symbol_variable& var, const std::string& name);
     
     std::string conversion_error(type* from, type* to);
     

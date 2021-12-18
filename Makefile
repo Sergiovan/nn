@@ -16,7 +16,7 @@ folders=$(sort $(dir $(shell find src/)))
 cpp=$(foreach var,$(folders),$(wildcard $(var)*.cpp))
 obj=$(patsubst %,$(objdir)/%,$(cpp:.cpp=.o))
 
-.PHONY: all clean debug release print generate
+.PHONY: all clean debug release print generate tree
 
 all: debug
 
@@ -30,6 +30,9 @@ profile: CXXFLAGS += -pg
 profile: CXXFLAGS += $(CXXDFLAGS)
 profile: LDFLAGS += -pg
 profile: $(target)
+
+tree: CXXFLAGS += -MM
+tree: $(target)
 
 $(target): $(obj)
 	@echo [$(CXX)] $@

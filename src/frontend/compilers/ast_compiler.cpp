@@ -41,6 +41,7 @@ void ast_compiler::compile_def(ast* root) {
                 ASSERT(!def->binary.left->is_zero(), "Name was placeholder"); // TODO Allow placeholder names and anonymous structs
                 // Add undefined symbol with struct name, for fibers fibers fibers
                 auto* sym = root_st.add_undefined(def->binary.left->tok->content, tt.TYPE, def);
+                // The symbol is in the current st, but its st is under the module st
                 sym->variable.st = mod_st.make_child(sym);
                 
                 // Make a new type for the struct, we'll pass it along to the upcoming compilation functions as-if it were a real type already
@@ -176,12 +177,7 @@ void ast_compiler::compile_def(ast* root) {
         bool method = root_sym && root_sym->is_variable() && root_sym->variable.t->is_primitive(primitive_type::TYPE); 
         
         // TODO Overloads?
-        if (method) {
-            nsym = root_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
-        } else {
-            // Non-methods _always_ go in the root ST.
-            nsym = mod_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
-        }
+        nsym = root_st.make_and_add_placeholder(name->tok->content, tt.NONE_FUNCTION, def);
         
         // All functions have their own scope, thus their own symbol table
         symbol_table* ftable = mod_st.make_child(nsym);
@@ -566,12 +562,7 @@ void ast_compiler::compile_zero(ast* node) {
                 if (ths->is_variable()) {
                     ast* iden = ast::make_iden({ths}, node->tok, ths->variable.t);
                     
-                    ASSERT(ths != root_sym, "this was the root symbol, somehow");
-                    
                     bool res = true;
-                    if (!ths->variable.defined) {
-                        res = define_loop(ths); // This yields
-                    }
                     
                     iden->compiled = iden;
                     iden->compiletime = ths->variable.compiletime;
@@ -770,7 +761,7 @@ void ast_compiler::compile_unary(ast* node) {
             ASSERT(assignment.left->is_block(), "Declarations were not a block");
             auto& decls = assignment.left->block;
             
-            std::vector<symbol*> declared_syms{};
+            std::vector<std::pair<symbol*, bool>> declared_syms{};
             std::vector<ast*> values{};
             
             for (auto decl_block : decls.elems) {
@@ -795,43 +786,53 @@ void ast_compiler::compile_unary(ast* node) {
                 
                 for (auto name : names.elems) {
                     symbol* sym = nullptr;
+                    bool added = false;
                     if (name->is_zero() && name->zero.sym == grammar::KW_PLACEHOLDER) {
                         sym = root_st.add_unnamed(block_type, decl_block, 
                                                   false, unary.sym == grammar::KW_LET, 
                                                   unary.sym == grammar::KW_REF, false, false);
+                        added = true;
                     } else {
                         ASSERT(name->is_iden(), "Name was not an identifier or a placeholder");
-                        sym = new symbol{
-                            name->tok->content, decl_block, symbol_variable{
-                                block_type, nullptr, nullptr, false, 
-                                unary.sym == grammar::KW_LET, 
-                                unary.sym == grammar::KW_REF, // TODO Add checks for assignment to things without an address, const, etc
-                                false, false, false, false
-                            }
-                        }; // Not added here to shadow previous declarations
-                        if (!sym) {
+                        if (root_st.get(name->tok->content)) {
                             mod.errors.push_back({name, "Variable already exists"});
                             sym = root_st.get(name->tok->content);
+                            added = true;
+                        } else {
+                            sym = new symbol{
+                                name->tok->content, decl_block, symbol_variable{
+                                    block_type, nullptr, nullptr, false, 
+                                    unary.sym == grammar::KW_LET, 
+                                    unary.sym == grammar::KW_REF, // TODO Add checks for assignment to things without an address, const, etc
+                                    false, false, false, false
+                                }
+                            }; // Not added here to shadow previous declarations
                         }
                     }
-                    declared_syms.push_back(sym);
+                    declared_syms.push_back({sym, added});
                 }
             }
             
             bool last_is_compound{false};
             if (!assignment.right->is_none()) {
                 ASSERT(assignment.right->is_block(), "Invalid assignment");
-                // u64 i{0}, j{0};
+                u64 i{0};
                 for (auto value : assignment.right->block.elems) {
                     compile(value);
                     
-                    type* value_type = value->t;
+                    auto [sym, decl] = declared_syms[i];
+                    if (!decl) {
+                        root_st.add(sym->name, sym);
+                    }
+                    ++i;
+                    
+                    type* value_type = value->compiled->t;
                     
                     if (value_type->is_compound()) {
                         last_is_compound = true; // TODO Not good enough to prevent value overflow
                         for (u64 i = 0; i < value_type->compound.members.size(); ++i) {
                             ast* selected_value = ast::make_binary({
-                                grammar::OSELECT, value, 
+                                grammar::OSELECT, value->compiled, 
                                 ast::make_value({i}, value->tok, tt.U64)
                             }, value->tok, value_type->compound.members[i].t);
                             assignment.right->block.at_end.push_back(selected_value); // This ensures it'll be deleted
@@ -839,48 +840,57 @@ void ast_compiler::compile_unary(ast* node) {
                         }
                     } else {
                         last_is_compound = false;
-                        values.push_back(value);
+                        values.push_back(value->compiled);
                     }
                     // ++i; ++j;
+                }
+                for (;i < declared_syms.size(); ++i) {
+                    auto [sym, decl] = declared_syms[i];
+                    if (!decl) {
+                        root_st.add(sym->name, sym);
+                    }
                 }
             }
             
             u64 i = 0;
             for (; i < declared_syms.size() && i < values.size(); ++i) {
-                if (!tt.can_convert_weak(values[i]->t, declared_syms[i]->variable.t)) {
+                symbol* sym = declared_syms[i].first;
+                if (!tt.can_convert_weak(values[i]->t, sym->variable.t)) {
                     if (values[i]->t == tt.GENERIC_COMPOUND) {
                         u64 j = i;
                         for (; i < declared_syms.size(); ++i) {
-                            declared_syms[i]->variable.value = values[j];
-                            declared_syms[i]->variable.t = tt.GENERIC_UNKNOWN;
-                            declared_syms[i]->variable.defined = true;
+                            sym->variable.value = values[j];
+                            sym->variable.t = tt.GENERIC_UNKNOWN;
+                            sym->variable.defined = true;
                         }
                         last_is_compound = true;
                     } else if (values[i]->t == tt.ERROR_COMPOUND) {
                         u64 j = i;
                         for (; i < declared_syms.size(); ++i) {
-                            declared_syms[i]->variable.value = values[j];
-                            declared_syms[i]->variable.t = tt.ERROR_TYPE;
-                            declared_syms[i]->variable.defined = true;
+                            sym->variable.value = values[j];
+                            sym->variable.t = tt.ERROR_TYPE;
+                            sym->variable.defined = true;
                         }
                         last_is_compound = true;
                     } else {
-                        mod.errors.push_back({values[i], conversion_error(values[i]->t, declared_syms[i]->variable.t)});
+                        mod.errors.push_back({values[i], conversion_error(values[i]->t, sym->variable.t)});
                     }
                 } else {
-                    declared_syms[i]->variable.value = values[i];
-                    declared_syms[i]->variable.t = values[i]->t;
-                    declared_syms[i]->variable.defined = true;
+                    sym->variable.value = values[i];
+                    sym->variable.t = values[i]->t;
+                    sym->variable.defined = true;
                 }
             }
             
             if (i < declared_syms.size()) { // We ran out of values, zero the rest
                 for (; i < declared_syms.size(); ++i) {
-                    ast* selected_value = ast::make_value({0}, declared_syms[i]->decl->tok, declared_syms[i]->variable.t);
+                    symbol* sym = declared_syms[i].first;
+                    
+                    ast* selected_value = ast::make_value({0}, sym->decl->tok, sym->variable.t);
                     assignment.right->block.at_end.push_back(selected_value);
-                    declared_syms[i]->variable.value = selected_value;
-                    declared_syms[i]->variable.t = selected_value->t;
-                    declared_syms[i]->variable.defined = true;
+                    sym->variable.value = selected_value;
+                    sym->variable.t = selected_value->t;
+                    sym->variable.defined = true;
                 }
             } else if (i < values.size()) { // We ran out of syms, is this allowed?
                 if (!last_is_compound) {
@@ -891,7 +901,7 @@ void ast_compiler::compile_unary(ast* node) {
             // Everything accounted for, simplify
             ast* simplified = ast::make_block({}, node->tok, tt.TYPELESS);
             for (i = 0; i < declared_syms.size(); ++i) {
-                symbol* sym = declared_syms[i];
+                symbol* sym = declared_syms[i].first;
                 simplified->block.elems.push_back(ast::make_unary({
                     grammar::KW_DEF, ast::make_iden({
                         sym
@@ -1210,8 +1220,13 @@ void ast_compiler::compile_iden(ast* node) {
         node->compiletime = false;
     } else {
         bool var = sym->is_variable();
+        // If we're in a supercompound and referring to a supercompound, we can use incomplete types
+        bool skip_define = root_sym->is_variable() && root_sym->variable.t == tt.TYPE &&
+                            root_sym->variable.value->nntype.t->is_supercompound() && var && 
+                            sym->variable.t == tt.TYPE && sym->variable.value->nntype.t->is_supercompound();
         bool res = true;
-        if (sym != root_sym && var && !sym->variable.defined) {
+        // Skip over type completeness iff we're in a compound AND we're trying to get another compound
+        if (!skip_define && var && !sym->variable.defined) {
             res = define_loop(sym); // Yields
         }
         
@@ -1417,6 +1432,13 @@ bool ast_compiler::define_loop(symbol* sym) {
     }
     
     return res;
+}
+
+symbol* st_get_loop(symbol_variable& var, const std::string& name) {
+    ASSERT(fiber::this_fiber() != nullptr, "Code needs to be called from inside fiber");
+    
+    
+    
 }
 
 std::string ast_compiler::conversion_error(type* from, type* to) {
