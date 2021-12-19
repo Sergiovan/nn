@@ -1,50 +1,84 @@
 # ROADMAP
 
-This document describes how the project will proceed, roughly, mostly, probably, at least if I have something to say about it. 
+This document describes how the project will proceed, roughly, mostly, probably, at least if I have something to say about it. Note that each version is a feature target, meaning if v0.1 is "Better C" then v0.0.* are all implementing that, and v0.1 has it all implemented.
 
-The DONE section shows milestones already reached.
-
-The TODO section shows semi-psuedo-vaguely-immediate issues that should be tackled. 
-
-The IMMEDIATE FUTURE section shows what's upcoming next.
-The FUTURE section shows what's to happen in a non-chronological, semi-accurate, per-release basis.
-
-The WHISHLIST section shows things that I would like to get done at some point because I think they're neat.
-
-## DONE
-- There doesn't seem to be anything here yet...
-
-## TODO
-For v0.0.1.
-- **Translation**:
-    - Spec:
-        - Entire thing.
-    - Lexer:
-        - Entire thing.
-    - Parser:
-        - Entire thing.
-    - LLVM backend:
-        - Entire thing.
-
-## IMMEDIATE FUTURE
 - **v0.0**: Project start.
-- **v0.0.1**: All example programs compile from start to finish and produce correct output. 
-- **v0.0.2**: AST Optimizations.
-- **v0.1**: Syntax and semantics works as specc'd envisioned, if not perfectly.
-
-## FUTURE
-- **v0.2**: Metaprogramming.
-- **v0.3**: Proper command line interface.
-- **v0.4**: Better debugging.
-- **v0.5**: Serious optimizations.
-- **v0.6**: Neat extras.
-- **v0.7**: Custom RISC-V backend and assembler.
-- **v0.8**: Bootstrapping.
+- **v0.1**: Better c.
+    - Mostly only language features that overlap with C, with nn syntax:
+        - Basic datatypes signed and unsigned integers, float, double, boolean, void.
+        - Declaring and defining variables, functions, structs, untagged unions, enums. 
+        - Pointers.
+        - if, while, match-case, goto, loop-while, break, continue, return.
+        - Integer and string literals.
+        - extern blocks, for C functions.
+    - Following exceptions to C:
+        - null instead of NULL.
+        - import instead of #include.
+        - label statement for labels.
+        - if expression instead of ternary operator.
+        - No default fallthrough on switch-case.
+        - No typedef but using statement.
+        - No preprocessor.
+        - No declaring anything volatile, register, inline, restrict, static, keywords with _.
+        - No arrays.
+        - No arrow syntax for dereferencing.
+        - No asm.
+        - No bitfields.
+    - From code to LLVM backend.
+- **v0.2**: Internal rearrangement.
+    - Proper import rules
+    - "asynchronous" compilation.
+- **v0.3**: Basic nn features.
+    - Multiple return.
+    - any, char, error, tuple, array.
+    - raise, defer, try-catch, for statements.
+    - namespaces and name importing.
+    - Multiaccess and select operators.
+    - Uniform function call syntax.
+    - new and delete.
+    - if, while, switch initializers.
+    - match expression.
+    - block expression.
+    - void initialization, zero by default.
+    - type type, type properties.
+    - Literal identifiers (syntax for keywords as identifiers)
+    - Type inference.
+    - Lambdas.
+    - Captures for functions.
+    - Bit operators, destructuring.
+    - Anonymous variables, functions, types.
+    - this, struct/enum/union functions.
+- **v0.4**: Compiletime code, metaprogramming and notes.
+    - Types as compiletime expressions.
+    - Compiletime-only variables and functions.
+    - Generics.
+    - Static code generation.
+    - Conditional compilation.
+    - Compiletime folding.
+    - Running programs as scripts.
+    - Compiler directives as code.
+- **v0.5**: Advanced nn features.
+    - Tagged unions.
+    - Pattern matching.
+    - Generators.
+    - dyanmic and static overloading.
+    - Advanced pointer types.
+    - Moving vs Copying.
+    - Import/Export (libraries).
+    - Constructors/Destructors.
+    - Operator overloading.
+- **v0.6**: Low level stuff.
+    - Asm blocks.
+    - Bitfields.
+    - Alignment.
+    - Data at specific locations.
+- **v0.7**: Non-LLVM backend.
+    - x86_64-linux?
+    - RISC-V-none
+- **v0.8**: Bootstrap.
+    - What else to say?
 - **v0.9**: Polish.
-- **v1.0**: Compiler.
-
-## WISHLIST
-- Syntax information interface.
-- Language server interface.
-- Minimal IDE.
-- S OS.
+    - Command line interface.
+    - Error and warning handling.
+    - Tests.
+- **v1.0**: Compiler!
