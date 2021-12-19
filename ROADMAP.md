@@ -29,7 +29,6 @@ This document describes how the project will proceed, roughly, mostly, probably,
     - Proper import rules
     - "asynchronous" compilation.
 - **v0.3**: Basic nn features.
-    - Multiple return.
     - any, char, error, tuple, array.
     - raise, defer, try-catch, for statements.
     - namespaces and name importing.
@@ -43,11 +42,14 @@ This document describes how the project will proceed, roughly, mostly, probably,
     - type type, type properties.
     - Literal identifiers (syntax for keywords as identifiers)
     - Type inference.
+    - Multiple return.
+    - Nested functions.
     - Lambdas.
     - Captures for functions.
     - Bit operators, destructuring.
     - Anonymous variables, functions, types.
     - this, struct/enum/union functions.
+    - Named parameters.
 - **v0.4**: Compiletime code, metaprogramming and notes.
     - Types as compiletime expressions.
     - Compiletime-only variables and functions.
@@ -61,6 +63,7 @@ This document describes how the project will proceed, roughly, mostly, probably,
     - Tagged unions.
     - Pattern matching.
     - Generators.
+    - Named returns.
     - dyanmic and static overloading.
     - Advanced pointer types.
     - Moving vs Copying.

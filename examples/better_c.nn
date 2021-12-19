@@ -1,1 +1,122 @@
-// brb
+import better_c_extern; // Import statement
+
+def fun foo(-> u0) {
+    puts("Function call!");
+}
+
+def fun bar(arg: u32 -> u32) {
+    // Return and arithmetic
+    return arg + 1;
+}
+
+// Struct
+def struct s {
+    a: u32;
+    b: u32;
+}
+
+// Union
+def union u {
+    a: u32;
+    b: f32;
+}
+
+def enum e {
+    A, B, C
+}
+
+def fun test_struct(st: *s) {
+    s.a = 1;
+    @s.b = 2;
+}
+
+// Main function, parameters
+def fun main(argc: u32, argv: *u8) {
+    puts(argv); // Call extern function
+
+    // If with comparison
+    if argc < 2 {
+        puts("There's not a lot of args huh");
+    } else {
+        puts("There's quite a lot of args, wowa");
+    }
+
+    // Variable declaration
+    var i: u32 = 10;
+
+    // Loop
+    loop {
+        puts("Loop");
+        // Complex expression, single line if
+        if !!--i then break; 
+    }
+
+    // Assignment
+    i = 5;
+
+    // loop-while
+    loop {
+        puts("Loop-while");
+        --i;
+    } while i > 0;
+
+    // Pointer shenanigans
+    var ip: *u32 = *i;
+    @ip = 10;
+
+    // Simple while
+    while i < 10 {
+        puts("While");
+        --i;
+    }
+
+    // Complex while (as for)
+    while var j: u32 = 0; j < 10; ++j {
+        puts("Another while");
+    }
+
+    // Match (as switch)
+    match i {
+        case 0 {
+            puts("It's zero!");
+        }
+        else then break;
+    }
+
+    // Declaring struct, union and enum
+    var st: s = `{1, 2};
+    var un: u = `{3};
+    var en: e = e.A;
+
+    // Match on enum value }
+    match en {
+        case e.A {
+            puts("en == e.A!");
+        }
+        case e.B {
+            puts("en == e.B!");
+        }
+        else then puts("I have no clue fam");
+    }
+
+    // Pass via pointer into function
+    test_struct(*st);
+    if st.a != 1 || st.b != 2 {
+        puts("Confounded emoji");
+    } else {
+        puts("Everything is good!");
+    }
+
+    // Check same location for unions
+    un.b = 0;
+    if bar(un.a) != 1 {
+        puts("Memory integrity failed, we dying now");
+    } else {
+        puts("The universe can rest in peace, phew");
+    }
+
+    // Signed number
+    var ddd: s32 = -1;
+
+    return ddd + 0x1;
+}
