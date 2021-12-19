@@ -1,57 +1,15 @@
-# Prerequisites
-*.d
+# Rust
+debug/
+target/
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+Cargo.lock
 
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# Output folder
-.idea/
-out/
-cmake-build-debug/
-**/CMakeLists.txt
-nbproject/
-
-# IDE
-.kdev4/
-nn.kdev4
-
-# Output
-/nn
-lobj/
-*.generated*
-autogen.mk
+**/*.rs.bk
 
 # VSCode
 .vscode/
 .vscodeignore
 *.vsix
 
-# npm
+# Node
 package-lock.json
