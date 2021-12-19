@@ -1,1 +1,174 @@
-tbd
+// Comment
+/* Multiline comment */
+
+// Type keywords
+u0 // void
+u1 // bool
+u8 // unsigned 8-bit
+u16 // unsigned 16-bit
+u32 // unsigned 32-bit
+u64 // unsigned 64-bit
+s8 // signed 8-bit
+s16 // signed 16-bit
+s32 // signed 32-bit
+s64 // signed 64-bit
+f32 // floating point single precision
+f64 // floating point double precision
+struct
+union
+enum
+fun // function
+
+// Box keywords
+
+var // variable
+const // constant
+def // define
+
+// Control flow keywords
+if 
+then 
+else 
+while
+loop
+match
+case
+break
+continue
+goto
+label
+
+// Operator keywords
+sizeof
+as
+
+// Literal keywords
+true
+false
+null
+
+// Other keywords
+import
+from
+extern
+using
+
+// Reserved keywords
+c8 // character 8-bit (UTF-8)
+c16 // character 16-bit (UTF-16)
+c32 // character 32-bit (UTF-32)
+e32 // error
+any // any type
+infer // infer type
+tuple
+type // type type
+let // Compiletime variable
+ref // Reference
+volat // volatile
+inline
+align // Align box
+for
+raise
+defer
+try
+catch
+yield
+async
+await
+new
+delete
+_
+this
+static
+dynamic
+namespace
+asm // assembly block
+import
+export
+operator
+in
+typeof
+and
+or
+gen // Generator
+lambda
+cte // Compile time execution
+
+// Symbols
++ // Add, Shared pointer
+++ // Increment
+- // Negate, subtract
+-- // Decrement
+= // Assign
+== // Equals
+> // Greater than
+>> // Shift right
+< // Less than
+<< // Shift left
+>= // Greater or equal than
+<= // Less or equal than, strong arrow left
+=> // Strong arrow right
+( // Open paren
+) // Close paren
+`( // Open tuple literal
+{ // Open brace
+} // Close brace
+`{ // Open struct literal
+[ // Open bracket
+] // Close bracket
+`[ // Open array literal
+. // Access
+.. // Concatenate
+... // Spread, destructure
+.( // Tuple Multiaccess
+.{ // Generic Multiaccess
+.[ // Array Multiaccess
+: // Of type
+:: // Select, Choose
+-> // Return type, Arrow right
+<- // Move, Arrow left
+! // Bitwise not
+!! // Logical not
+@ // Dereference
+# // Hash
+% // Modulo
+^ // Binary xor
+^^ // Logical xor
+& // Binary and
+&& // Logical and
+| // Binary or
+|| // Logical or
+@^ // Flip bit at
+@& // Unset bit at
+@| // Set bit at
+@? // Check bit at
+* // Pointer to, multiply, address of
+~ // Info
+; // Semicolon
+/ // Divide
+? // Propagate
+<> // Diamond
+~> // Weak arrow right
+<~ // Weak arrow left
+|> // Mix left
+<| // Mix left
+?? // Nullish coalescence
+
+// Literals (regexish)
+0x[0-9a-fA-F]+ // Hexadecimal
+0o[0-7]+ // Octal
+0b[01]+ // Binary
+\d(\d|_\d|'\d)* // Decimal
+\d(\d|_\d|'\d)*\.\d(\d|_\d|'\d)* // Float
+
+'.' // Char
+[_a-zA-Z][_a-zA-Z0-9]+' // Identifier literal
+"([^"]|\\\")+" // String literal
+
+// Identifiers
+[_a-zA-Z][_a-zA-Z0-9]+
+$"([^"]|\\\")+"
+
+// Notes
+$[
+$[_a-zA-Z0-9]+

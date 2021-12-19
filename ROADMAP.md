@@ -36,7 +36,7 @@ This document describes how the project will proceed, roughly, mostly, probably,
     - Multiaccess and select operators.
     - Uniform function call syntax.
     - new and delete.
-    - if, while, switch initializers.
+    - if, while, match initializers.
     - match expression.
     - block expression.
     - void initialization, zero by default.
