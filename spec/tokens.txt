@@ -119,6 +119,7 @@ cte // Compile time execution
 [ // Open bracket
 ] // Close bracket
 `[ // Open array literal
+, // Comma
 . // Access
 .. // Concatenate
 ... // Spread, destructure

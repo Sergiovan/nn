@@ -12,7 +12,7 @@ pub enum TokenData {
     CHR(char),
     STR(String),
     NOTE(String),
-    COMMENT(String),
+    COMMENT{text: String, block: bool},
     U0, U1, U8, U16, U32, U64,
     S8, S16, S32, S64, F32, F64, 
     STRUCT, UNION, ENUM, FUN,
@@ -48,8 +48,8 @@ pub enum TokenData {
     OBRACE, CBRACE, OSTRUCT,
     OBRACK, CBRACK, OARRAY,
 
-    DOT, CONCAT, SPREAD,
-    DOTPAREN, DOTBRACE, DOTBRACKET,
+    COMMA, DOT, CONCAT, SPREAD,
+    DOTPAREN, DOTBRACE, DOTBRACK,
     COLON, BIND, LARROW, RARROW,
     BANG, LNOT, AMPERSAND, LAND, VBAR, LOR, CARET, LXOR,
     AT, HASH, PERCENT, BITSET, BITCLEAR, BITFLIP, BITCHECK,
@@ -79,7 +79,180 @@ pub struct Token {
 
 pub struct LexInfo {
     pub tokens: Vec<Token>,
+}
 
+impl LexInfo {
+    pub fn recreate(&self) -> String {
+        self.tokens.iter().map(|tok| -> String {
+            match &tok.t {
+                TokenData::IDEN(i) => i.to_string(),
+                TokenData::INT(u) => u.to_string(),
+                TokenData::FLOAT(f) => f.to_string(),
+                TokenData::CHR(c) => c.to_string(),
+                TokenData::STR(s) => format!("\"{}\"", s),
+                TokenData::NOTE(n) => format!("${}", n),
+                TokenData::COMMENT{text: c, block: true} => format!("/*{}*/", c),
+                TokenData::COMMENT{text: c, block: false} => format!("//{}\n", c),
+                TokenData::U0 => "u0".to_string(),
+                TokenData::U1 => "u1".to_string(),
+                TokenData::U8 => "u8".to_string(),
+                TokenData::U16 => "u16".to_string(),
+                TokenData::U32 => "u32".to_string(),
+                TokenData::U64 => "u64".to_string(),
+                TokenData::S8 => "s8".to_string(),
+                TokenData::S16 => "s16".to_string(),
+                TokenData::S32 => "s32".to_string(),
+                TokenData::S64 => "s64".to_string(),
+                TokenData::F32 => "f32".to_string(),
+                TokenData::F64 => "f64".to_string(),
+                TokenData::STRUCT => "struct".to_string(),
+                TokenData::UNION => "union".to_string(),
+                TokenData::ENUM => "enum".to_string(),
+                TokenData::FUN => "fun".to_string(),
+                TokenData::VAR => "var".to_string(),
+                TokenData::CONST => "const".to_string(),
+                TokenData::DEF => "def".to_string(),
+                TokenData::IF => "if".to_string(),
+                TokenData::THEN => "then".to_string(),
+                TokenData::ELSE => "else".to_string(),
+                TokenData::WHILE => "while".to_string(),
+                TokenData::LOOP => "loop".to_string(),
+                TokenData::MATCH => "match".to_string(),
+                TokenData::CASE => "case".to_string(),
+                TokenData::BREAK => "break".to_string(),
+                TokenData::CONTINUE => "continue".to_string(),
+                TokenData::GOTO => "goto".to_string(),
+                TokenData::LABEL => "label".to_string(),
+                TokenData::SIZEOF => "sizeof".to_string(),
+                TokenData::AS => "as".to_string(),
+                TokenData::TRUE => "true".to_string(),
+                TokenData::FALSE => "false".to_string(),
+                TokenData::NULL => "null".to_string(),
+                TokenData::IMPORT => "import".to_string(),
+                TokenData::FROM => "from".to_string(),
+                TokenData::EXTERN => "extern".to_string(),
+                TokenData::USING => "using".to_string(),
+                TokenData::C8 => "c8".to_string(),
+                TokenData::C16 => "c16".to_string(),
+                TokenData::C32 => "c32".to_string(),
+                TokenData::E32 => "e32".to_string(),
+                TokenData::ANY => "any".to_string(),
+                TokenData::INFER => "infer".to_string(),
+                TokenData::TUPLE => "tuple".to_string(),
+                TokenData::TYPE => "type".to_string(),
+                TokenData::LET => "let".to_string(),
+                TokenData::REF => "ref".to_string(),
+                TokenData::VOLAT => "volat".to_string(),
+                TokenData::INLINE => "inline".to_string(),
+                TokenData::ALIGN => "align".to_string(),
+                TokenData::FOR => "for".to_string(),
+                TokenData::RAISE => "raise".to_string(),
+                TokenData::DEFER => "defer".to_string(),
+                TokenData::TRY => "try".to_string(),
+                TokenData::CATCH => "catch".to_string(),
+                TokenData::YIELD => "yield".to_string(),
+                TokenData::ASYNC => "async".to_string(),
+                TokenData::AWAIT => "await".to_string(),
+                TokenData::NEW => "new".to_string(),
+                TokenData::DELETE => "delete".to_string(),
+                TokenData::UNDERSCORE => "underscore".to_string(),
+                TokenData::THIS => "this".to_string(),
+                TokenData::STATIC => "static".to_string(),
+                TokenData::DYNAMIC => "dynamic".to_string(),
+                TokenData::NAMESPACE => "namespace".to_string(),
+                TokenData::ASM => "asm".to_string(),
+                TokenData::EXPORT => "export".to_string(),
+                TokenData::OPERATOR => "operator".to_string(),
+                TokenData::IN => "in".to_string(),
+                TokenData::TYPEOF => "typeof".to_string(),
+                TokenData::AND => "and".to_string(),
+                TokenData::OR => "or".to_string(),
+                TokenData::NOT => "not".to_string(),
+                TokenData::GEN => "gen".to_string(),
+                TokenData::LAMBDA => "lambda".to_string(),
+                TokenData::CTE => "cte".to_string(),
+                TokenData::PLUS => "+".to_string(),
+                TokenData::INCREMENT => "++".to_string(),
+                TokenData::MINUS => "-".to_string(),
+                TokenData::DECREMENT => "--".to_string(),
+                TokenData::EQ => "=".to_string(),
+                TokenData::EQEQ => "==".to_string(),
+                TokenData::NOTEQ => "!=".to_string(),
+                TokenData::GT => ">".to_string(),
+                TokenData::SHR => ">>".to_string(),
+                TokenData::LT => "<".to_string(),
+                TokenData::SHL => "<<".to_string(),
+                TokenData::GTEQ => ">=".to_string(),
+                TokenData::SLARROW => "<=".to_string(),
+                TokenData::SRARROW => "=>".to_string(),
+                TokenData::OPAREN => "(".to_string(),
+                TokenData::CPAREN => ")".to_string(),
+                TokenData::OTUPLE => "`(".to_string(),
+                TokenData::OBRACE => "{".to_string(),
+                TokenData::CBRACE => "}".to_string(),
+                TokenData::OSTRUCT => "`{".to_string(),
+                TokenData::OBRACK => "[".to_string(),
+                TokenData::CBRACK => "]".to_string(),
+                TokenData::OARRAY => "`[".to_string(),
+                TokenData::COMMA => ",".to_string(),
+                TokenData::DOT => ".".to_string(),
+                TokenData::CONCAT => "..".to_string(),
+                TokenData::SPREAD => "...".to_string(),
+                TokenData::DOTPAREN => ".(".to_string(),
+                TokenData::DOTBRACE => ".{".to_string(),
+                TokenData::DOTBRACK => ".[".to_string(),
+                TokenData::COLON => ":".to_string(),
+                TokenData::BIND => "::".to_string(),
+                TokenData::LARROW => "<-".to_string(),
+                TokenData::RARROW => "->".to_string(),
+                TokenData::BANG => "!".to_string(),
+                TokenData::LNOT => "!!".to_string(),
+                TokenData::AMPERSAND => "&".to_string(),
+                TokenData::LAND => "&&".to_string(),
+                TokenData::VBAR => "|".to_string(),
+                TokenData::LOR => "||".to_string(),
+                TokenData::CARET => "^".to_string(),
+                TokenData::LXOR => "^^".to_string(),
+                TokenData::AT => "@".to_string(),
+                TokenData::HASH => "#".to_string(),
+                TokenData::PERCENT => "%".to_string(),
+                TokenData::BITSET => "@|".to_string(),
+                TokenData::BITCLEAR => "@&".to_string(),
+                TokenData::BITFLIP => "@^".to_string(),
+                TokenData::BITCHECK => "@?".to_string(),
+                TokenData::ASTERISK => "*".to_string(),
+                TokenData::SQUIGGLY => "~".to_string(),
+                TokenData::SEMICOLON => ";".to_string(),
+                TokenData::SLASH => "/".to_string(),
+                TokenData::QM => "?".to_string(),
+                TokenData::PLUSEQ => "+=".to_string(),
+                TokenData::MINUSEQ => "-=".to_string(),
+                TokenData::ASTERISKEQ => "*=".to_string(),
+                TokenData::SLASHEQ => "/=".to_string(),
+                TokenData::PERCENTEQ => "%=".to_string(),
+                TokenData::SHLEQ => "<<=".to_string(),
+                TokenData::SHREQ => ">>=".to_string(),
+                TokenData::ANDEQ => "&=".to_string(),
+                TokenData::OREQ => "|=".to_string(),
+                TokenData::XOREQ => "^=".to_string(),
+                TokenData::BITSETEQ => "@|=".to_string(),
+                TokenData::BITCLEAREQ => "@&=".to_string(),
+                TokenData::BITFLIPEQ => "@^=".to_string(),
+                TokenData::CONCATEQ => "..=".to_string(),
+                TokenData::DIAMOND => "<>".to_string(),
+                TokenData::WLARROW => "<~".to_string(),
+                TokenData::WRARROW => "~>".to_string(),
+                TokenData::LPIPE => "<|".to_string(),
+                TokenData::RPIPE => "|>".to_string(),
+                TokenData::NULLISH => "??".to_string(),
+                TokenData::BACKTICK => "`".to_string(),
+                TokenData::NOTEOPEN => "$[".to_string(),
+                TokenData::DEFAULT => "/* DEFAULT TOKEN */".to_string(),
+                TokenData::ERROR(s) => format!("/* ERROR: {} */", s),
+                TokenData::LINEBREAK => "\n".to_string(),
+            }
+        }).collect::<Vec<_>>().join(" ")
+    }
 }
 
 pub struct Lexer {
@@ -684,7 +857,7 @@ impl Lexer {
                         }
                         Some('[') => {
                             self.next(); // [
-                            T::DOTBRACKET
+                            T::DOTBRACK
                         }
                         _ => T::DOT
                     }
@@ -853,7 +1026,7 @@ impl Lexer {
                                     }
                                 }
                             }
-                            T::COMMENT(s)
+                            T::COMMENT{text: s, block: false}
                         }
                         // Block comment (Currently no recursion)
                         Some('*') => {
@@ -891,7 +1064,7 @@ impl Lexer {
                                 }
                                 prev = c;
                             }
-                            T::COMMENT(s)
+                            T::COMMENT{text: s, block: true}
                         }
                         Some('=') => {
                             self.next(); // =
@@ -910,6 +1083,10 @@ impl Lexer {
                         _ => T::SQUIGGLY
                     }
                 }
+                ',' => {
+                    self.next(); // ,
+                    T::COMMA
+                }
                 ';' => {
                     self.next(); // ;
                     T::SEMICOLON
@@ -925,6 +1102,7 @@ impl Lexer {
                     }
                 }
                 _ => {
+                    self.next(); // ???
                     T::ERROR("Unknown character found".to_string())
                 }
             };

@@ -31,8 +31,8 @@ def fun test_struct(st: *s) {
 }
 
 // Main function, parameters
-def fun main(argc: u32, argv: *u8) {
-    puts(argv); // Call extern function
+def fun main(argc: u32, argv: **u8) {
+    puts(argv[0]); // Call extern function
 
     // If with comparison
     if argc < 2 {
