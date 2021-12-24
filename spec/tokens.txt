@@ -90,6 +90,7 @@ in
 typeof
 and
 or
+not
 gen // Generator
 lambda
 cte // Compile time execution
@@ -101,6 +102,7 @@ cte // Compile time execution
 -- // Decrement
 = // Assign
 == // Equals
+!= // Not equals
 > // Greater than
 >> // Shift right
 < // Less than
@@ -124,7 +126,7 @@ cte // Compile time execution
 .{ // Generic Multiaccess
 .[ // Array Multiaccess
 : // Of type
-:: // Select, Choose
+:: // Bind, Select, Choose
 -> // Return type, Arrow right
 <- // Move, Arrow left
 ! // Bitwise not
@@ -153,6 +155,21 @@ cte // Compile time execution
 |> // Mix left
 <| // Mix left
 ?? // Nullish coalescence
+
++= // Plus equals
+-= // Minus equals
+*= // Times equals
+/= // Divide equals
+%= // Modulo equals
+<<= // Shl equals
+>>= // Shr equals
+&= // And equals
+|= // Or equals
+^= // Xor equals
+@^= // Flip bit equals
+@&= // Clear bit equals
+@|= // Set bit equals
+..= // Concatenate equals
 
 // Literals (regexish)
 0x[0-9a-fA-F]+ // Hexadecimal
