@@ -152,8 +152,8 @@ cte // Compile time execution
 <> // Diamond
 ~> // Weak arrow right
 <~ // Weak arrow left
-|> // Mix left
-<| // Mix left
+|> // Pipe right
+<| // Pipe left
 ?? // Nullish coalescence
 
 += // Plus equals
