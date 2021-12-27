@@ -15,7 +15,7 @@ This document describes how the project will proceed, roughly, mostly, probably,
         - null instead of NULL.
         - import instead of #include.
         - label statement for labels.
-        - if expression instead of ternary operator.
+        - No ternary operator.
         - No default fallthrough on switch-case.
         - No typedef but using statement.
         - No preprocessor.

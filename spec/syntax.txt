@@ -14,7 +14,7 @@
 // Better C syntax
 
 type = ("u0" | "u8" | "u16" | "u32" | "u64" | "s8" | "s16" | "s32" | "s64" | "f32" | "f64" | 
-        "fun" funtype | "*" type | identifier) ;
+        "fun" funtype | "*" "const"? type | identifier) ;
 funtype = "(" (type; ",") ("->" type)? ")" ;
 box = ("const" | "var") ;
 block = "{" stmt* "}" ;
@@ -60,7 +60,7 @@ loopstmt = "loop" block ;
 
 matchstmt = "match" exrp matchblock ;
 matchblock = "{" case* "}" ;
-case = "case" expr block ;
+case = ("case" expr | "else") block ;
 
 returnstmt = "return" expr ";" ;
 
