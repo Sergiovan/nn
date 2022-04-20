@@ -3,21 +3,20 @@
 This document describes how the project will proceed, roughly, mostly, probably, at least if I have something to say about it. Note that each version is a feature target, meaning if v0.1 is "Better C" then v0.0.* are all implementing that, and v0.1 has it all implemented.
 
 - **v0.0**: Project start.
-- **v0.1**: Better c.
+- **v0.1**: Better c. See [explanation](./roadmap/0100_BETTER_C_NN.md)
     - Mostly only language features that overlap with C, with nn syntax:
         - Basic datatypes signed and unsigned integers, float, double, boolean, void.
         - Declaring and defining variables, functions, structs, untagged unions, enums. 
         - Pointers.
         - if, while, match-case, goto, loop-while, break, continue, return.
         - Integer and string literals.
-        - extern blocks, for C functions.
+        - Type aliases.
     - Following exceptions to C:
-        - null instead of NULL.
         - import instead of #include.
         - label statement for labels.
+        - extern blocks, for C functions.
         - No ternary operator.
         - No default fallthrough on switch-case.
-        - No typedef but using statement.
         - No preprocessor.
         - No declaring anything volatile, register, inline, restrict, static, keywords with _.
         - No arrays.
@@ -28,7 +27,7 @@ This document describes how the project will proceed, roughly, mostly, probably,
 - **v0.2**: Internal rearrangement.
     - Proper import rules
     - "asynchronous" compilation.
-- **v0.3**: Basic nn features.
+- **v0.3**: Basic nn features. See [explanation](./roadmap/0300_BASIC_NN.md)
     - any, char, error, tuple, array.
     - raise, defer, try-catch, for statements.
     - namespaces and name importing.
@@ -36,33 +35,37 @@ This document describes how the project will proceed, roughly, mostly, probably,
     - Uniform function call syntax.
     - new and delete.
     - if, while, match initializers.
-    - match expression.
-    - block expression.
+    - if, for, while, match, block expressions.
+    - Named blocks.
     - void initialization, zero by default.
-    - type type, type properties.
+    - type type, type properties, typeof.
+    - Advanced literals.
     - Literal identifiers (syntax for keywords as identifiers)
     - Type inference.
     - Multiple return.
     - Nested functions.
     - Lambdas.
     - Captures for functions.
-    - Bit operators, destructuring.
+    - Bit operators.
+    - Destructuring.
     - Anonymous variables, functions, types.
-    - this, struct/enum/union functions.
+    - this, This, struct/enum/union functions.
     - Named parameters.
 - **v0.4**: Compiletime code, metaprogramming and notes.
-    - Types as compiletime expressions.
     - Compiletime-only variables and functions.
-    - Generics.
+    - Types as compiletime expressions.
     - Static code generation.
     - Conditional compilation.
     - Compiletime folding.
     - Running programs as scripts.
     - Compiler directives as code.
 - **v0.5**: Advanced nn features.
+    - Prelude.
+    - Methods on primitives.
+    - Traits and Concepts.
     - Tagged unions.
     - Pattern matching.
-    - Generators.
+    - Generators and fibers and async and threads.
     - Named returns.
     - dyanmic and static overloading.
     - Advanced pointer types.
