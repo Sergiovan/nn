@@ -9,5 +9,8 @@ fn main() {
     // for tok in &toks.tokens {
     //     println!("{:?}", tok);
     // }
-    // println!("{}", toks.recreate());
+    // println!("\n{}", toks.recreate());
+    let mut parser = parser::Parser::new(&toks);
+    let res = parser.parse_program();
+    println!("{:?}", res);
 }
