@@ -1,3 +1,0 @@
-extern C { // Extern C block
-    def fun puts(str: *u8); // Declaration without definition
-}

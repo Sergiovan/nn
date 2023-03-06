@@ -1,0 +1,189 @@
+{	
+	"comment": "See: https://macromates.com/manual/en/language_grammars",
+	"scopeName": "source.nn",
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "nn",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#literals"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#variables"
+		},
+		{
+			"include": "#reserved"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#compiler"
+		}
+	],
+	"repository": {
+		"comments": {
+			"patterns": [{
+				"name": "comment.line.double-slash",
+				"match": "//.*"
+			}, {
+				"name": "comment.block",
+				"begin": "/\\*",
+				"end": "\\*/",
+				"patterns": [{
+					"include": "#block_comment"
+				}]
+			}]
+		},
+		"literals": {
+			"patterns": [{
+				"name": "constant.numeric.float",
+				"match": "\\b\\d(\\d|_\\d)*\\.\\d(\\d|_\\d)*(e(\\+|-)\\d+)?([a-zA-Z_]\\w*)?",
+				"captures": {
+					"5": { "name": "storage.type.float" }
+				}
+			}, {
+				"name": "constant.numeric.integer.hexadecimal",
+				"match": "\\b0x\\h(\\h|_\\h)*([a-zA-Z_]\\w*)?\\b",
+				"captures": {
+					"2": { "name": "storage.type.integer" }
+				}
+			}, {
+				"name": "constant.numeric.integer.binary",
+				"match": "\\b0b[01]([01]|_[01])*([a-zA-Z_]\\w*)?\\b",
+				"captures": {
+					"2": { "name": "storage.type.integer" }
+				}
+			}, {
+				"name": "constant.numeric.integer.decimal",
+				"match": "\\b\\d(\\d|_\\d)*([a-zA-Z_]\\w*)?\\b",
+				"captures": {
+					"2": { "name": "storage.type.integer" }
+				}
+			}, {
+				"name": "string.quoted.single",
+				"begin": "'\"",
+				"end": "\"",
+				"patterns": [{
+					"include": "#escapes"
+				}, {
+					"name": "constant.character",
+					"match": "."
+				}]
+			}]
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.nn",
+				"match": "\\b(if|then|else|loop|while|return|continue|break|match|case)\\b"
+			}, {
+				"name": "keyword.operator",
+				"match": "\\b(or|and|not|move|copy|as|is)\\b"
+			}, {
+				"name": "keyword.other",
+				"match": "\\b(import|from|extern|using)\\b"
+			},{
+				"name": "constant.language",
+				"match": "\\b(true|false|null)\\b"
+			}, {
+				"name": "storage.type.simple",
+				"match": "\\b(void|bool|u8|u16|u32|u64|s8|s16|s32|s64|f32|f64|c32|err|infer|byte)\\b"
+			}, {
+				"name": "storage.type.complex",
+				"match": "\\b(struct|union|enum|fun)\\b"
+			}, {
+				"name": "storage.modifier",
+				"match": "\\b(var|const|def|pub|alias)\\b"
+			}, {
+				"name": "variable.language",
+				"match": "\\b(this|This|_)\\b"
+			}]
+		},
+		"variables": {
+			"patterns": [{
+				"name": "entity.name.function",
+				"match": "\\b([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)(?=\\(|\\[)"
+			}, {
+				"name": "entity.name.function",
+				"match": "(?<=fun +)([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)"
+			}, {
+				"name": "entity.name.type",
+				"match": "(?<=(?:struct|union|tuple|enum|infer) +)([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)"
+			}, {
+				"name": "entity.name.namespace",
+				"match": "(?<=namespace +)([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)"
+			}, {
+				"name": "support.variable",
+				"match": "'([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)"
+			}, {
+				"name": "entity.name.tag",
+				"match": "`([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)"
+			}, {
+				"name": "variable",
+				"match": "\\b([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)"
+			}]
+		},
+		"reserved": {
+			"patterns": [{
+				"name": "invalid.illegal.keyword",
+				"match": "\\b(c8|c16|e32|b8|b16|b32|b64|any|type|let|ref|alias|inline|align|for|raise|defer|try|catch|yield|async|await|delete|_|this|static|dynamic|namespace|asm|export|operator|in|is|typeof|gen|lambda|unsafe)\\b"
+			}]
+		},
+		"strings": {
+			"patterns": [{
+				"name": "string.quoted.double.nn",
+				"begin": "(?<!')\"",
+				"end": "(?<!`)\"",
+				"patterns": [{
+					"include": "#escapes"
+				}]
+			}]
+		}, 
+		"compiler": {
+			"patterns": [{
+				"name": "support.function",
+				"match": "(?<!\\w)\\$[a-zA-Z_]\\w*\\b"
+			}, {
+				"name": "support.function",
+				"begin": "(?<!\\w)\\$\"",
+				"end": "(?<!`)\"",
+				"contentName": "variable",
+				"patterns": [{
+					"include": "#escapes"
+				}]
+			}]
+		},
+		"escapes": {
+			"patterns": [{
+				"name": "constant.character.escape.hexadecimal",
+				"match": "`x\\h\\h"
+			}, {
+				"name": "constant.character.escape.unicode",
+				"match": "`u\\d{6}"
+			}, {
+				"name": "constant.character.escape.newline",
+				"match": "`n"
+			}, {
+				"name": "constant.character.escape.tab",
+				"match": "`t"
+			}, {
+				"name": "constant.character.escape.cr",
+				"match": "`r"
+			}, {
+				"name": "constant.character.escape.backtick",
+				"match": "``"
+			}, {
+				"name": "constant.character.escape.doublequotes",
+				"match": "`\""
+			}, {
+				"name": "invalid.character.escape.all",
+				"match": "`."
+			}]
+		}
+	}
+}

@@ -1,0 +1,37 @@
+{
+  "name": "nn-lang",
+  "displayName": "nn syntax colors",
+  "description": "Funny colors for nn",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.72.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "nn",
+      "aliases": ["nn"],
+      "extensions": [".nn"],
+      "configuration": "./language-configuration.json"
+    }, {
+      "id": "nn-markdown"
+    }],
+    "grammars": [
+    {
+      "language": "nn",
+      "scopeName": "source.nn",
+      "path": "./syntaxes/nn.tmLanguage.json"
+    }, 
+    {
+      "language": "nn-markdown",
+      "scopeName": "markdown.nn.codeblock",
+      "path": "./syntaxes/nn-markdown.tmLanguage.json",
+      "injectTo": ["text.html.markdown"],
+      "embeddedLanguages": {
+        "meta.embedded.block.nn": "nn"
+      }
+    }]
+  }
+}

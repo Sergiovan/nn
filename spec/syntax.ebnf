@@ -1,0 +1,459 @@
+(* Syntax for nn at this point in time *)
+
+(* Whitespace *)
+space = " ";
+tab = "\t";
+newline = "\n";
+carriage_return = "\r";
+whitespace = space | tab | newline | carriage_return;
+
+(* Symbols *)
+plus = "+";
+minus = "-";
+star = "*";
+slash = "/";
+forward_slash = "\";
+percent = "%";
+equal = "=";
+bang = "!";
+question_mark = "?";
+less = "<";
+more = ">";
+open_paren = "(";
+close_paren = ")";
+open_brace = "{";
+close_brace = "}";
+open_bracket = "[";
+close_bracket = "]";
+comma = ",";
+period = ".";
+colon = ":";
+semicolon = ";";
+apostrophe = "'";
+quote = '"';
+backtick = "`";
+at = "@";
+hash = "#";
+dollar = "$";
+ampersand = "&";
+vertical_bar = "|";
+caret = "^";
+tilde = "~";
+underscore = "_";
+
+symbols = plus | minus | star | slash | forward_slash | percent | equal | bang | question_mark 
+        | less | more | open_paren | close_paren | open_brace | close_brace | open_bracket
+        | close_bracket | comma | period | colon | semicolon | apostrophe | quote | backtick
+        | at | hash | dollar | ampersand | vertical_bar | caret | tilde;
+
+(* Symbols as code units *)
+add = plus;
+increment = plus, plus;
+subtract = minus;
+negate = subtract;
+decrement = minus, minus;
+multiply = star;
+divide = slash;
+modulo = percent;
+assign = equal;
+equals = equal, equal;
+not_equals = bang, equal;
+greater_than = more;
+greater_equal = more, equal;
+less_than = less;
+less_equal = less, equal;
+strong_arrow_left = less, equal;
+strong_arrow_right = equal, more;
+open_struct_literal = apostrophe, open_brace;
+open_array_literal = apostrophe, open_bracket;
+access = period;
+range = period, period;
+spread = period, period, period;
+open_swizzle = period, open_brace;
+open_constant_access = period, open_bracket;
+all = star;
+of_type = colon;
+select = colon, colon;
+arrow_right = minus, more;
+return_type = arrow_right;
+arrow_left = less, minus;
+bit_not = bang;
+bit_and = ampersand;
+bit_or = vertical_bar;
+bit_xor = caret;
+dereference = at;
+pointer_to = star;
+nullish = question_mark;
+nullish_coalesce = question_mark, question_mark;
+errorish = bang;
+errorish_coalesce = bang, bang;
+line_comment = slash, slash;
+open_comment = slash, star;
+close_comment = star, slash;
+
+(* Keywords *)
+u8 = "u8";
+u16 = "u16";
+u32 = "u32";
+u64 = "u64";
+s8 = "s8";
+s16 = "s16";
+s32 = "s32";
+s64 = "s64";
+f32 = "f32";
+f64 = "f64";
+c8 = "c8";
+c16 = "c16";
+c32 = "c32";
+b8 = "b8";
+b16 = "b16";
+b32 = "b32";
+b64 = "b64";
+void = "void";
+bool = "bool";
+err = "err";
+any = "any";
+type = "type";
+no_return = "no_return";
+null_type = "null_type";
+struct = "struct";
+union = "union";
+enum = "enum";
+fun = "fun";
+infer = "infer";
+let = "let";
+def = "def";
+mut = "mut";
+ref = "ref";
+align = "align";
+do = "do";
+if = "if";
+then = "then";
+else = "else";
+while = "while";
+loop = "loop";
+for = "for";
+match = "match";
+case = "case";
+break = "break";
+continue = "continue";
+yield = "yield";
+return = "return";
+try = "try";
+catch = "catch";
+raise = "raise";
+typeof = "typeof";
+sizeof = "sizeof";
+as = "as";
+is = "is";
+and = "and";
+or = "or";
+not = "not";
+true = "true";
+false = "false";
+null = "null";
+nothing = "nothing";
+never = "never";
+self = "self";
+Self = "Self";
+import = "import";
+export = "export";
+alias = "alias";
+pub = "pub";
+const = "const";
+inline = "inline";
+delete = "delete";
+copy = "copy";
+move = "move";
+namespace = "namespace";
+extern = "extern";
+defer = "defer";
+async = "async";
+await = "await";
+static = "static";
+dynamic = "dynamic";
+asm = "asm";
+operator = "operator";
+in = "in";
+gen = "gen";
+lambda = "lambda";
+unsafe = "unsafe";
+from = "from";
+
+keywords = u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | b8 | b16
+         | b32 | b64 | void | bool | err | any | type | no_return | null_type | struct | union
+         | enum | fun | infer | let | def | mut | ref | align | do | if | then | else | while | loop
+         | for | match | case | break | continue | yield | try | catch | raise | typeof | sizeof
+         | as | is | and | or | not | true | false | null | nothing | never | self | Self | import
+         | export | alias | pub | const | inline | delete | copy | move | namespace ;
+
+reserved = extern | defer | async | await | static | dynamic | asm | operator | in | gen | lambda 
+         | unsafe | from;
+
+all_keywords = keywords | reserved; 
+keyword_literal = true | false | null | nothing | never | self | Self;
+
+(* Numbers *)
+zero = "0";
+decimal_number = "0".."9";
+hexadecimal_number = decimal_number | "a".."f" | "A".."F";
+octal_number = "0".."7";
+binary_number = "0" | "1";
+exponent = ("e" | "E"), ["+" | "-"], decimal_integer;
+number_separator = underscore | apostrophe;
+
+decimal_literal = decimal_number, { decimal_number | ( number_separator, decimal_number ) };
+decimal_integer = decimal_literal, [exponent];
+hexadecimal_integer = zero, ("x" | "X"), hexadecimal_number, {hexadecimal_number | (number_separator, hexadecimal_number)};
+octal_integer = zero, ("o" | "O"), octal_number, {octal_number | (number_separator, octal_number)};
+binary_integer = zero, ("b" | "B"), binary_number, {binary_number | (number_separator, binary_number)};
+integer = decimal_integer | hexadecimal_integer | octal_integer | binary_integer;
+
+decimal_real = [decimal_literal], period, decimal_literal, [exponent] 
+             | decimal_literal, period, [exponent];
+real = decimal_real;
+
+number = integer | real;
+
+(* Strings *)
+string_literal = quote, {(? valid UTF-8 ? - quote) | (backtick, quote)}, quote;
+character_literal = apostrophe, string_literal;
+
+(* Identifiers *)
+anonymous = "_";
+valid = ? valid UTF-8 ? - (whitespace | symbols);
+valid_first = valid - decimal_number;
+
+identifier_legal = (valid_first, {valid}) - (anonymous | all_keywords);
+identifier_literal = apostrophe, identifier_legal;
+identifier_name = hash, identifier_legal;
+identifier_string = dollar, string_literal;
+
+identifier_define = identifier_legal | identifier_string | anonymous;
+identifier = identifier_legal | identifier_string;
+
+(* Compound literals *)
+
+struct_literal = open_struct_literal, [struct_literal_arguments], close_brace;
+struct_literal_arguments = argument, {comma, argument}, [comma];
+
+array_literal = open_array_literal, [array_literal_arguments], close_bracket;
+array_literal_arguments = expression, {comma, expression}, [comma];
+
+(* Programs *)
+
+statement = empty_statement
+          | block
+          | import_statement
+          | export_statement
+          | declaration_statement
+          | def_statement
+          | assignment_statement
+          | alias_statement
+          | const_statement
+          | expression_statement
+          | if_block
+          | while_block
+          | loop_block
+          | match_block
+          | for_block
+          | try_catch_block;
+
+empty_statement = semicolon;
+
+import_statement = import, (identifier | string_literal), {access, identifier}, semicolon; (* Very simple *)
+
+export_statement = export, (declaration_statement | def_statement | indirect_identifier), semicolon; (* Expends later with block-of-decls *)
+
+declaration_statement = declaration, semicolon;
+
+def_statement = function_definition
+              | struct_definition
+              | union_definition
+              | enum_definition;
+
+assignment_statement = assignment, semicolon; 
+
+alias_statement = alias, indirect_identifier, equal, type_expression; (* Accept more than types? *)
+
+const_statement = const, statement;
+
+expression_statement = expression, semicolon; 
+
+block = open_brace, {statement}, close_brace;
+expression_block = do, [identifier_name], block;
+
+declaration = let, simple_declaration;
+simple_declaration = pattern, [colon, type_expression], equals, expression;
+assignment = expression, equals, expression; (* expression-pattern for unwrapping stuff? *)
+
+function_definition = def, (function_literal_block | function_literal_expression, semicolon);
+struct_definition = def, struct_type_literal;
+union_definition = def, union_type_literal;
+enum_definition = def, union_type_literal;
+
+block_or_expression = block | expression;
+assignment_or_expression = assignment | expression;
+
+if_condition = [declaration, {semicolon, declaration}, semicolon], expression 
+             | declaration, {semicolon, declaration}, [semicolon, expression];
+if_block = if, if_condition, (block | (then, expression)), [else, (if_block | block_or_expression)];
+if_expression = [identifier_name], if_block;
+
+while_condition = [declaration, {semicolon, declaration}, semicolon], expression, {semicolon, assignment_or_expression};
+while_block = [do], while, while_condition, block, [then, while_block];
+while_expression = [identifier_name], while_block;
+
+loop_block = loop, block;
+loop_expression = [identifier_name], loop_block;
+
+match_block = match, expression, match_body;
+match_body = open_brace, [match_arms], close_brace;
+
+match_arms = match_case_expression, [comma, [match_arms]] 
+           | match_else_expression, [comma, [match_arms]]
+           | match_case_block, [match_arms]
+           | match_else_block, [match_arms];
+
+case_pattern = (pattern | expression) 
+             | expression, {comma, expression};
+
+match_case = match_case_expression 
+           | match_case_block;
+
+match_case_expression = case, case_pattern, strong_arrow_right, expression;
+match_case_block = case, case_pattern, block;
+
+match_else = match_else_expression 
+           | match_else_block;
+match_else_expression = else, strong_arrow_right, expression;
+match_else_block = else, block;
+
+match_expression = [identifier_name], match_block;
+
+for_block = ??;
+for_expression = [identifier_name], for_block;
+
+try_catch_block = try, simple_declaration, (block | (then, expression))
+                , catch, identifier_define, (block | expression);
+try_catch_expression = [identifier_name], try_catch_block;
+
+pattern = ??;
+
+type_literal = struct_type_literal
+             | union_type_literal
+             | enum_type_literal
+             | function_type_literal
+             | u8 | u16 | u32 | u64 | s8 | s16 | s32 | s64 | f32 | f64 | c8 | c16 | c32 | b8
+             | b16 | b32 | b64 | void | bool | err | any | type | no_return | null_type | infer;
+
+indirect_identifier_define = identifier_define | open_bracket, string_expression, close_bracket;
+
+struct_type_literal = struct, [identifier], open_brace, [struct_members], close_brace;
+struct_members = struct_member, {comma, struct_member}, [comma];
+struct_member = indirect_identifier_define, colon, type_expression 
+              | expression;
+
+union_type_literal = union, [identifier], open_brace, [union_members], close_brace;
+union_members = union_member, {comma, union_member}, [comma];
+union_member = indirect_identifier, open_paren, type_expression, close_paren;
+
+enum_type_literal = enum, [identifier], open_brace, [enum_members], close_brace;
+enum_members = enum_member, {comma, enum_member}, [comma];
+enum_member = indirect_identifier;
+
+function_type_literal = fun, [identifier], (constant_parameters, [runtime_parameters] | runtime_parameters);
+constant_parameters = open_bracket, [parameters], [function_return], close_bracket;
+runtime_parameters = open_paren, [parameters], [function_return], close_paren;
+parameters = parameter, {comma, parameter}, [comma]; 
+parameter = indirect_identifier_define, colon, type_expression (* parameter patterns? *)
+          | type_expression;
+function_return = arrow_right, [indirect_identifier_define, colon], type_expression;
+
+function_literal = function_literal_block | function_literal_expression;
+function_literal_block = function_type_literal, block;
+function_literal_expression = function_type_literal, strong_arrow_right, expression;
+
+struct_identifier = identifier | number;
+indirect_identifier = identifier | open_bracket, string_expression, close_bracket;
+indirect_struct_identifier = identifier | number | open_bracket, (string_expression | integer_expression), close_bracket;
+
+type_expression = expression; (* But it should give a type :) *)
+string_expression = expression; (* But it should give a string :) *)
+integer_expression = expression; (* But it should give an integer :) *)
+
+expression = break_expression 
+           | continue_expression 
+           | yield_expression 
+           | return_expression 
+           | raise_expression 
+           | value_expression;
+
+break_expression = break, [identifier_name];
+continue_expression = continue, [identifier_name];
+yield_expression = yield, [identifier_name], [expression];
+return_expression = return, [expression];
+raise_expression = raise, ??;
+
+(* Operator precedence not shown *)
+value_expression = base_expression;
+
+pre_expression = ? pre-operator ?, value_expression
+               | array_slice_definition, type_expression;
+
+array_slice_definition = open_bracket, (array_type_definition | slice_type_definition), close_bracket;
+array_type_definition = [[expression], [semicolon, expression]];
+slice_type_definition = ([expression], range, [expression] | star), [semicolon, expression];
+
+post_expression = function_call 
+                | array_index 
+                | swizzle 
+                | constant_access 
+                | access_expression
+                | select_expression
+                | catch_expression
+                | value_expression, ? post-operator ?;
+
+function_call = value_expression, ([constant_arguments], runtime_arguments | constant_arguments);
+constant_arguments = open_bracket, [arguments], close_bracket;
+runtime_arguments = open_paren, [arguments], close_paren;
+arguments = argument, {comma, argument}, [comma];
+argument = [indirect_identifier, equal], expression;
+
+array_index = value_expression, [nullish_coalesce], open_bracket, value_expression, close_bracket;
+
+swizzle = value_expression, open_swizzle, swizzle_arguments, close_brace;
+swizzle_arguments = indirect_struct_identifier, {comma, indirect_struct_identifier}, [comma];
+
+constant_access = value_expression, open_constant_access, expression, close_bracket;
+
+access_expression = value_expression, [nullish_coalesce], period, struct_identifier;
+
+select_expression = value_expression, select, struct_identifier;
+
+catch_expression = value_expression, [identifier_name], catch, identifier_define, (strong_arrow_right, expression | block);
+
+infix_expression = value_expression, ? infix operator ?, value_expression; (* Or expression? *) 
+
+base_expression = open_paren, expression, close_paren 
+                | const, expression
+                | number 
+                | string_literal 
+                | character_literal
+                | keyword_literal
+                | struct_literal
+                | array_literal
+                | type_literal
+                | function_literal
+                | identifier_literal
+                | identifier
+                | expression_block
+                | if_expression
+                | while_expression
+                | loop_expression
+                | match_expression
+                | for_expression
+                | try_catch_expression
+                | pre_expression
+                | infix_expression
+                | post_expression;

@@ -1,9 +1,7 @@
 // Comment
 /* Multiline comment */
 
-// Type keywords
-u0 // void
-u1 // bool
+// Primitive type keywords
 u8 // unsigned 8-bit
 u16 // unsigned 16-bit
 u32 // unsigned 32-bit
@@ -14,85 +12,95 @@ s32 // signed 32-bit
 s64 // signed 64-bit
 f32 // floating point single precision
 f64 // floating point double precision
+c8  // character 8-bit
+c16 // character 16-bit
+c32 // character 32-bit
+b8 // generic 8-bit data
+b16 // generic 16-bit data
+b32 // generic 32-bit data
+b64 // generic 64-bit data
+void
+bool
+err
+any // any type
+type // type type
+no_return
+null_type
 struct
 union
 enum
 fun // function
+infer
 
 // Box keywords
 
-var // variable
-const // constant
+let // variable
 def // define
+mut // mutable
+ref // reference
+align // Align box
 
 // Control flow keywords
 if 
 then 
-else 
+else
 while
 loop
+for
 match
 case
 break
 continue
-goto
-label
+yield
+try
+catch
+raise
 
 // Operator keywords
+typeof
 sizeof
 as
+is
+and
+or
+not
 
 // Literal keywords
 true
 false
 null
+nothing
+never
+self
+Self
 
 // Other keywords
 import
-from
+export
 extern
-using
+alias
+pub
+const // Means Compile-time, not immutable
+inline
+delete
+copy
+move
+_
+namespace
 
 // Reserved keywords
-c8 // character 8-bit (UTF-8)
-c16 // character 16-bit (UTF-16)
-c32 // character 32-bit (UTF-32)
-e32 // error
-any // any type
-infer // infer type
-tuple
-type // type type
-let // Compiletime variable
-ref // Reference
-volat // volatile
-inline
-align // Align box
-for
-raise
 defer
-try
-catch
-yield
 async
 await
-new
-delete
-_
-this
 static
 dynamic
-namespace
 asm // assembly block
-export
 operator
 in
-typeof
-and
-or
-not
 gen // Generator
 lambda
-cte // Compile time execution
+unsafe
+from
 
 // Symbols
 + // Add, Shared pointer
@@ -111,22 +119,24 @@ cte // Compile time execution
 => // Strong arrow right
 ( // Open paren
 ) // Close paren
-`( // Open tuple literal
 { // Open brace
 } // Close brace
-`{ // Open struct literal
+'{ // Open struct literal
+({ // Open expression block
+}) // Close expression block
 [ // Open bracket
 ] // Close bracket
-`[ // Open array literal
+'[ // Open array literal
 , // Comma
 . // Access
 .. // Concatenate
 ... // Spread, destructure
-.( // Tuple Multiaccess
-.{ // Generic Multiaccess
-.[ // Array Multiaccess
+// .{ // Swizzle psudo-operator
+// .[ // Constant access pseudo-operator
 : // Of type
-:: // Bind, Select, Choose
+:: // Select
+// ::* // Select all pseudo-operator
+// ::{ // Select multiple pseudo-operator
 -> // Return type, Arrow right
 <- // Move, Arrow left
 ! // Bitwise not
@@ -178,13 +188,13 @@ cte // Compile time execution
 \d(\d|_\d|'\d)* // Decimal
 \d(\d|_\d|'\d)*\.\d(\d|_\d|'\d)* // Float
 
-'.' // Char
+\\. // Char
 [_a-zA-Z][_a-zA-Z0-9]+' // Identifier literal
-"([^"]|\\\")+" // String literal
+"([^"]|`")+" // String literal
 
 // Identifiers
 [_a-zA-Z][_a-zA-Z0-9]+
-$"([^"]|\\\")+"
+$"([^"]|`")+"
 
 // Notes
 $[
