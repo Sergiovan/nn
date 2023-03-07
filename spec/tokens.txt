@@ -77,7 +77,6 @@ Self
 // Other keywords
 import
 export
-extern
 alias
 pub
 const // Means Compile-time, not immutable
@@ -89,6 +88,7 @@ _
 namespace
 
 // Reserved keywords
+extern
 defer
 async
 await

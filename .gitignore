@@ -13,3 +13,7 @@ Cargo.lock
 
 # Node
 package-lock.json
+
+# Added by cargo
+
+/target

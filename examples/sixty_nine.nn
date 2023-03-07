@@ -1,0 +1,10 @@
+def fun num() => 42;
+
+def fun aaa() {
+    5 + 10;
+    return 27;
+}
+
+def fun main() {
+    return num() + aaa();
+}
