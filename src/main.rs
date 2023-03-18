@@ -3,17 +3,21 @@ mod module;
 mod lexer;
 mod parser;
 
+mod util;
+
 use std::fs;
 
 fn main() {
     let mut c = compiler::Compiler::new();
 
     let module = c.module_from_string(fs::read_to_string("examples/sixty_nine.nn").unwrap().to_owned());
-    c.modules[module].lex();
+    let module = &mut c.modules[module];
 
-    c.modules[module].print_token_table(&c);
+    module.lex();
 
-    c.modules[module].parse();
+    module.print_token_table();
 
-    c.modules[module].print_ast(&c);
+    module.parse();
+
+    module.print_ast();
 }

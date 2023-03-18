@@ -2,54 +2,53 @@ use std::iter::Peekable;
 use std::iter::Iterator;
 use std::slice;
 
-use crate::lexer::{Span, Token, TokenType};
-use crate::module::{Module, module_id};
+use crate::lexer::{Token, TokenType};
+use crate::module::{Span, Module};
+use crate::util::IndexedVector::{VecId, IVec, ivec};
 
-pub type ast_id = usize;
+pub type AstId = VecId;
 
 #[derive(Debug, PartialEq)]
 pub enum AstType {
-    Program(ast_id),
+    Program(AstId),
     ErrorAst, // TODO Proper errors
 
-    Iden(String),
-    Block(Vec<ast_id>),
-    FunctionDefinition{ftype: ast_id, body: ast_id},
+    Iden,
+    Block(Vec<AstId>),
+    FunctionDefinition{ftype: AstId, body: AstId},
 
-    NumberLiteral(u64),
+    NumberLiteral,
 
-    FunctionType{name: ast_id, constant_params: ast_id, params: ast_id},
+    FunctionType{name: AstId, constant_params: AstId, params: AstId},
     
-    Return(ast_id),
+    Return(AstId),
     
-    Add{left: ast_id, right: ast_id},
-    FunctionCall{function: ast_id, params: ast_id},
+    Add{left: AstId, right: AstId},
+    FunctionCall{function: AstId, params: AstId},
     FunctionParams( /* TODO */ ),
-    FunctionParam( /* TODO */ )
+    _FunctionParam( /* TODO */ )
 }
 
 #[derive(Debug)]
-pub struct Ast {
-    pub id: ast_id,
+pub struct Ast<'a> {
+    pub id: AstId,
     pub atype: AstType,
-    pub span: Span
+    pub span: Span<'a>
 }
 
 pub struct ParserError (String);
 
-pub struct Parser<'a> {
-    module_idx: module_id,
+pub struct Parser<'m, 'p: 'm> {
+    module: &'m Module<'m, 'p>,
     current: usize,
 
-    data: Peekable<slice::Iter<'a, Token>>,
-    asts: Vec<Ast>,
-    errors: Vec<ParserError>,
-
-    eof_token: Token
+    data: Peekable<slice::Iter<'p, Token<'p>>>,
+    asts: IVec<Ast<'p>>,
+    errors: IVec<ParserError>
 }
 
 enum OpType {
-    Prefix,
+    _Prefix,
     Postfix
 }
 
@@ -88,17 +87,23 @@ macro_rules! expect_and_skip {
 
 use AstType as AT;
 use TokenType as TT;
-impl<'a> Parser<'a> {
-    pub fn new(module: &Module) -> Parser {
+impl<'m, 'p> Parser<'m, 'p> {
+    pub fn new<'a: 'm>(module: &'a Module<'m, 'p>, tokens: Peekable<std::slice::Iter<'p, Token<'p>>>) -> Parser<'m, 'p> {
         Parser {
-            module_idx: module.id,
+            module: module,
             current: 0,
-            data: module.tokens.iter().peekable(),
+            data: tokens.clone(),
 
-            asts: vec![],
-            errors: vec![],
+            asts: ivec![],
+            errors: ivec![],
+        }
+    }
 
-            eof_token: Token {ttype: TT::EOF, span: Span { module_idx: module.id, start: module.source.len() - 1, end: module.source.len() - 1}}
+    fn eof_token(&self) -> Token<'p> {
+        let pos: u32 = self.module.get_source().len() as u32 - 1;
+        Token {
+            ttype: TT::EOF, 
+            span: self.module.new_span(pos, pos, u32::MAX, u32::MAX)
         }
     }
 
@@ -106,25 +111,21 @@ impl<'a> Parser<'a> {
         self.program();
     }
 
-    pub fn get_results(self) -> (Vec<Ast>, Vec<ParserError>) {
+    pub fn get_results(self) -> (IVec<Ast<'p>>, IVec<ParserError>) {
         (self.asts, self.errors)
     }
 
-    fn new_ast(&mut self, atype: AstType, start: &Span, end: &Span) -> ast_id {
+    fn new_ast(&mut self, atype: AstType, start: &Span<'p>, end: &Span<'p>) -> AstId {
         if atype == AT::ErrorAst {
             println!("Error AST!");
         }
 
-        let id: ast_id = self.asts.len();
+        let id: AstId = AstId::from(self.asts.len());
 
         self.asts.push(Ast {
             id: id,
             atype: atype, 
-            span: Span { 
-                module_idx: start.module_idx,
-                start: start.start,
-                end: end.end
-            }
+            span: self.module.new_span(start.start, end.start + end.text.len() as u32, start.line, start.col)
         });
 
         id
@@ -141,34 +142,34 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn peek(&mut self) -> &Token {
+    fn peek(&mut self) -> Token<'p> {
         if let Some(&tok) = self.data.peek() {
-            tok
+            tok.clone()
         } else {
-            &self.eof_token
+            self.eof_token()
         }
     }
 
-    fn next(&mut self) -> &Token {
+    fn next(&mut self) -> Token<'p> {
         self.current += 1;
         let res = self.data.next();
         self.skip_comments();
-        res.unwrap_or(&self.eof_token)
+        res.unwrap_or(&self.eof_token()).clone()
     }
 
-    fn get(&mut self, id: ast_id) -> &Ast {
-        assert!(id < self.asts.len(), "Accessing non-existent ast");
+    fn get(&mut self, id: AstId) -> &Ast<'p> {
+        assert!(self.asts.valid_index(id), "Accessing non-existent ast");
         
         &self.asts[id]
     }
 
-    fn program(&mut self) -> ast_id {
+    fn program(&mut self) -> AstId {
         self.skip_comments();
 
         let t = self.peek();
-        if let t @ Token {ttype: TT::EOF, ..} = t {
-            let madeup = Span {module_idx: self.module_idx, start: 0, end: 0};
-            self.new_ast(AT::ErrorAst, &madeup, &madeup)
+        if let Token {ttype: TT::EOF, ..} = t {
+            let eof = self.eof_token().clone();
+            self.new_ast(AT::ErrorAst, &eof.span, &eof.span)
         } else {
             let start = t.span;
             let block = self.top_block();
@@ -177,19 +178,18 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn iden(&mut self) -> ast_id {
+    fn iden(&mut self) -> AstId {
         let iden = self.next();
-        if let TT::Iden(s) = &iden.ttype {
+        if let TT::Iden = &iden.ttype {
             let t = iden.span;
-            let str = s.clone();
-            self.new_ast(AT::Iden(str), &t, &t) // TODO extract specific characters?
+            self.new_ast(AT::Iden, &t, &t) // TODO extract specific characters?
         } else {
             let t = self.next().span;
             self.new_ast(AT::ErrorAst, &t, &t)
         }
     }
 
-    fn top_block(&mut self) -> ast_id {
+    fn top_block(&mut self) -> AstId {
         let mut asts = vec![];
 
         assert!(self.peek().ttype != TT::EOF);
@@ -214,7 +214,7 @@ impl<'a> Parser<'a> {
         self.new_ast(AT::Block(asts), &start, &end)
     }
 
-    fn top_level_statement(&mut self) -> ast_id {
+    fn top_level_statement(&mut self) -> AstId {
         let t = self.peek();
         match t.ttype {
             TT::Def => {
@@ -229,7 +229,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn function_block(&mut self) -> ast_id {
+    fn function_block(&mut self) -> AstId {
         let mut asts = vec![];
 
         expect!(self, TT::OpenBrace);
@@ -259,7 +259,7 @@ impl<'a> Parser<'a> {
         self.new_ast(AT::Block(asts), &start, &end)
     }
 
-    fn statement(&mut self) -> ast_id {
+    fn statement(&mut self) -> AstId {
         let t = self.peek();
 
         match t.ttype {
@@ -274,7 +274,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn define(&mut self) -> ast_id {
+    fn define(&mut self) -> AstId {
         let def = self.next(); // def
         let def_span = def.span;
         
@@ -302,23 +302,23 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn function_type(&mut self) -> ast_id {
+    fn function_type(&mut self) -> AstId {
         let fun = self.next(); // fun
         let fun_span = fun.span;
 
         assert!(fun.ttype == TT::Fun);
 
-        expect!(self, TT::Iden(_));
+        expect!(self, TT::Iden);
         let name = self.iden();
 
         expect!(self, TT::OpenParen); // TODO Constant parameters
         let params = self.function_params();
 
         let end_span = self.get(params).span;
-        self.new_ast(AT::FunctionType{name: name, constant_params: usize::MAX, params: params}, &fun_span, &end_span)
+        self.new_ast(AT::FunctionType{name: name, constant_params: AstId::from(u32::MAX), params: params}, &fun_span, &end_span)
     }
 
-    fn function_params(&mut self) -> ast_id {
+    fn function_params(&mut self) -> AstId {
         let oparen = self.next(); // (
         let start_span = oparen.span;
 
@@ -332,7 +332,7 @@ impl<'a> Parser<'a> {
         self.new_ast(AT::FunctionParams(), &start_span, &end_span)
     }
 
-    fn function_body(&mut self) -> (ast_id, bool) {
+    fn function_body(&mut self) -> (AstId, bool) {
         let t = self.peek();
         let error_span = t.span;
         match t.ttype {
@@ -361,7 +361,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn expression(&mut self) -> ast_id {
+    fn expression(&mut self) -> AstId {
         let t = self.peek();
 
         match t.ttype {
@@ -376,7 +376,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn return_expression(&mut self) -> ast_id {
+    fn return_expression(&mut self) -> AstId {
         let r#return = self.next(); // return
         let return_span = r#return.span;
 
@@ -390,18 +390,18 @@ impl<'a> Parser<'a> {
     fn operator_precedence(ttype: &TokenType, op_type: OpType) -> usize {
         match ttype {
             TT::Add => match op_type {
-                OpType::Prefix => 90,
+                OpType::_Prefix => 90,
                 OpType::Postfix => 30
             },
             TT::OpenParen => match op_type {
-                OpType::Prefix => 0xFFFFFFFF,
+                OpType::_Prefix => 0xFFFFFFFF,
                 OpType::Postfix => 50
             }
             _ => 0
         }
     }
 
-    fn value_expression(&mut self, precedence: usize) -> ast_id {
+    fn value_expression(&mut self, precedence: usize) -> AstId {
         let tok = self.peek();
 
         // Prefixes
@@ -417,13 +417,12 @@ impl<'a> Parser<'a> {
                 expect_and_skip!(self, TT::CloseParen); // )
                 expr
             }
-            TT::Integer(i) => {
+            TT::Integer => {
                 let tok_span = tok.span;
-                let num = *i;
                 self.next(); // Number
-                self.new_ast(AT::NumberLiteral(num), &tok_span, &tok_span)
+                self.new_ast(AT::NumberLiteral, &tok_span, &tok_span)
             }
-            TT::Iden(_) => {
+            TT::Iden => {
                 self.iden()
             }
             _ => {
@@ -449,7 +448,7 @@ impl<'a> Parser<'a> {
                     let res_span = self.get(res).span;
 
                     expect_and_skip!(self, TT::CloseParen);
-                    self.new_ast(AT::FunctionCall { function: res, params: 0xFFFFFFFF }, &res_span, &close_span)
+                    self.new_ast(AT::FunctionCall { function: res, params: AstId::from(u32::MAX)}, &res_span, &close_span)
                 }
                 TT::Add => {
                     self.next(); // +

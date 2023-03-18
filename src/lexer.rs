@@ -1,21 +1,8 @@
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-use crate::module::{module_id, Module};
-use crate::compiler::Compiler;
-
-#[derive(Copy, Clone, Debug)]
-pub struct Span {
-    pub module_idx: module_id,
-    pub start: usize,
-    pub end: usize
-}
-
-impl Span {
-    pub fn to_string(&self, c: &Compiler) -> String {
-        c.modules[self.module_idx].text_from_span(self)
-    }
-}
+use crate::module::{Module, Span};
+use crate::util::IndexedVector::{IVec, ivec};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
@@ -23,8 +10,8 @@ pub enum TokenType {
     EOF,
 
     Comment{block: bool}, 
-    Iden(String),
-    Integer(u64),
+    Iden,
+    Integer,
     
     Def,
     Fun,
@@ -42,35 +29,42 @@ pub enum TokenType {
 }
 
 #[derive(Clone, Debug)]
-pub struct Token {
-    pub span: Span,
+pub struct Token<'a> {
+    pub span: Span<'a>,
     pub ttype: TokenType
 }
 
-impl Token {
-    pub fn to_string(&self, c: &Compiler) -> String {
-        format!("{:?} {}", self.ttype, self.span.to_string(c))
+impl<'a> ToString for Token<'a> {
+    fn to_string(&self) -> String {
+        format!("{:?} {}", self.ttype, self.span.to_string())
     }
 }
 
-pub struct Lexer {
-    module_idx: module_id,
-    current: usize,
+// 'l (The content of the Module) will live at least as long as 'm (The reference to the module)
+// 'l thus delimits the lifetime of the module, which is longer than the lexer's
+pub struct Lexer<'m, 'l: 'm> {
+    module: &'m Module<'m, 'l>,
+    current: u32,
+    line: u32, 
+    col: u32,
 
     data: Peekable<IntoIter<char>>
 }
 
-impl Lexer {
-    pub fn new(module: &Module) -> Lexer {
+impl<'m, 'l> Lexer<'m, 'l> {
+    pub fn new(module: &'m Module<'m, 'l>) -> Lexer<'m, 'l> {
         Lexer {
-            module_idx: module.id,
+            module: &module,
             current: 0,
-            data: module.source.chars().collect::<Vec<_>>().into_iter().peekable()
+            line: 0,
+            col: 0,
+
+            data: module.get_source().chars().collect::<Vec<_>>().into_iter().peekable()
         }
     }
 
-    fn peek(&mut self) -> Option<&char> {
-        self.data.peek()
+    fn peek(&mut self) -> Option<char> {
+        self.data.peek().and_then(|r| Some(*r))
     }
 
     fn next(&mut self) -> Option<char> {
@@ -78,28 +72,27 @@ impl Lexer {
         self.data.next()
     }
 
-    fn new_token(&self, ttype: TokenType, start: usize) -> Token {
+    fn new_token(&self, ttype: TokenType, start: u32) -> Token<'l> {
         Token {
-            ttype: ttype, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}
+            ttype: ttype, 
+            span: self.module.new_span(start, self.current, self.line, self.col)
         }
     }
 
-    fn number(&mut self, start: usize) -> Token {
-        let mut s: String = String::new();
-
-        while let Some(&c) = self.peek() {
+    fn number(&mut self, start: u32) -> Token<'l> {
+        while let Some(c) = self.peek() {
             match c {
-                '0' ..= '9' => s.push(c),
+                '0' ..= '9' => (),
                 _ => break
             }
             self.next();
         }
 
-        self.new_token(TokenType::Integer(s.parse::<u64>().unwrap()), start)
+        self.new_token(TokenType::Integer, start)
     }
 
-    pub fn lex(&mut self) -> Vec<Token> {
-        let mut res: Vec<Token> = vec![];
+    pub fn lex(mut self) -> IVec<Token<'l>> {
+        let mut res: IVec<Token> = ivec![];
 
         fn is_whitespace(c: char) -> bool {
             match c {
@@ -122,7 +115,7 @@ impl Lexer {
             }
         }
 
-        while let Some(&c) = self.peek() {
+        while let Some(c) = self.peek() {
             use TokenType as TT;
             let start = self.current;
 
@@ -157,7 +150,7 @@ impl Lexer {
                     if let Some('/') = self.peek() {
                         self.next();
 
-                        while let Some(&c) = self.peek() {
+                        while let Some(c) = self.peek() {
                             self.next(); 
                             match c {
                                 '\n' => break,
@@ -181,7 +174,7 @@ impl Lexer {
                 }
                 'a' ..= 'z' | 'A' ..= 'Z' | '_' => {
                     let mut s = String::new();
-                    while let Some(&c) = self.peek() {
+                    while let Some(c) = self.peek() {
                         if is_whitespace(c) || is_symbol(c) {
                             break;
                         }
@@ -193,7 +186,7 @@ impl Lexer {
                         "fun"    => self.new_token(TT::Fun, start),
                         "return" => self.new_token(TT::Return, start),
 
-                        _ => self.new_token(TT::Iden(s), start)
+                        _ => self.new_token(TT::Iden, start)
                     }
                 }
                 ' ' | '\n' | '\t' | '\r' => {

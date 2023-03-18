@@ -1,25 +1,22 @@
 use crate::module;
 
-pub struct Compiler {
-    pub modules: Vec<module::Module>
+use crate::util::IndexedVector::{IVec, ivec, VecId};
+
+pub struct Compiler<'a> {
+    pub modules: IVec<module::Module<'a, 'a>>
 }
 
-impl Compiler {
-    pub fn new() -> Compiler {
+impl<'a> Compiler<'a> {
+    pub fn new() -> Compiler<'a> {
         Compiler {
-            modules: vec![]
+            modules: ivec![]
         }
     }
 
-    pub fn module_from_string(&mut self, data: String) -> module::module_id {
-        let id = self.modules.len();
+    pub fn module_from_string(&mut self, data: String) -> module::ModuleId {
+        let id = VecId::from(self.modules.len());
         
-        self.modules.push(module::Module {
-            id: id,
-            source: data,
-            tokens: vec![],
-            ast_nodes: vec![]
-        });
+        self.modules.push(module::Module::new(VecId::from(id), data));
 
         id
     }
