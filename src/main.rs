@@ -1,6 +1,7 @@
 mod compiler;
 mod module;
 mod lexer;
+mod parser;
 
 use std::fs;
 
@@ -11,4 +12,8 @@ fn main() {
     c.modules[module].lex();
 
     c.modules[module].print_token_table(&c);
+
+    c.modules[module].parse();
+
+    c.modules[module].print_ast(&c);
 }

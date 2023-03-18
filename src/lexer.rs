@@ -17,12 +17,14 @@ impl Span {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
     ErrorToken,
+    EOF,
+
     Comment{block: bool}, 
-    Iden,
-    Integer,
+    Iden(String),
+    Integer(u64),
     
     Def,
     Fun,
@@ -39,7 +41,7 @@ pub enum TokenType {
     Semicolon,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub span: Span,
     pub ttype: TokenType
@@ -76,6 +78,12 @@ impl Lexer {
         self.data.next()
     }
 
+    fn new_token(&self, ttype: TokenType, start: usize) -> Token {
+        Token {
+            ttype: ttype, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}
+        }
+    }
+
     fn number(&mut self, start: usize) -> Token {
         let mut s: String = String::new();
 
@@ -87,9 +95,7 @@ impl Lexer {
             self.next();
         }
 
-        Token {
-            ttype: TokenType::Integer, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}
-        }
+        self.new_token(TokenType::Integer(s.parse::<u64>().unwrap()), start)
     }
 
     pub fn lex(&mut self) -> Vec<Token> {
@@ -111,7 +117,7 @@ impl Lexer {
                 ']' | ',' | '.' | ':' | 
                 ';' | '\'' | '"' | '`' | 
                 '@' | '#' | '$' | '&' | 
-                '|' | '^' | '~' | '_' => true,
+                '|' | '^' | '~' => true,
                 _ => false
             }
         }
@@ -124,27 +130,27 @@ impl Lexer {
                 '0' ..= '9' => self.number(start),
                 '+' => { 
                     self.next();
-                    Token {ttype: TT::Add, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                    self.new_token(TT::Add, start)
                 }
                 ';' => {
                     self.next();
-                    Token {ttype: TT::Semicolon, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                    self.new_token(TT::Semicolon, start)
                 }
                 '(' => {
                     self.next();
-                    Token {ttype: TT::OpenParen, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                    self.new_token(TT::OpenParen, start)
                 }
                 ')' => {
                     self.next();
-                    Token {ttype: TT::CloseParen, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                    self.new_token(TT::CloseParen, start)
                 }
                 '{' => {
                     self.next();
-                    Token {ttype: TT::OpenBrace, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                    self.new_token(TT::OpenBrace, start)
                 }
                 '}' => {
                     self.next();
-                    Token {ttype: TT::CloseBrace, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                    self.new_token(TT::CloseBrace, start)
                 }
                 '/' => {
                     self.next(); // /
@@ -159,18 +165,18 @@ impl Lexer {
                             }
                         }
 
-                        Token {ttype: TT::Comment{block: false}, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                        self.new_token(TT::Comment{block: false}, start)
                     } else {
-                        Token {ttype: TT::ErrorToken, span: Span{module_idx: self.module_idx, start: start, end: self.current - 1 }}
+                        self.new_token(TT::ErrorToken, start)
                     }
                 }
                 '=' => {
                     self.next(); // =
                     if let Some('>') = self.peek() {
                         self.next(); // >
-                        Token {ttype: TT::StrongArrowRight, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                        self.new_token(TT::StrongArrowRight, start)
                     } else {
-                        Token {ttype: TT::ErrorToken, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                        self.new_token(TT::ErrorToken, start)
                     }
                 }
                 'a' ..= 'z' | 'A' ..= 'Z' | '_' => {
@@ -183,20 +189,20 @@ impl Lexer {
                         s.push(c);
                     }
                     match s.as_str() {
-                        "def"    => Token {ttype: TT::Def, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}},
-                        "fun"    => Token {ttype: TT::Fun, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}},
-                        "return" => Token {ttype: TT::Return, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}},
+                        "def"    => self.new_token(TT::Def, start),
+                        "fun"    => self.new_token(TT::Fun, start),
+                        "return" => self.new_token(TT::Return, start),
 
-                        _ => Token {ttype: TT::Iden, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1}}
+                        _ => self.new_token(TT::Iden(s), start)
                     }
                 }
                 ' ' | '\n' | '\t' | '\r' => {
-                    self.next();
+                    self.next(); // TODO Whitespace token for formatting purposes
                     continue;
                 }
                 _ => {
                     self.next(); // Skip weirdo token
-                    Token {ttype: TT::ErrorToken, span: Span {module_idx: self.module_idx, start: start, end: self.current - 1 }}
+                    self.new_token(TT::ErrorToken, start)
                 }
             };
 

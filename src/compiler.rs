@@ -17,7 +17,8 @@ impl Compiler {
         self.modules.push(module::Module {
             id: id,
             source: data,
-            tokens: vec![]
+            tokens: vec![],
+            ast_nodes: vec![]
         });
 
         id
