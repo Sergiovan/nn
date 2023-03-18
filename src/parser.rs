@@ -4,9 +4,9 @@ use std::slice;
 
 use crate::lexer::{Token, TokenType};
 use crate::module::{Span, Module};
-use crate::util::IndexedVector::{VecId, IVec, ivec};
+use crate::util::IndexedVector::{IndexedVector, IVec, ivec};
 
-pub type AstId = VecId;
+pub type AstId = <IVec<Ast<'static>> as IndexedVector>::Index;
 
 #[derive(Debug, PartialEq)]
 pub enum AstType {
@@ -44,7 +44,7 @@ pub struct Parser<'m, 'p: 'm> {
 
     data: Peekable<slice::Iter<'p, Token<'p>>>,
     asts: IVec<Ast<'p>>,
-    errors: IVec<ParserError>
+    errors: Vec<ParserError>
 }
 
 enum OpType {
@@ -95,7 +95,7 @@ impl<'m, 'p> Parser<'m, 'p> {
             data: tokens.clone(),
 
             asts: ivec![],
-            errors: ivec![],
+            errors: vec![],
         }
     }
 
@@ -111,7 +111,7 @@ impl<'m, 'p> Parser<'m, 'p> {
         self.program();
     }
 
-    pub fn get_results(self) -> (IVec<Ast<'p>>, IVec<ParserError>) {
+    pub fn get_results(self) -> (IVec<Ast<'p>>, Vec<ParserError>) {
         (self.asts, self.errors)
     }
 

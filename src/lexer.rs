@@ -2,7 +2,6 @@ use std::iter::Peekable;
 use std::vec::IntoIter;
 
 use crate::module::{Module, Span};
-use crate::util::IndexedVector::{IVec, ivec};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TokenType {
@@ -91,8 +90,8 @@ impl<'m, 'l> Lexer<'m, 'l> {
         self.new_token(TokenType::Integer, start)
     }
 
-    pub fn lex(mut self) -> IVec<Token<'l>> {
-        let mut res: IVec<Token> = ivec![];
+    pub fn lex(mut self) -> Vec<Token<'l>> {
+        let mut res: Vec<Token> = vec![];
 
         fn is_whitespace(c: char) -> bool {
             match c {

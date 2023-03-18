@@ -3,7 +3,7 @@ use std::cmp::max;
 use crate::lexer::{Token, Lexer};
 use crate::parser::{Ast, AstId, Parser, AstType};
 
-use crate::util::IndexedVector::{VecId, IVec, ivec};
+use crate::util::IndexedVector::{IndexedVector, IVec, ivec};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Span<'a> {
@@ -20,12 +20,12 @@ impl<'a> ToString for Span<'a> {
     }
 }
 
-pub type ModuleId = VecId;
+pub type ModuleId = <IVec<Module<'static, 'static>> as IndexedVector>::Index;
 
 pub struct Module<'a, 'b: 'a> {
     pub id: ModuleId,
-    pub source: &'b String,
-    tokens: IVec<Token<'a>>,
+    source: &'b mut String,
+    tokens: Vec<Token<'a>>,
     ast_nodes: IVec<Ast<'a>>,
 }
 
@@ -35,13 +35,12 @@ impl<'a, 'b> Module<'a, 'b> {
         // Listen, this is awful but I don't have enough knowledge to figure
         // out the proper way to do it, and google is being unhelpful.
         let mut _box = Box::new(source);
-        let ptr = &mut *_box as *mut String;
-        Box::leak(_box);
+        let ptr = &mut *Box::leak(_box) as *mut String;
 
         Module {
             id,
-            source: unsafe { &*ptr },
-            tokens: ivec![],
+            source: unsafe { &mut *ptr },
+            tokens: vec![],
             ast_nodes: ivec![]
         }
     }
@@ -75,7 +74,7 @@ impl<'a, 'b> Module<'a, 'b> {
             // let toks = self.tokens;
             // but it complains about borrows outliving the scope of the function
             // presumably because some Span is not being done properly
-            let toks = unsafe { &*(&self.tokens as *const IVec<Token<'_>>) };
+            let toks = unsafe { &*(&self.tokens as *const Vec<Token<'_>>) };
             let iter = toks.iter();
             let mut parser = Parser::new(&self, iter.peekable());
             parser.parse();
@@ -201,7 +200,7 @@ impl<'a, 'b> Drop for Module<'a, 'b> {
     fn drop(&mut self) {
         // Undo hacks from earlier
         unsafe { 
-            std::ptr::drop_in_place(self.source as *const String as *mut String)
+            let _ = Box::from_raw(self.source as *mut String);
         }
     }
 }
