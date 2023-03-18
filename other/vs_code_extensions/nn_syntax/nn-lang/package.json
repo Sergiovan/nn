@@ -2,7 +2,9 @@
   "name": "nn-lang",
   "displayName": "nn syntax colors",
   "description": "Funny colors for nn",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "repository": "https://https://github.com/Sergiovan/nn",
+  "author": "Sergiovan",
   "engines": {
     "vscode": "^1.72.0"
   },

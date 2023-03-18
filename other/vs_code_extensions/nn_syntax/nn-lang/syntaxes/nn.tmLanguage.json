@@ -14,10 +14,10 @@
 			"include": "#keywords"
 		},
 		{
-			"include": "#variables"
+			"include": "#reserved"
 		},
 		{
-			"include": "#reserved"
+			"include": "#variables"
 		},
 		{
 			"include": "#strings"
@@ -80,28 +80,34 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.nn",
-				"match": "\\b(if|then|else|loop|while|return|continue|break|match|case)\\b"
+				"match": "\\b(if|then|else|loop|while|return|continue|break|match|case|raise|try|catch|yield)\\b"
 			}, {
 				"name": "keyword.operator",
-				"match": "\\b(or|and|not|move|copy|as|is)\\b"
+				"match": "\\b(or|and|not|as|is)\\b"
 			}, {
 				"name": "keyword.other",
-				"match": "\\b(import|from|extern|using)\\b"
+				"match": "\\b(import|from|extern|using|inline|const|namespace|typeof)\\b"
 			},{
 				"name": "constant.language",
 				"match": "\\b(true|false|null)\\b"
 			}, {
 				"name": "storage.type.simple",
-				"match": "\\b(void|bool|u8|u16|u32|u64|s8|s16|s32|s64|f32|f64|c32|err|infer|byte)\\b"
+				"match": "\\b(void|bool|u8|u16|u32|u64|s8|s16|s32|s64|f32|f64|c32|err|infer|byte|any|type)\\b"
 			}, {
 				"name": "storage.type.complex",
 				"match": "\\b(struct|union|enum|fun)\\b"
 			}, {
 				"name": "storage.modifier",
-				"match": "\\b(var|const|def|pub|alias)\\b"
+				"match": "\\b(var|def|pub|alias)\\b"
 			}, {
 				"name": "variable.language",
-				"match": "\\b(this|This|_)\\b"
+				"match": "\\b(self|Self|_)\\b"
+			}]
+		},
+		"reserved": {
+			"patterns": [{
+				"name": "invalid.illegal.keyword",
+				"match": "\\b(c8|c16|e32|b8|b16|b32|b64|let|ref|move|copy|align|for|defer|async|await|delete|static|dynamic|asm|export|operator|in|gen|lambda|unsafe)\\b"
 			}]
 		},
 		"variables": {
@@ -126,12 +132,6 @@
 			}, {
 				"name": "variable",
 				"match": "\\b([a-zA-Z][a-zA-Z0-9_]*|_[a-zA-Z0-9_]+)"
-			}]
-		},
-		"reserved": {
-			"patterns": [{
-				"name": "invalid.illegal.keyword",
-				"match": "\\b(c8|c16|e32|b8|b16|b32|b64|any|type|let|ref|alias|inline|align|for|raise|defer|try|catch|yield|async|await|delete|_|this|static|dynamic|namespace|asm|export|operator|in|is|typeof|gen|lambda|unsafe)\\b"
 			}]
 		},
 		"strings": {
