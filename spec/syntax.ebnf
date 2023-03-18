@@ -242,10 +242,28 @@ array_literal_arguments = expression, {comma, expression}, [comma];
 
 (* Programs *)
 
+program = { top_level_statement };
+
+top_level_statement = empty_statement
+                    | block
+                    | import_statement
+                    | export_statement
+                    | declaration_statement
+                    | def_statement
+                    | assignment_statement
+                    | alias_statement
+                    | const_statement
+                    | expression_statement
+                    | if_block
+                    | while_block
+                    | loop_block
+                    | match_block
+                    | for_block
+                    | try_catch_block; 
+
 statement = empty_statement
           | block
           | import_statement
-          | export_statement
           | declaration_statement
           | def_statement
           | assignment_statement
@@ -284,8 +302,8 @@ block = open_brace, {statement}, close_brace;
 expression_block = do, [identifier_name], block;
 
 declaration = let, simple_declaration;
-simple_declaration = pattern, [colon, type_expression], equals, expression;
-assignment = expression, equals, expression; (* expression-pattern for unwrapping stuff? *)
+simple_declaration = pattern, [colon, type_expression], equals, value_expression;
+assignment = value_expression, equals, value_expression; (* expression-pattern for unwrapping stuff? *)
 
 function_definition = def, (function_literal_block | function_literal_expression, semicolon);
 struct_definition = def, struct_type_literal;
@@ -295,19 +313,19 @@ enum_definition = def, union_type_literal;
 block_or_expression = block | expression;
 assignment_or_expression = assignment | expression;
 
-if_condition = [declaration, {semicolon, declaration}, semicolon], expression 
-             | declaration, {semicolon, declaration}, [semicolon, expression];
+if_condition = [declaration, {semicolon, declaration}, semicolon], value_expression 
+             | declaration, {semicolon, declaration}, [semicolon, value_expression];
 if_block = if, if_condition, (block | (then, expression)), [else, (if_block | block_or_expression)];
 if_expression = [identifier_name], if_block;
 
-while_condition = [declaration, {semicolon, declaration}, semicolon], expression, {semicolon, assignment_or_expression};
+while_condition = [declaration, {semicolon, declaration}, semicolon], value_expression, {semicolon, assignment_or_expression};
 while_block = [do], while, while_condition, block, [then, while_block];
 while_expression = [identifier_name], while_block;
 
 loop_block = loop, block;
 loop_expression = [identifier_name], loop_block;
 
-match_block = match, expression, match_body;
+match_block = match, value_expression, match_body;
 match_body = open_brace, [match_arms], close_brace;
 
 match_arms = match_case_expression, [comma, [match_arms]] 
@@ -315,8 +333,8 @@ match_arms = match_case_expression, [comma, [match_arms]]
            | match_case_block, [match_arms]
            | match_else_block, [match_arms];
 
-case_pattern = (pattern | expression) 
-             | expression, {comma, expression};
+case_pattern = (pattern | value_expression) 
+             | value_expression, {comma, value_expression};
 
 match_case = match_case_expression 
            | match_case_block;
@@ -352,7 +370,7 @@ indirect_identifier_define = identifier_define | open_bracket, string_expression
 struct_type_literal = struct, [identifier], open_brace, [struct_members], close_brace;
 struct_members = struct_member, {comma, struct_member}, [comma];
 struct_member = indirect_identifier_define, colon, type_expression 
-              | expression;
+              | type_expression;
 
 union_type_literal = union, [identifier], open_brace, [union_members], close_brace;
 union_members = union_member, {comma, union_member}, [comma];
@@ -372,15 +390,11 @@ function_return = arrow_right, [indirect_identifier_define, colon], type_express
 
 function_literal = function_literal_block | function_literal_expression;
 function_literal_block = function_type_literal, block;
-function_literal_expression = function_type_literal, strong_arrow_right, expression;
+function_literal_expression = function_type_literal, strong_arrow_right, value_expression;
 
 struct_identifier = identifier | number;
 indirect_identifier = identifier | open_bracket, string_expression, close_bracket;
 indirect_struct_identifier = identifier | number | open_bracket, (string_expression | integer_expression), close_bracket;
-
-type_expression = expression; (* But it should give a type :) *)
-string_expression = expression; (* But it should give a string :) *)
-integer_expression = expression; (* But it should give an integer :) *)
 
 expression = break_expression 
            | continue_expression 
@@ -397,6 +411,35 @@ raise_expression = raise, ??;
 
 (* Operator precedence not shown *)
 value_expression = base_expression;
+
+type_expression = value_expression; (* But it should give a type :) *)
+string_expression = value_expression; (* But it should give a string :) *)
+integer_expression = value_expression; (* But it should give an integer :) *)
+
+base_expression = expression_atom
+                | pre_expression
+                | infix_expression
+                | post_expression;
+
+expression_atom = open_paren, expression, close_paren 
+                | const, expression
+                | number 
+                | string_literal 
+                | character_literal
+                | keyword_literal
+                | struct_literal
+                | array_literal
+                | type_literal
+                | function_literal
+                | identifier_literal
+                | identifier
+                | expression_block
+                | if_expression
+                | while_expression
+                | loop_expression
+                | match_expression
+                | for_expression
+                | try_catch_expression; 
 
 pre_expression = ? pre-operator ?, value_expression
                | array_slice_definition, type_expression;
@@ -434,26 +477,3 @@ select_expression = value_expression, select, struct_identifier;
 catch_expression = value_expression, [identifier_name], catch, identifier_define, (strong_arrow_right, expression | block);
 
 infix_expression = value_expression, ? infix operator ?, value_expression; (* Or expression? *) 
-
-base_expression = open_paren, expression, close_paren 
-                | const, expression
-                | number 
-                | string_literal 
-                | character_literal
-                | keyword_literal
-                | struct_literal
-                | array_literal
-                | type_literal
-                | function_literal
-                | identifier_literal
-                | identifier
-                | expression_block
-                | if_expression
-                | while_expression
-                | loop_expression
-                | match_expression
-                | for_expression
-                | try_catch_expression
-                | pre_expression
-                | infix_expression
-                | post_expression;
