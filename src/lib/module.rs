@@ -108,52 +108,76 @@ impl<'a, 'b> Module<'a, 'b> {
     pub fn print_ast_helper(&self, ast: crate::parser::AstId, side: String, padding: usize) -> String {
         use AstType as AT;
 
+        const PIPE: char = '┃';
+        const FORK: char = '┣';
+        const LAST: char = '┗';
+        const NONE: char = ' ';
+
+        fn convert_side(previous: &str) -> String {
+            let mut s = String::with_capacity(previous.len() + 2);
+
+            for c in previous.chars() {
+                let new_char: char = match c {
+                    PIPE => PIPE,
+                    FORK => PIPE,
+                    LAST => NONE,
+                    NONE => NONE,
+                    _ => c
+                };
+                s.push(new_char);
+            }
+
+            s
+        }
+
         let ast_nodes = &self.ast_nodes;
         let node = &ast_nodes[ast];
 
         let mut res: String = "".to_string(); 
 
-        let add = |txt| format!("{: <padding$}: {}{}", node.id.to_string(), side, txt, padding = padding);
+        let add_header = |txt| format!("{: >padding$}: {}{}", node.id.to_string(), side, txt, padding = padding);
+        let new_side = convert_side(&side);
+        let add_child = |txt| format!("{: >padding$}: {}{}", node.id.to_string(), new_side, txt, padding = padding);
 
         match &node.atype {
             AT::Program(id) => {
-                res += &add("Program\n");
-                res += &self.print_ast_helper(*id, "| ".to_string(), padding);
+                res += &add_header("Program\n");
+                res += &self.print_ast_helper(*id, format!("{} ", LAST), padding);
             },
             AT::ErrorAst => {
-                res += &add("ErrorAst\n");
+                res += &add_header("ErrorAst\n");
             },
             AT::Iden => {
-                res += &add(&format!("Iden: {}\n", node.span.to_string()));
+                res += &add_header(&format!("Iden: {}\n", node.span.to_string()));
             },
             AT::Block(elems) => {
-                res += &add(&format!("Block ({} elements)\n", elems.len()));
+                res += &add_header(&format!("Block ({} elements)\n", elems.len()));
                 for id in elems.iter().take(elems.len() - 1) {
-                    res += &self.print_ast_helper(*id, side.clone() + "| ", padding);
+                    res += &self.print_ast_helper(*id, new_side.clone() + &format!("{} ", FORK), padding);
                 }
                 if elems.len() > 0 {
-                    res += &self.print_ast_helper(*elems.last().unwrap(), side.clone() + "| ", padding);
+                    res += &self.print_ast_helper(*elems.last().unwrap(), new_side.clone() + &format!("{} ", LAST), padding);
                 }
             },
             AT::FunctionDefinition { ftype, body } => {
                 let s = format!("Function definition\n");
-                res += &add(&s);
-                let s = format!("  Type\n");
-                res += &add(&s);
-                res += &self.print_ast_helper(*ftype, side.clone() + "  | ", padding);
-                let s = format!("  Body\n");
-                res += &add(&s);
-                res += &self.print_ast_helper(*body, side.clone() + "  | ", padding);
+                res += &add_header(&s);
+                let s = format!("{} Type\n", FORK);
+                res += &add_child(&s);
+                res += &self.print_ast_helper(*ftype, new_side.clone() + &format!("{} {} ", PIPE, FORK), padding);
+                let s = format!("{} Body\n", LAST);
+                res += &add_child(&s);
+                res += &self.print_ast_helper(*body, new_side.clone() + &format!("  {} ", LAST), padding);
             },
             AT::NumberLiteral => {
-                res += &add(&format!("Integer: {}\n", node.span.to_string()));
+                res += &add_header(&format!("Integer: {}\n", node.span.to_string()));
             },
             AT::FunctionType { name, .. } => {
                 let s = format!("Function type\n");
-                res += &add(&s);
-                let s = format!("  Name\n");
-                res += &add(&s);
-                res += &self.print_ast_helper(*name, side.clone() + "    ", padding);
+                res += &add_header(&s);
+                let s = format!("{} Name\n", LAST);
+                res += &add_child(&s);
+                res += &self.print_ast_helper(*name, new_side.clone() + &format!("  {} ", LAST), padding);
                 // let s = format!("Constant parameters\n");
                 // res += &add(&s);
                 // res += &self.print_ast_helper(c, *constant_params, side.clone() + "| ", padding);
@@ -162,20 +186,20 @@ impl<'a, 'b> Module<'a, 'b> {
                 // res += &self.print_ast_helper(c, *params, side.clone() + "| ", padding);
             },
             AT::Return(id) => {
-                res += &add(&format!("Return\n"));
-                res += &self.print_ast_helper(*id, side.clone() + "| ", padding)
+                res += &add_header(&format!("Return\n"));
+                res += &self.print_ast_helper(*id, new_side.clone() + &format!("{} ", LAST), padding)
             },
             AT::Add { left, right } => {
-                res += &add(&format!("Add\n"));
-                res += &self.print_ast_helper(*left, side.clone() + "| ", padding);
-                res += &self.print_ast_helper(*right, side.clone() + "| ", padding);
+                res += &add_header(&format!("Add\n"));
+                res += &self.print_ast_helper(*left, new_side.clone() + &format!("{} ", FORK), padding);
+                res += &self.print_ast_helper(*right, new_side.clone() + &format!("{} ", LAST), padding);
             },
             AT::FunctionCall { function, .. } => {
                 let s = format!("Function call\n");
-                res += &add(&s);
-                let s = format!("  Function\n");
-                res += &add(&s);
-                res += &self.print_ast_helper(*function, side.clone() + "  | ", padding);
+                res += &add_header(&s);
+                let s = format!("{} Function\n", LAST);
+                res += &add_child(&s);
+                res += &self.print_ast_helper(*function, new_side.clone() + &format!("  {} ", LAST), padding);
                 // let s = format!("Arguments\n");
                 // res += &add(&s);
                 // res += &self.print_ast_helper(c, *params, side.clone() + "| ", padding);
