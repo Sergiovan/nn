@@ -1,6 +1,6 @@
 use super::Span;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenType {
 	ErrorToken,
 	Eof,
@@ -34,4 +34,10 @@ impl ToString for Token {
 	fn to_string(&self) -> String {
 		format!("{:?} {}", self.ttype, self.span.to_string())
 	}
+}
+
+impl Token {
+  pub fn is(&self, ttype: TokenType) -> bool {
+    self.ttype == ttype
+  }
 }
