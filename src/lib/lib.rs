@@ -1,9 +1,6 @@
 mod compiler;
-mod module;
-mod lexer;
-mod parser;
-
 mod util;
+mod frontend;
 
 use std::fs;
 use std::path::Path;

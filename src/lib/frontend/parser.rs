@@ -1,40 +1,15 @@
+pub mod ast;
+
+use self::ast::{Ast, AstId, AstType};
+
+use super::lexer::token::{Token, TokenType};
+use super::module::{span::Span, Module};
+
+use crate::util::indexed_vector::{IndexedVec, ivec};
+
 use std::iter::Peekable;
 use std::iter::Iterator;
 use std::slice;
-
-use crate::lexer::{Token, TokenType};
-use crate::module::{Span, Module};
-use crate::util::IndexedVector::{IndexedVector, IndexedVec, ivec};
-
-pub type AstId = <IndexedVec<Ast<'static>> as IndexedVector>::Index;
-
-#[derive(Debug, PartialEq)]
-pub enum AstType {
-	Program(AstId),
-	ErrorAst, // TODO Proper errors
-
-	Iden,
-	Block(Vec<AstId>),
-	FunctionDefinition{ftype: AstId, body: AstId},
-
-	NumberLiteral,
-
-	FunctionType{name: AstId, constant_params: AstId, params: AstId},
-	
-	Return(AstId),
-	
-	Add{left: AstId, right: AstId},
-	FunctionCall{function: AstId, params: AstId},
-	FunctionParams( /* TODO */ ),
-	_FunctionParam( /* TODO */ )
-}
-
-#[derive(Debug)]
-pub struct Ast<'a> {
-	pub id: AstId,
-	pub atype: AstType,
-	pub span: Span<'a>
-}
 
 pub struct ParserError (String);
 

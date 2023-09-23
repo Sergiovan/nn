@@ -1,6 +1,6 @@
-use crate::module;
+use crate::frontend::module;
 
-use crate::util::IndexedVector::{IndexedVec, ivec, IndexedVecIndex};
+use crate::util::indexed_vector::{IndexedVec, ivec, IndexedVecIndex};
 
 pub struct Compiler<'a> {
 	pub modules: IndexedVec<module::Module<'a, 'a>>

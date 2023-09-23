@@ -1,43 +1,11 @@
+pub mod token;
+
+use self::token::{Token, TokenType};
+
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-use crate::module::{Module, Span};
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum TokenType {
-	ErrorToken,
-	Eof,
-
-	Comment{block: bool}, 
-	Iden,
-	Integer,
-	
-	Def,
-	Fun,
-
-	Return,
-
-	Add,
-	StrongArrowRight,
-	OpenParen,
-	CloseParen,
-	OpenBrace,
-	CloseBrace,
-
-	Semicolon,
-}
-
-#[derive(Clone, Debug)]
-pub struct Token<'a> {
-	pub span: Span<'a>,
-	pub ttype: TokenType
-}
-
-impl<'a> ToString for Token<'a> {
-	fn to_string(&self) -> String {
-		format!("{:?} {}", self.ttype, self.span.to_string())
-	}
-}
+use super::module::{Module, span::Span};
 
 // 'l (The content of the Module) will live at least as long as 'm (The reference to the module)
 // 'l thus delimits the lifetime of the module, which is longer than the lexer's

@@ -1,24 +1,13 @@
+pub mod span;
+
 use std::cmp::max;
 
-use crate::lexer::{Token, Lexer};
-use crate::parser::{Ast, AstId, Parser, AstType};
+use self::span::Span;
 
-use crate::util::IndexedVector::{IndexedVector, IndexedVec, ivec};
+use super::lexer::{token::Token, Lexer};
+use super::parser::{Parser, ast::{Ast, AstId, AstType}};
 
-#[derive(Copy, Clone, Debug)]
-pub struct Span<'a> {
-	pub text: &'a str,
-	pub module_idx: ModuleId,
-	pub start: u32,
-	pub line: u32,
-	pub col: u32
-}
-
-impl<'a> ToString for Span<'a> {
-	fn to_string(&self) -> String {
-		self.text.to_owned()
-	}
-}
+use crate::util::indexed_vector::{IndexedVector, IndexedVec, ivec};
 
 pub type ModuleId = <IndexedVec<Module<'static, 'static>> as IndexedVector>::Index;
 
@@ -106,7 +95,7 @@ impl<'a, 'b> Module<'a, 'b> {
 		}
 	}
 
-	pub fn print_ast_helper(&self, ast: crate::parser::AstId, side: String, padding: usize) -> String {
+	pub fn print_ast_helper(&self, ast: AstId, side: String, padding: usize) -> String {
 		use AstType as AT;
 
 		const PIPE: char = '┃';
