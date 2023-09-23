@@ -1,6 +1,6 @@
 mod compiler;
-mod util;
 mod frontend;
+mod util;
 
 use std::fs;
 use std::path::Path;
@@ -15,9 +15,11 @@ pub fn compile(path: &Path) {
 
 	module.print_token_table();
 
-	println!("\n\n");
+	println!();
 
 	module.parse();
+
+	println!();
 
 	module.print_ast();
 }

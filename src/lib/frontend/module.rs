@@ -3,13 +3,15 @@ pub mod span;
 use self::span::Span;
 
 use super::lexer::{token::Token, Lexer};
-use super::parser::{Parser, ast::{Ast, AstId, AstType}};
+use super::parser::{
+	ast::{Ast, AstId, AstType},
+	Parser,
+};
 
-use crate::util::indexed_vector::{IndexedVector, IndexedVec, ivec};
+use crate::util::indexed_vector::{ivec, IndexedVec, IndexedVector};
 
+use std::cell::{Ref, RefCell};
 use std::cmp::max;
-use std::cell::{RefCell, Ref};
-
 
 pub type ModuleId = <IndexedVec<Module> as IndexedVector>::Index;
 
@@ -19,27 +21,46 @@ pub struct Module {
 	source_ptr: *mut String,
 	source: &'static str,
 	tokens: RefCell<Vec<Token>>,
+	eof_token: Token,
 	ast_nodes: RefCell<IndexedVec<Ast>>,
 }
 
 impl Module {
 	pub fn new(id: ModuleId, source: String) -> Module {
+		use super::lexer::token::TokenType;
+
+		let source_len = source.len();
+		let last_line = source.lines().count();
+		let last_col = source.lines().last().map_or(0, |l| l.len());
+
 		// We fenaggle a heap-string here, to do some lifetime hacks later
 		// Listen, this is awful but I don't have enough knowledge to figure
 		// out the proper way to do it, and google is being unhelpful.
 		let mut _box = Box::new(source);
 		let ptr = &mut *Box::leak(_box) as *mut String;
 
+		let source: &'static str = unsafe { &*ptr };
+
 		Module {
 			id,
 			source_ptr: ptr,
-			source: unsafe { &*ptr },
+			source,
 			tokens: RefCell::new(vec![]),
-			ast_nodes: RefCell::new(ivec![])
+			eof_token: Token {
+				ttype: TokenType::Eof,
+				span: Span {
+					text: "",
+					module_idx: id,
+					start: source_len as u32 - 1_u32,
+					line: last_line as u32,
+					col: last_col as u32,
+				},
+			},
+			ast_nodes: RefCell::new(ivec![]),
 		}
 	}
 
-	// Spans depend on the lifetime of modules, 
+	// Spans depend on the lifetime of modules,
 	// but since modules live forever this is not an issue
 	pub fn new_span(&self, start: u32, end: u32, line: u32, col: u32) -> Span {
 		Span {
@@ -47,7 +68,7 @@ impl Module {
 			module_idx: self.id,
 			start,
 			line,
-			col
+			col,
 		}
 	}
 
@@ -57,6 +78,10 @@ impl Module {
 
 	pub fn tokens(&self) -> Ref<Vec<Token>> {
 		self.tokens.borrow()
+	}
+
+	pub fn eof_token(&self) -> &Token {
+		&self.eof_token
 	}
 
 	pub fn ast_nodes(&self) -> Ref<IndexedVec<Ast>> {
@@ -72,7 +97,7 @@ impl Module {
 	}
 
 	pub fn parse(&self) {
-		let (asts, _errors) = {
+		let (asts, errors) = {
 			let toks = self.tokens.borrow();
 			let iter = toks.iter();
 			let mut parser = Parser::new(self, iter.peekable());
@@ -80,7 +105,9 @@ impl Module {
 			parser.get_results()
 		};
 		*self.ast_nodes.borrow_mut() = asts;
-		// self.errors = errors;
+		for error in errors.into_iter() {
+			println!("{:?}", error);
+		}
 	}
 
 	pub fn print_token_table(&self) {
@@ -90,17 +117,31 @@ impl Module {
 		let idx_size = max(tokens.len().to_string().len(), 3);
 		let span_size = self.source().len().to_string().len() * 2 + 1;
 
-		let hdr = format!("{: <idx_width$} | {: <ttype_width$} | {: ^span_width$} | {} ", 
-						  "IDX", "TOKEN TYPE", "SPAN", "VALUE", 
-						  idx_width = idx_size, ttype_width = TOKEN_TYPE_SIZE, span_width = span_size);
+		let hdr = format!(
+			"{: <idx_width$} | {: <ttype_width$} | {: ^span_width$} | {} ",
+			"IDX",
+			"TOKEN TYPE",
+			"SPAN",
+			"VALUE",
+			idx_width = idx_size,
+			ttype_width = TOKEN_TYPE_SIZE,
+			span_width = span_size
+		);
 		println!("{}", hdr);
 		println!("{}", "-".repeat(hdr.len()));
 		for (i, t) in tokens.iter().enumerate() {
 			let token_type_string = format!("{:?}", t.ttype);
 			let span_string = format!("{}:{}", t.span.start, t.span.text.len());
-			println!("{: <idx_width$} | {: <ttype_width$} | {: ^span_width$} | {}", 
-					 i, token_type_string, span_string, t.span.to_string().replace('\n', ""), 
-					 idx_width = idx_size, ttype_width = TOKEN_TYPE_SIZE, span_width = span_size);
+			println!(
+				"{: <idx_width$} | {: <ttype_width$} | {: ^span_width$} | {}",
+				i,
+				token_type_string,
+				span_string,
+				t.span.to_string().replace('\n', ""),
+				idx_width = idx_size,
+				ttype_width = TOKEN_TYPE_SIZE,
+				span_width = span_size
+			);
 		}
 	}
 
@@ -121,7 +162,7 @@ impl Module {
 					FORK => PIPE,
 					LAST => NONE,
 					NONE => NONE,
-					_ => c
+					_ => c,
 				};
 				s.push(new_char);
 			}
@@ -132,97 +173,149 @@ impl Module {
 		let ast_nodes = self.ast_nodes.borrow();
 		let node = &ast_nodes[ast];
 
-		let mut res: String = "".to_string(); 
+		let mut res: String = "".to_string();
 
-		let add_header = |txt| format!("{: >padding$}: {}{}", node.id.to_string(), side, txt, padding = padding);
+		let add_header = |txt| {
+			format!(
+				"{: >padding$}: {}{}",
+				node.id.to_string(),
+				side,
+				txt,
+				padding = padding
+			)
+		};
 		let new_side = convert_side(&side);
-		let add_child = |txt| format!("{: >padding$}: {}{}", node.id.to_string(), new_side, txt, padding = padding);
+		let add_child = |txt| {
+			format!(
+				"{: >padding$}: {}{}",
+				node.id.to_string(),
+				new_side,
+				txt,
+				padding = padding
+			)
+		};
 
 		match &node.atype {
 			AT::Program(id) => {
 				res += &add_header("Program\n");
 				res += &self.print_ast_helper(*id, format!("{} ", LAST), padding);
-			},
+			}
 			AT::ErrorAst => {
 				res += &add_header("ErrorAst\n");
-			},
+			}
 			AT::Iden => {
 				res += &add_header(&format!("Iden: {}\n", node.span.to_string()));
-			},
+			}
 			AT::Block(elems) => {
 				res += &add_header(&format!("Block ({} elements)\n", elems.len()));
 				for id in elems.iter().take(elems.len() - 1) {
-					res += &self.print_ast_helper(*id, new_side.clone() + &format!("{} ", FORK), padding);
+					res += &self.print_ast_helper(
+						*id,
+						new_side.clone() + &format!("{} ", FORK),
+						padding,
+					);
 				}
 				if !elems.is_empty() {
-					res += &self.print_ast_helper(*elems.last().unwrap(), new_side.clone() + &format!("{} ", LAST), padding);
+					res += &self.print_ast_helper(
+						*elems.last().unwrap(),
+						new_side.clone() + &format!("{} ", LAST),
+						padding,
+					);
 				}
-			},
+			}
 			AT::FunctionDefinition { ftype, body } => {
 				let s = "Function definition\n".to_string();
 				res += &add_header(&s);
 				let s = format!("{} Type\n", FORK);
 				res += &add_child(&s);
-				res += &self.print_ast_helper(*ftype, new_side.clone() + &format!("{} {} ", PIPE, FORK), padding);
+				res += &self.print_ast_helper(
+					*ftype,
+					new_side.clone() + &format!("{} {} ", PIPE, FORK),
+					padding,
+				);
 				let s = format!("{} Body\n", LAST);
 				res += &add_child(&s);
-				res += &self.print_ast_helper(*body, new_side.clone() + &format!("  {} ", LAST), padding);
-			},
+				res += &self.print_ast_helper(
+					*body,
+					new_side.clone() + &format!("  {} ", LAST),
+					padding,
+				);
+			}
 			AT::NumberLiteral => {
 				res += &add_header(&format!("Integer: {}\n", node.span.to_string()));
-			},
+			}
 			AT::FunctionType { name, .. } => {
 				let s = "Function type\n".to_string();
 				res += &add_header(&s);
 				let s = format!("{} Name\n", LAST);
 				res += &add_child(&s);
-				res += &self.print_ast_helper(*name, new_side.clone() + &format!("  {} ", LAST), padding);
+				res += &self.print_ast_helper(
+					*name,
+					new_side.clone() + &format!("  {} ", LAST),
+					padding,
+				);
 				// let s = format!("Constant parameters\n");
 				// res += &add(&s);
 				// res += &self.print_ast_helper(c, *constant_params, side.clone() + "| ", padding);
 				// let s = format!("Runtime parameters\n");
 				// res += &add(&s);
 				// res += &self.print_ast_helper(c, *params, side.clone() + "| ", padding);
-			},
+			}
 			AT::Return(id) => {
 				res += &add_header("Return\n");
-				res += &self.print_ast_helper(*id, new_side.clone() + &format!("{} ", LAST), padding)
-			},
+				res +=
+					&self.print_ast_helper(*id, new_side.clone() + &format!("{} ", LAST), padding)
+			}
 			AT::Add { left, right } => {
 				res += &add_header("Add\n");
-				res += &self.print_ast_helper(*left, new_side.clone() + &format!("{} ", FORK), padding);
-				res += &self.print_ast_helper(*right, new_side.clone() + &format!("{} ", LAST), padding);
-			},
+				res += &self.print_ast_helper(
+					*left,
+					new_side.clone() + &format!("{} ", FORK),
+					padding,
+				);
+				res += &self.print_ast_helper(
+					*right,
+					new_side.clone() + &format!("{} ", LAST),
+					padding,
+				);
+			}
 			AT::FunctionCall { function, .. } => {
 				let s = "Function call\n".to_string();
 				res += &add_header(&s);
 				let s = format!("{} Function\n", LAST);
 				res += &add_child(&s);
-				res += &self.print_ast_helper(*function, new_side.clone() + &format!("  {} ", LAST), padding);
+				res += &self.print_ast_helper(
+					*function,
+					new_side.clone() + &format!("  {} ", LAST),
+					padding,
+				);
 				// let s = format!("Arguments\n");
 				// res += &add(&s);
 				// res += &self.print_ast_helper(c, *params, side.clone() + "| ", padding);
-			},
-			AT::FunctionParams() => {
-
-			},
-			AT::_FunctionParam() => {
-
-			},
+			}
+			AT::FunctionParams() => {}
+			AT::_FunctionParam() => {}
 		}
 		res
 	}
 
 	pub fn print_ast(&self) {
 		let padding = self.ast_nodes().len().to_string().len() + 1;
-		print!("{}", self.print_ast_helper(AstId::from(self.ast_nodes().len() - 1), "".to_owned(), padding));
+		print!(
+			"{}",
+			self.print_ast_helper(
+				AstId::from(self.ast_nodes().len() - 1),
+				"".to_owned(),
+				padding
+			)
+		);
 	}
 }
 
 impl Drop for Module {
 	fn drop(&mut self) {
 		// Undo lifetime hacks from earlier
-		unsafe { 
+		unsafe {
 			let _ = Box::from_raw(self.source_ptr);
 		}
 	}

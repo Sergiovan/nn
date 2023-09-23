@@ -2,16 +2,17 @@ pub mod ast;
 
 use self::ast::{Ast, AstId, AstType};
 
-use super::lexer::token::{Token, TokenType};
+use super::lexer::token::{MaybeToken, Token, TokenType};
 use super::module::{span::Span, Module};
 
-use crate::util::indexed_vector::{IndexedVec, ivec};
+use crate::util::indexed_vector::{ivec, IndexedVec};
 
-use std::iter::Peekable;
 use std::iter::Iterator;
+use std::iter::Peekable;
 use std::slice;
 
-pub struct ParserError (String);
+#[derive(Debug)]
+pub struct ParserError(String);
 
 pub struct Parser<'m> {
 	module: &'m Module,
@@ -19,80 +20,24 @@ pub struct Parser<'m> {
 
 	data: Peekable<slice::Iter<'m, Token>>,
 	asts: IndexedVec<Ast>,
-	errors: Vec<ParserError>
+	errors: Vec<ParserError>,
 }
 
 enum OpType {
 	_Prefix,
-	Postfix
-}
-
-macro_rules! next_is {
-	($self:ident, $pat:pat) => {
-		(if let Some(Token { ttype: $pat, .. }) = $self.peek() {
-			true
-		} else {
-			false
-		})
-	}
-}
-
-macro_rules! assert_next {
-	($self:ident, $pat:pat) => {
-		if !next_is!($self, $pat) {
-			let current = $self.current;
-			let incoming_type = $self.peek().unwrap_or(&$self.eof_token()).ttype.clone();
-			panic!("Expected {:?} but found {:?} at position {}", stringify!($pat), incoming_type, current);
-		}
-	}
-}
-
-macro_rules! expect_next {
-	($self:ident, $pat:pat) => {
-		(if next_is!($self, $pat) {
-			true
-		} else {
-			let current = $self.current;
-			let incoming_type = $self.peek().unwrap_or(&$self.eof_token()).ttype.clone();
-			$self.new_error(ParserError(format!("Expected {:?} but found {:?} at position {}", stringify!($pat), incoming_type, current)));
-			false
-		})
-	}
-}
-
-macro_rules! expect_and_skip {
-	($self:ident, $pat:pat) => {
-		(if expect_next!($self, $pat) { 
-			$self.next(); true 
-		} else { 
-			false 
-		})
-	}
-}
-
-macro_rules! next_or_error {
-	($self:ident) => {
-		{
-			let Some(e) = $self.next() else {return $self.eof();};
-			e
-		}
-	}
-}
-
-macro_rules! peek_or_error {
-	($self:ident) => {
-		{
-			let Some(e) = $self.peek() else {return $self.eof();};
-			e
-		}
-	}
+	Postfix,
 }
 
 use AstType as AT;
 use TokenType as TT;
 
+type ParserResult<T = AstId> = Result<T, ()>;
+
 impl<'m> Parser<'m> {
-	pub fn new<'a>(module: &'a Module, tokens: Peekable<std::slice::Iter<'a, Token>>) -> Parser<'a> {
+	pub fn new<'a>(
+		module: &'a Module,
+		tokens: Peekable<std::slice::Iter<'a, Token>>,
+	) -> Parser<'a> {
 		Parser {
 			module,
 			current: 0,
@@ -103,21 +48,16 @@ impl<'m> Parser<'m> {
 		}
 	}
 
-	fn eof_token(&self) -> Token {
-		let pos: u32 = self.module.source().len() as u32 - 1;
-		Token {
-				ttype: TT::Eof, 
-				span: self.module.new_span(pos, pos, u32::MAX, u32::MAX)
-		}
-	}
-
-	fn eof(&mut self) -> AstId {
-		let eof = self.eof_token();
-		self.new_ast(AT::ErrorAst, &eof.span, &eof.span)
-	}
-
 	pub fn parse(&mut self) {
-		self.program();
+		match self.program() {
+			Ok(_) => (),
+			Err(()) => {
+				self.new_error(ParserError(format!(
+					"Program ended unexpectedly at {}",
+					self.current
+				)));
+			}
+		};
 	}
 
 	pub fn get_results(self) -> (IndexedVec<Ast>, Vec<ParserError>) {
@@ -133,8 +73,29 @@ impl<'m> Parser<'m> {
 
 		self.asts.push(Ast {
 			id,
-			atype, 
-			span: self.module.new_span(start.start, end.start + end.text.len() as u32, start.line, start.col)
+			atype,
+			span: self.module.new_span(
+				start.start,
+				end.start + end.text.len() as u32,
+				start.line,
+				start.col,
+			),
+		});
+
+		id
+	}
+
+	fn new_error_ast(&mut self) -> AstId {
+		println!("Error AST!");
+
+		let id: AstId = AstId::from(self.asts.len());
+
+		let span = self.peek().unwrap_or(self.module.eof_token()).span;
+
+		self.asts.push(Ast {
+			id,
+			atype: AT::ErrorAst,
+			span,
 		});
 
 		id
@@ -145,269 +106,336 @@ impl<'m> Parser<'m> {
 	}
 
 	fn skip_comments(&mut self) {
-		while let Some(Token {ttype: TT::Comment { .. }, .. }) = self.peek() {
+		while let Ok(Token {
+			ttype: TT::Comment { .. },
+			..
+		}) = self.peek()
+		{
 			self.current += 1;
 			self.data.next();
 		}
 	}
 
-	fn peek(&mut self) -> Option<&'m Token> {
-		self.data.peek().cloned()
+	fn raw_peek(&mut self) -> MaybeToken<'m> {
+		self.data.peek().cloned().into()
 	}
 
-	fn next(&mut self) -> Option<&'m Token> {
+	fn raw_next(&mut self) -> MaybeToken<'m> {
 		self.current += 1;
 		let res = self.data.next();
 		self.skip_comments();
-		res
+		res.into()
+	}
+
+	fn peek(&mut self) -> ParserResult<&'m Token> {
+		self.raw_peek().expect().map_err(|_| ())
+	}
+
+	fn next(&mut self) -> ParserResult<&'m Token> {
+		self.raw_next().expect().map_err(|_| ())
+	}
+
+	fn skip(&mut self) {
+		self.raw_next();
+	}
+
+	fn _peek_assert(&mut self, ttype: TokenType) -> &'m Token {
+		self.raw_peek().assert_is(ttype)
+	}
+
+	fn next_assert(&mut self, ttype: TokenType) -> &'m Token {
+		self.raw_next().assert_is(ttype)
+	}
+
+	fn peek_expect(&mut self, ttype: TokenType) -> ParserResult<&'m Token> {
+		self.raw_peek().expect_is(ttype).map_err(|e| {
+			let t = e.unwrap_or(self.module.eof_token());
+			self.new_error(ParserError(format!(
+				"Expected {:?} but found {:?} at position {}",
+				ttype, t.ttype, self.current
+			)));
+		})
+	}
+
+	fn next_expect(&mut self, ttype: TokenType) -> ParserResult<&'m Token> {
+		self.raw_next().expect_is(ttype).map_err(|e| {
+			let t = e.unwrap_or(self.module.eof_token());
+			self.new_error(ParserError(format!(
+				"Expected {:?} but found {:?} at position {}",
+				ttype, t.ttype, self.current
+			)));
+		})
+	}
+
+	fn peek_is(&mut self, ttype: TokenType) -> bool {
+		self.raw_peek().is(ttype)
+	}
+
+	fn _peek_one_of(&mut self, ttypes: &[TokenType]) -> bool {
+		self.raw_peek()._one_of(ttypes)
+	}
+
+	fn skip_if_is(&mut self, ttype: TokenType) -> bool {
+		if self.peek_is(ttype) {
+			self.raw_next();
+			true
+		} else {
+			false
+		}
+	}
+
+	fn _skip_if_one_of(&mut self, ttypes: &[TokenType]) -> bool {
+		if self._peek_one_of(ttypes) {
+			self.raw_next();
+			true
+		} else {
+			false
+		}
+	}
+
+	fn expect_is_and_skip(&mut self, ttype: TokenType) -> bool {
+		if !self.skip_if_is(ttype) {
+			let expected = self.raw_peek().ttype();
+			self.new_error(ParserError(format!(
+				"Expected {:?} but found {:?} at position {}",
+				ttype, expected, self.current
+			)));
+			false
+		} else {
+			true
+		}
 	}
 
 	fn get(&mut self, id: AstId) -> &Ast {
 		assert!(self.asts.valid_index(id), "Accessing non-existent ast");
-		
+
 		&self.asts[id]
 	}
 
-  /** **/
+	/** **/
 
-	fn program(&mut self) -> AstId {
+	fn program(&mut self) -> ParserResult {
 		self.skip_comments();
 
-		let t = peek_or_error!(self);
+		let t = self.peek()?;
 		let start = t.span;
-		let block = self.top_block();
+		let block = self.top_block()?;
 		let end = self.asts[block].span;
-		self.new_ast(AT::Program(block), &start, &end)
-
+		Ok(self.new_ast(AT::Program(block), &start, &end))
 	}
 
-	fn iden(&mut self) -> AstId {
-		let n = next_or_error!(self);
-		if let Token {span: s, ttype: TT::Iden} = n {
-			self.new_ast(AT::Iden, s, s) // TODO extract specific characters?
+	fn iden(&mut self) -> ParserResult {
+		let n = self.next()?;
+		if let Token {
+			span: s,
+			ttype: TT::Iden,
+		} = n
+		{
+			Ok(self.new_ast(AT::Iden, s, s)) // TODO extract specific characters?
 		} else {
 			let t = n.span;
-			self.new_ast(AT::ErrorAst, &t, &t)
+			Ok(self.new_ast(AT::ErrorAst, &t, &t))
 		}
 	}
 
-	fn top_block(&mut self) -> AstId {
+	fn top_block(&mut self) -> ParserResult {
 		let mut asts = vec![];
 
-		assert!(self.peek().is_some());
+		let t = self.raw_peek().assert();
 
-		let start = self.peek().unwrap().span;
+		let start = t.span;
 		let mut end = start;
 
 		loop {
 			let t = self.peek();
-			let ast = match t {
-				None => break,
-				Some(_) => {
-					self.top_level_statement()
-				} 
-			};
+			if t.is_err() {
+				break;
+			}
+			let ast = self.top_level_statement()?;
 
 			asts.push(ast);
 
-			end = self.peek().unwrap_or(&self.eof_token()).span;
+			end = self.peek().unwrap_or(self.module.eof_token()).span;
 		}
 
-		self.new_ast(AT::Block(asts), &start, &end)
+		Ok(self.new_ast(AT::Block(asts), &start, &end))
 	}
 
-	fn top_level_statement(&mut self) -> AstId {
-		let t = peek_or_error!(self);
+	fn top_level_statement(&mut self) -> ParserResult {
+		let t = self.peek()?;
 
-		match t.ttype {
-			TT::Def => {
-				self.define()
-			}
-			_ => {
-				let t_span = t.span;
-				let r = self.new_ast(AT::ErrorAst, &t_span, &t_span);
-				self.next();
-				r
-			}
+		if t.is(TT::Def) {
+			Ok(self.define()?)
+		} else {
+			let t_span = t.span;
+			let r = self.new_ast(AT::ErrorAst, &t_span, &t_span);
+			self.skip();
+			Ok(r)
 		}
 	}
 
-	fn function_block(&mut self) -> AstId {
+	fn function_block(&mut self) -> ParserResult {
 		let mut asts = vec![];
 
-		expect_next!(self, TT::OpenBrace);
+		let Ok(t) = self.next_expect(TT::OpenBrace) else {
+			return Ok(self.new_error_ast());
+		}; // {
 
-		let start = next_or_error!(self).span; // {
+		let start = t.span;
 		let end = start;
 
 		loop {
-			let t = self.peek();
-			let ast = match t {
-				None => {
-					break;
-				}
-				Some(t) => {
-					if t.is(TT::CloseBrace) {
-						break;
-					} else {
-						self.statement()
-					}
-				}
-			};
+			let t = self.peek()?;
+			if t.is(TT::CloseBrace) {
+				break;
+			}
+			let ast = self.statement()?;
 
 			asts.push(ast);
 		}
 
-		expect_and_skip!(self, TT::CloseBrace); // }
+		self.expect_is_and_skip(TT::CloseBrace); // }
 
-		self.new_ast(AT::Block(asts), &start, &end)
+		Ok(self.new_ast(AT::Block(asts), &start, &end))
 	}
 
-	fn statement(&mut self) -> AstId {
-		let t = peek_or_error!(self);
+	fn statement(&mut self) -> ParserResult {
+		let t = self.peek()?;
 
 		match t.ttype {
-			TT::Def => {
-				self.define()
-			}
+			TT::Def => self.define(),
 			_ => {
-				let res = self.expression(); // Easy tail recursion hmm
-				expect_and_skip!(self, TT::Semicolon);
-				res
+				let res = self.expression()?; // Easy tail recursion hmm
+				self.expect_is_and_skip(TT::Semicolon);
+				Ok(res)
 			}
 		}
 	}
 
-	fn define(&mut self) -> AstId {
-		assert_next!(self, TT::Def);
+	fn define(&mut self) -> ParserResult {
+		let def = self.next_assert(TT::Def); // def
 
-		let def = self.next().unwrap(); // def
-		let def_span = def.span;
+		let t = self.peek()?;
 
-		let t = self.peek();
-		match t {
-			None => self.new_ast(AT::ErrorAst, &def_span, &def_span),
-			Some(t) => {
-				if t.is(TT::Fun) {
-					let ftype = self.function_type();
-					// TODO Expect body?
-					let (fbody, expr) = self.function_body(); // TODO No body
-	
-					let _ = expr && expect_and_skip!(self, TT::Semicolon);
-	
-					let start_span = self.get(ftype).span;
-					let end_span = self.get(fbody).span;
-	
-					self.new_ast(AT::FunctionDefinition{ftype, body: fbody}, &start_span, &end_span)
-				} else {
-					let end_span = t.span;
-					self.new_ast(AT::ErrorAst, &def_span, &end_span)
-				}
+		match t.ttype {
+			TT::Fun => {
+				let ftype = self.function_type()?;
+				// TODO Expect body?
+				let fbody = self.function_body()?; // TODO No body
+
+				let start_span = def.span;
+				let end_span = self.get(fbody).span;
+
+				Ok(self.new_ast(
+					AT::FunctionDefinition { ftype, body: fbody },
+					&start_span,
+					&end_span,
+				))
 			}
+			_ => Ok(self.new_error_ast()),
 		}
 	}
 
-	fn function_type(&mut self) -> AstId {
-		assert_next!(self, TT::Fun);
-
-		let fun = self.next().unwrap(); // fun
+	fn function_type(&mut self) -> ParserResult {
+		let fun = self.next_assert(TT::Fun); // fun
 		let fun_span = fun.span;
 
-		expect_next!(self, TT::Iden);
-		let name = self.iden();
+		if self.peek_expect(TT::Iden).is_err() {
+			return Ok(self.new_error_ast());
+		};
 
-		expect_next!(self, TT::OpenParen); // TODO Constant parameters
-		let params = self.function_params();
+		let name = self.iden()?;
+
+		// TODO Constant parameters
+
+		if self.peek_expect(TT::OpenParen).is_err() {
+			return Ok(self.new_error_ast());
+		}
+
+		let params = self.function_params()?;
 
 		let end_span = self.get(params).span;
-		self.new_ast(AT::FunctionType{name, constant_params: AstId::from(u32::MAX), params}, &fun_span, &end_span)
+		Ok(self.new_ast(
+			AT::FunctionType {
+				name,
+				constant_params: AstId::from(u32::MAX),
+				params,
+			},
+			&fun_span,
+			&end_span,
+		))
 	}
 
-	fn function_params(&mut self) -> AstId {
-		assert_next!(self, TT::OpenParen);
-
-		let oparen = self.next().unwrap(); // (
+	fn function_params(&mut self) -> ParserResult {
+		let oparen = self.next_assert(TT::OpenParen); // (
 		let start_span = oparen.span;
 
-		assert!(oparen.ttype == TT::OpenParen);
-
 		// TODO Parameters :P
-		let cparen = self.peek().unwrap(); // TODO )
-		let end_span = cparen.span;
-		expect_and_skip!(self, TT::CloseParen);
+		let cparen = self.peek_expect(TT::CloseParen); // )
+		let end_span = cparen.unwrap_or(self.peek()?).span;
+		self.skip_if_is(TT::CloseParen);
 
-		self.new_ast(AT::FunctionParams(), &start_span, &end_span)
+		Ok(self.new_ast(AT::FunctionParams(), &start_span, &end_span))
 	}
 
-	fn function_body(&mut self) -> (AstId, bool) {
-		let t = self.peek().unwrap(); // TODO fix
+	fn function_body(&mut self) -> ParserResult {
+		let t = self.peek()?;
 		let error_span = t.span;
 
 		match t.ttype {
-			TT::OpenBrace => {
-				(self.function_block(), false)
-			}
+			TT::OpenBrace => Ok(self.function_block()?),
 			TT::StrongArrowRight => {
 				let arrow = self.next().unwrap(); // TODO fix =>
 				let start_span = arrow.span;
 
-				let expr = self.expression();
+				let expr = self.expression()?;
 				let expr_span = self.get(expr).span;
+
+				self.expect_is_and_skip(TT::Semicolon);
 
 				let retexpr = self.new_ast(AT::Return(expr), &expr_span, &expr_span);
 
-				(self.new_ast(
-					AT::Block(vec![retexpr]), &start_span, &expr_span
-				), true)
+				Ok(self.new_ast(AT::Block(vec![retexpr]), &start_span, &expr_span))
 			}
-			TT::Eof => {
-				(self.new_ast(AT::ErrorAst, &error_span, &error_span), false)
-			}
-			_ => {
-				(self.new_ast(AT::ErrorAst, &error_span, &error_span), false)
-			}
+			_ => Ok(self.new_ast(AT::ErrorAst, &error_span, &error_span)),
 		}
 	}
 
-	fn expression(&mut self) -> AstId {
-		let t = peek_or_error!(self);
+	fn expression(&mut self) -> ParserResult {
+		let t = self.peek()?;
 
 		if t.is(TT::Return) {
 			self.return_expression()
 		} else {
-			let res = self.value_expression(0);
-			expect_and_skip!(self, TT::Semicolon);
-			res
+			self.value_expression(0)
 		}
 	}
 
-	fn return_expression(&mut self) -> AstId {
-		assert_next!(self, TT::Return);
-
-		let r#return = self.next().unwrap(); // return
+	fn return_expression(&mut self) -> ParserResult {
+		let r#return = self.next_assert(TT::Return); // return
 		let return_span = r#return.span;
 
-		let res = self.expression();
+		let res = self.expression()?;
 		let res_span = self.get(res).span;
-		self.new_ast(AT::Return(res), &r#return_span, &res_span)
+		Ok(self.new_ast(AT::Return(res), &r#return_span, &res_span))
 	}
 
 	fn operator_precedence(ttype: &TokenType, op_type: OpType) -> usize {
 		match ttype {
 			TT::Add => match op_type {
 				OpType::_Prefix => 90,
-				OpType::Postfix => 30
+				OpType::Postfix => 30,
 			},
 			TT::OpenParen => match op_type {
 				OpType::_Prefix => 0xFFFFFFFF,
-				OpType::Postfix => 50
-			}
-			_ => 0
+				OpType::Postfix => 50,
+			},
+			_ => 0,
 		}
 	}
 
-	fn value_expression(&mut self, precedence: usize) -> AstId {
-		let tok = peek_or_error!(self);
+	fn value_expression(&mut self, precedence: usize) -> ParserResult {
+		let tok = self.peek()?;
 
 		// Prefixes
 		let mut res = match &tok.ttype {
@@ -417,53 +445,68 @@ impl<'m> Parser<'m> {
 			//     self.new_ast(AT::Negate(expr), &tok.span, &self.get(expr).span)
 			// }
 			TT::OpenParen => {
-				self.next(); // (
-				let expr = self.expression();
-				expect_and_skip!(self, TT::CloseParen); // )
+				self.skip(); // (
+				let expr = self.expression()?;
+				self.expect_is_and_skip(TT::CloseParen); // )
 				expr
 			}
 			TT::Integer => {
 				let tok_span = tok.span;
-				self.next(); // Number
+				self.skip(); // Integer
 				self.new_ast(AT::NumberLiteral, &tok_span, &tok_span)
 			}
-			TT::Iden => {
-				self.iden()
-			}
+			TT::Iden => self.iden()?,
 			_ => {
 				let tok_span = tok.span;
-				self.next(); // ???
+				self.skip(); // ???
 				self.new_ast(AT::ErrorAst, &tok_span, &tok_span)
 			}
 		};
 
 		loop {
-			let tok = peek_or_error!(self);
+			let tok = self.peek()?;
 			let new_precedence = Self::operator_precedence(&tok.ttype, OpType::Postfix);
 			if new_precedence < precedence {
-				return res;
+				return Ok(res);
 			}
 
 			res = match tok.ttype {
 				TT::OpenParen => {
-					self.next(); // (
-					// TODO Params
-					let close = peek_or_error!(self); 
+					// Function call
+					self.skip(); // (
+
+					// TODO Function Params
+					let close = self.peek()?;
 					let close_span = close.span;
 					let res_span = self.get(res).span;
 
-					expect_and_skip!(self, TT::CloseParen);
-					self.new_ast(AT::FunctionCall { function: res, params: AstId::from(u32::MAX)}, &res_span, &close_span)
+					self.expect_is_and_skip(TT::CloseParen); // )
+
+					self.new_ast(
+						AT::FunctionCall {
+							function: res,
+							params: AstId::from(u32::MAX),
+						},
+						&res_span,
+						&close_span,
+					)
 				}
 				TT::Add => {
-					self.next(); // +
-					let rhs = self.value_expression(new_precedence);
+					self.skip(); // +
+					let rhs = self.value_expression(new_precedence)?;
 					let start_span = self.get(res).span;
 					let end_span = self.get(rhs).span;
-					self.new_ast(AT::Add{left: res, right: rhs}, &start_span, &end_span)
+					self.new_ast(
+						AT::Add {
+							left: res,
+							right: rhs,
+						},
+						&start_span,
+						&end_span,
+					)
 				}
 				_ => {
-					return res;
+					return Ok(res);
 				}
 			}
 		}
