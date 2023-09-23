@@ -2,12 +2,12 @@ use crate::frontend::module;
 
 use crate::util::indexed_vector::{IndexedVec, ivec, IndexedVecIndex};
 
-pub struct Compiler<'a> {
-	pub modules: IndexedVec<module::Module<'a, 'a>>
+pub struct Compiler {
+	pub modules: IndexedVec<module::Module>
 }
 
-impl<'a> Compiler<'a> {
-	pub fn new() -> Compiler<'a> {
+impl Compiler {
+	pub fn new() -> Compiler {
 		Compiler {
 			modules: ivec![]
 		}

@@ -1,7 +1,7 @@
 use crate::util::indexed_vector::{IndexedVec, IndexedVector};
 use super::Span;
 
-pub type AstId = <IndexedVec<Ast<'static>> as IndexedVector>::Index;
+pub type AstId = <IndexedVec<Ast> as IndexedVector>::Index;
 
 #[derive(Debug, PartialEq)]
 pub enum AstType {
@@ -25,8 +25,8 @@ pub enum AstType {
 }
 
 #[derive(Debug)]
-pub struct Ast<'a> {
+pub struct Ast {
 	pub id: AstId,
 	pub atype: AstType,
-	pub span: Span<'a>
+	pub span: Span
 }

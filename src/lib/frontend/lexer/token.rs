@@ -25,12 +25,12 @@ pub enum TokenType {
 }
 
 #[derive(Clone, Debug)]
-pub struct Token<'a> {
-	pub span: Span<'a>,
+pub struct Token {
+	pub span: Span,
 	pub ttype: TokenType
 }
 
-impl<'a> ToString for Token<'a> {
+impl ToString for Token {
 	fn to_string(&self) -> String {
 		format!("{:?} {}", self.ttype, self.span.to_string())
 	}

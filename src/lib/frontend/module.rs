@@ -1,7 +1,5 @@
 pub mod span;
 
-use std::cmp::max;
-
 use self::span::Span;
 
 use super::lexer::{token::Token, Lexer};
@@ -9,18 +7,23 @@ use super::parser::{Parser, ast::{Ast, AstId, AstType}};
 
 use crate::util::indexed_vector::{IndexedVector, IndexedVec, ivec};
 
-pub type ModuleId = <IndexedVec<Module<'static, 'static>> as IndexedVector>::Index;
+use std::cmp::max;
+use std::cell::{RefCell, Ref};
+
+
+pub type ModuleId = <IndexedVec<Module> as IndexedVector>::Index;
 
 #[derive(Debug)]
-pub struct Module<'a, 'b: 'a> {
+pub struct Module {
 	pub id: ModuleId,
-	source: &'b mut String,
-	tokens: Vec<Token<'a>>,
-	ast_nodes: IndexedVec<Ast<'a>>,
+	source_ptr: *mut String,
+	source: &'static str,
+	tokens: RefCell<Vec<Token>>,
+	ast_nodes: RefCell<IndexedVec<Ast>>,
 }
 
-impl<'a, 'b> Module<'a, 'b> {
-	pub fn new(id: ModuleId, source: String) -> Module<'a, 'b> {
+impl Module {
+	pub fn new(id: ModuleId, source: String) -> Module {
 		// We fenaggle a heap-string here, to do some lifetime hacks later
 		// Listen, this is awful but I don't have enough knowledge to figure
 		// out the proper way to do it, and google is being unhelpful.
@@ -29,15 +32,18 @@ impl<'a, 'b> Module<'a, 'b> {
 
 		Module {
 			id,
-			source: unsafe { &mut *ptr },
-			tokens: vec![],
-			ast_nodes: ivec![]
+			source_ptr: ptr,
+			source: unsafe { &*ptr },
+			tokens: RefCell::new(vec![]),
+			ast_nodes: RefCell::new(ivec![])
 		}
 	}
 
-	pub fn new_span(&'a self, start: u32, end: u32, line: u32, col: u32) -> Span<'b> {
+	// Spans depend on the lifetime of modules, 
+	// but since modules live forever this is not an issue
+	pub fn new_span(&self, start: u32, end: u32, line: u32, col: u32) -> Span {
 		Span {
-			text: &self.get_source()[(start as usize)..(end as usize)],
+			text: &self.source()[(start as usize)..(end as usize)],
 			module_idx: self.id,
 			start,
 			line,
@@ -45,41 +51,44 @@ impl<'a, 'b> Module<'a, 'b> {
 		}
 	}
 
-	pub fn get_source(&'a self) -> &'b String {
-		unsafe { &*(self.source as *const String) }
+	pub fn source(&self) -> &'static str {
+		self.source
 	}
 
-	pub fn lex(&mut self) {
+	pub fn tokens(&self) -> Ref<Vec<Token>> {
+		self.tokens.borrow()
+	}
+
+	pub fn ast_nodes(&self) -> Ref<IndexedVec<Ast>> {
+		self.ast_nodes.borrow()
+	}
+
+	pub fn lex(&self) {
 		let tokens = {
 			let lexer = Lexer::new(self);
 			lexer.lex()
 		};
-		self.tokens = tokens;
+		*self.tokens.borrow_mut() = tokens;
 	}
 
-	pub fn parse(&mut self) {
+	pub fn parse(&self) {
 		let (asts, _errors) = {
-			// Safe because asts only depend on source (via Span) and are stored in self
-			// Once again, I don't understand what's happening when I do a simple
-			// let toks = self.tokens;
-			// but it complains about borrows outliving the scope of the function
-			// presumably because some Span is not being done properly
-			let toks = unsafe { &*(&self.tokens as *const Vec<Token<'_>>) };
+			let toks = self.tokens.borrow();
 			let iter = toks.iter();
 			let mut parser = Parser::new(self, iter.peekable());
 			parser.parse();
 			parser.get_results()
 		};
-		self.ast_nodes = asts;
+		*self.ast_nodes.borrow_mut() = asts;
 		// self.errors = errors;
 	}
 
 	pub fn print_token_table(&self) {
 		const TOKEN_TYPE_SIZE: usize = 16;
 
-		let tokens = &self.tokens;
+		let tokens = self.tokens();
 		let idx_size = max(tokens.len().to_string().len(), 3);
-		let span_size = self.get_source().len().to_string().len() * 2 + 1;
+		let span_size = self.source().len().to_string().len() * 2 + 1;
 
 		let hdr = format!("{: <idx_width$} | {: <ttype_width$} | {: ^span_width$} | {} ", 
 						  "IDX", "TOKEN TYPE", "SPAN", "VALUE", 
@@ -120,7 +129,7 @@ impl<'a, 'b> Module<'a, 'b> {
 			s
 		}
 
-		let ast_nodes = &self.ast_nodes;
+		let ast_nodes = self.ast_nodes.borrow();
 		let node = &ast_nodes[ast];
 
 		let mut res: String = "".to_string(); 
@@ -205,16 +214,16 @@ impl<'a, 'b> Module<'a, 'b> {
 	}
 
 	pub fn print_ast(&self) {
-		let padding = self.ast_nodes.len().to_string().len() + 1;
-		print!("{}", self.print_ast_helper(AstId::from(self.ast_nodes.len() - 1), "".to_owned(), padding));
+		let padding = self.ast_nodes().len().to_string().len() + 1;
+		print!("{}", self.print_ast_helper(AstId::from(self.ast_nodes().len() - 1), "".to_owned(), padding));
 	}
 }
 
-impl<'a, 'b> Drop for Module<'a, 'b> {
+impl Drop for Module {
 	fn drop(&mut self) {
-		// Undo hacks from earlier
+		// Undo lifetime hacks from earlier
 		unsafe { 
-			let _ = Box::from_raw(self.source as *mut String);
+			let _ = Box::from_raw(self.source_ptr);
 		}
 	}
 }

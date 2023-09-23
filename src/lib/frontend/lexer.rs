@@ -9,8 +9,8 @@ use super::module::{Module, span::Span};
 
 // 'l (The content of the Module) will live at least as long as 'm (The reference to the module)
 // 'l thus delimits the lifetime of the module, which is longer than the lexer's
-pub struct Lexer<'m, 'l: 'm> {
-	module: &'m Module<'m, 'l>,
+pub struct Lexer<'m> {
+	module: &'m Module,
 	current: u32,
 	line: u32, 
 	col: u32,
@@ -18,15 +18,15 @@ pub struct Lexer<'m, 'l: 'm> {
 	data: Peekable<IntoIter<char>>
 }
 
-impl<'m, 'l> Lexer<'m, 'l> {
-	pub fn new(module: &'m Module<'m, 'l>) -> Lexer<'m, 'l> {
+impl<'m> Lexer<'m> {
+	pub fn new(module: &Module) -> Lexer {
 		Lexer {
 			module,
 			current: 0,
 			line: 0,
 			col: 0,
 
-			data: module.get_source().chars().collect::<Vec<_>>().into_iter().peekable()
+			data: module.source().chars().collect::<Vec<_>>().into_iter().peekable()
 		}
 	}
 
@@ -39,14 +39,14 @@ impl<'m, 'l> Lexer<'m, 'l> {
 		self.data.next()
 	}
 
-	fn new_token(&self, ttype: TokenType, start: u32) -> Token<'l> {
+	fn new_token(&self, ttype: TokenType, start: u32) -> Token {
 		Token {
 			ttype, 
 			span: self.module.new_span(start, self.current, self.line, self.col)
 		}
 	}
 
-	fn number(&mut self, start: u32) -> Token<'l> {
+	fn number(&mut self, start: u32) -> Token {
 		while let Some(c) = self.peek() {
 			match c {
 				'0' ..= '9' => (),
@@ -58,7 +58,7 @@ impl<'m, 'l> Lexer<'m, 'l> {
 		self.new_token(TokenType::Integer, start)
 	}
 
-	pub fn lex(mut self) -> Vec<Token<'l>> {
+	pub fn lex(mut self) -> Vec<Token> {
 		let mut res: Vec<Token> = vec![];
 
 		fn is_whitespace(c: char) -> bool {

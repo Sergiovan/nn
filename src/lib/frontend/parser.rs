@@ -13,12 +13,12 @@ use std::slice;
 
 pub struct ParserError (String);
 
-pub struct Parser<'m, 'p: 'm> {
-	module: &'m Module<'m, 'p>,
+pub struct Parser<'m> {
+	module: &'m Module,
 	current: usize,
 
-	data: Peekable<slice::Iter<'p, Token<'p>>>,
-	asts: IndexedVec<Ast<'p>>,
+	data: Peekable<slice::Iter<'m, Token>>,
+	asts: IndexedVec<Ast>,
 	errors: Vec<ParserError>
 }
 
@@ -62,8 +62,8 @@ macro_rules! expect_and_skip {
 
 use AstType as AT;
 use TokenType as TT;
-impl<'m, 'p> Parser<'m, 'p> {
-	pub fn new<'a: 'm>(module: &'a Module<'m, 'p>, tokens: Peekable<std::slice::Iter<'p, Token<'p>>>) -> Parser<'m, 'p> {
+impl<'m> Parser<'m> {
+	pub fn new<'a>(module: &'a Module, tokens: Peekable<std::slice::Iter<'a, Token>>) -> Parser<'a> {
 		Parser {
 			module,
 			current: 0,
@@ -74,8 +74,8 @@ impl<'m, 'p> Parser<'m, 'p> {
 		}
 	}
 
-	fn eof_token(&self) -> Token<'p> {
-		let pos: u32 = self.module.get_source().len() as u32 - 1;
+	fn eof_token(&self) -> Token {
+		let pos: u32 = self.module.source().len() as u32 - 1;
 		Token {
 			ttype: TT::Eof, 
 			span: self.module.new_span(pos, pos, u32::MAX, u32::MAX)
@@ -86,11 +86,11 @@ impl<'m, 'p> Parser<'m, 'p> {
 		self.program();
 	}
 
-	pub fn get_results(self) -> (IndexedVec<Ast<'p>>, Vec<ParserError>) {
+	pub fn get_results(self) -> (IndexedVec<Ast>, Vec<ParserError>) {
 		(self.asts, self.errors)
 	}
 
-	fn new_ast(&mut self, atype: AstType, start: &Span<'p>, end: &Span<'p>) -> AstId {
+	fn new_ast(&mut self, atype: AstType, start: &Span, end: &Span) -> AstId {
 		if atype == AT::ErrorAst {
 			println!("Error AST!");
 		}
@@ -117,7 +117,7 @@ impl<'m, 'p> Parser<'m, 'p> {
 		}
 	}
 
-	fn peek(&mut self) -> Token<'p> {
+	fn peek(&mut self) -> Token {
 		if let Some(&tok) = self.data.peek() {
 			tok.clone()
 		} else {
@@ -125,14 +125,14 @@ impl<'m, 'p> Parser<'m, 'p> {
 		}
 	}
 
-	fn next(&mut self) -> Token<'p> {
+	fn next(&mut self) -> Token {
 		self.current += 1;
 		let res = self.data.next();
 		self.skip_comments();
 		res.unwrap_or(&self.eof_token()).clone()
 	}
 
-	fn get(&mut self, id: AstId) -> &Ast<'p> {
+	fn get(&mut self, id: AstId) -> &Ast {
 		assert!(self.asts.valid_index(id), "Accessing non-existent ast");
 		
 		&self.asts[id]
