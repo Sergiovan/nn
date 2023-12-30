@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::ops::Index;
@@ -15,7 +16,7 @@ impl<T> Clone for IndexedVecIndex<T> {
 	}
 }
 
-impl<T> Copy for IndexedVecIndex<T> { }
+impl<T> Copy for IndexedVecIndex<T> {}
 
 impl<T> PartialEq for IndexedVecIndex<T> {
 	fn eq(&self, other: &Self) -> bool {
@@ -36,9 +37,9 @@ impl<T> From<usize> for IndexedVecIndex<T> {
 	}
 }
 
-impl<T> ToString for IndexedVecIndex<T> {
-	fn to_string(&self) -> String {
-		self.0.to_string()
+impl<T> Display for IndexedVecIndex<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
 	}
 }
 
@@ -75,7 +76,7 @@ impl<T> DerefMut for IndexedVec<T> {
 
 impl<T> Index<IndexedVecIndex<T>> for IndexedVec<T> {
 	type Output = T;
-	
+
 	fn index(&self, index: IndexedVecIndex<T>) -> &Self::Output {
 		&self.0[index.0 as usize]
 	}
@@ -90,6 +91,16 @@ impl<T> IndexMut<IndexedVecIndex<T>> for IndexedVec<T> {
 impl<T> From<Vec<T>> for IndexedVec<T> {
 	fn from(value: Vec<T>) -> Self {
 		IndexedVec(value)
+	}
+}
+
+impl<T> IntoIterator for IndexedVec<T> {
+	type Item = <Vec<T> as IntoIterator>::Item;
+
+	type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.0.into_iter()
 	}
 }
 
