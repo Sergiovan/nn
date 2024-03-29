@@ -22,4 +22,16 @@ pub fn compile(path: &Path) {
 	println!();
 
 	module.print_ast();
+
+	println!();
+
+	module.gen_ir();
+
+	// println!();
+
+	// module.enumerate_ir();
+
+	println!();
+
+	module.print_ir();
 }

@@ -1,13 +1,11 @@
-use std::collections::VecDeque;
-
-use crate::{
-	ivec,
-	util::indexed_vector::{IndexedVec, IndexedVector},
-};
+use crate::{ivec, util::indexed_vector::IndexedVec};
 
 use self::ir::{Ir, IrId, Type};
 
-use super::parser::ast::{Ast, AstId, AstType};
+use super::{
+	module::span::Span,
+	parser::ast::{Ast, AstId, AstType},
+};
 
 pub mod ir;
 
@@ -30,9 +28,13 @@ impl<'a> IrGenerator<'a> {
 		}
 	}
 
-	pub fn generate(&mut self) {}
+	pub fn generate(&mut self) {
+		self.convert((self.asts.len() - 1).into());
+	}
 
-	pub fn get_results(self) {}
+	pub fn get_results(self) -> (IndexedVec<Ir>, Vec<IrGeneratorError>) {
+		(self.ir, self.errors)
+	}
 
 	fn ast(&self, ast: AstId) -> &'a AstType {
 		&self.asts[ast].atype
@@ -56,43 +58,41 @@ impl<'a> IrGenerator<'a> {
 		res
 	}
 
-	fn program(&mut self, ast: AstId) {
-		let AstType::Program(block) = self.ast(ast) else {
-			self.error(format!("Expected Program, found: {:?}", self.asts[ast]));
-			return;
-		};
-		_ = self.block(*block, Self::top_level_block);
-	}
-
-	fn top_level_block(&mut self, ast: &AstType) -> IrId {
+	fn convert(&mut self, ast_id: AstId) -> IrId {
+		let ast = self.ast(ast_id);
 		match ast {
+			AstType::Program(block) => self.convert(*block),
+			AstType::ErrorAst => self.error(format!(
+				"Found error AST @ {}",
+				self.asts[ast_id].span.to_string()
+			)),
+			AstType::Iden => self.push(Ir::Iden(self.asts[ast_id].span.to_string())),
+			AstType::Symbol => self.push(Ir::Symbol(self.asts[ast_id].span.to_string())),
+			AstType::TopBlock(stmts) => self.block(stmts),
+			AstType::FunctionBlock(stmts) => self.block(stmts),
+			AstType::_Block(stmts) => self.block(stmts),
 			AstType::FunctionDefinition { ftype, body } => self.function_definition(*ftype, *body),
-			_ => self.error(format!("Expected FunctionDefinition, got {} instead", ast)),
+			AstType::NumberLiteral => self.number_literal(&self.asts[ast_id].span),
+			AstType::FunctionType { .. } => self.error(format!(
+				"Found function type where it's not available (yet): {}",
+				self.asts[ast_id].span.to_string()
+			)),
+			AstType::Return(r) => self.r#return(*r),
+			AstType::Add { left, right } => self.add(*left, *right),
+			AstType::FunctionCall { function, args } => self.function_call(*function, *args),
+			AstType::FunctionParams() => self.empty_block(),
+			AstType::_FunctionParam() => self.error(format!(
+				"Found invalid AST @ {}",
+				self.asts[ast_id].span.to_string()
+			)),
 		}
 	}
 
-	fn function_body_block(&mut self, ast: &AstType) -> IrId {
-		match ast {
-			AstType::Add { left, right } => todo!(),
-			AstType::Return(val) => todo!(),
-			AstType::FunctionCall { function, params } => todo!(),
-			_ => self.error(format!("Invalid ast found in function body: {}", ast)),
-		}
-	}
-
-	fn block(&mut self, ast: AstId, matcher: fn(&mut Self, &AstType) -> IrId) -> IrId {
+	fn block(&mut self, stmts: &[AstId]) -> IrId {
 		let block_id = self.reserve();
-		let mut block = vec![];
-		let AstType::Block(elems) = self.ast(ast) else {
-			return self.error(format!("Expected block, found: {:?}", self.asts[ast]));
-		};
+		let block = stmts.iter().map(|s| self.convert(*s));
 
-		for elem in elems {
-			let elem = self.ast(*elem);
-			block.push(matcher(self, elem));
-		}
-
-		self.ir[block_id] = Ir::Block(block);
+		self.ir[block_id] = Ir::Block(block.collect());
 		block_id
 	}
 
@@ -111,7 +111,7 @@ impl<'a> IrGenerator<'a> {
 	fn function_definition(&mut self, ftype: AstId, body: AstId) -> IrId {
 		let AstType::FunctionType {
 			name,
-			constant_params,
+			constant_params: _,
 			params,
 		} = self.ast(ftype)
 		else {
@@ -121,20 +121,20 @@ impl<'a> IrGenerator<'a> {
 			));
 		};
 
-		let AstType::Block(elems) = self.ast(body) else {
+		let AstType::FunctionBlock(..) = self.ast(body) else {
 			return self.error(format!(
 				"Expected function body, found {:?}",
 				self.asts[body]
 			));
 		};
 
-		let iden = self.iden(*name);
+		let iden = self.convert(*name);
 		// constant params
-		let params = self.empty_block(); // For now
+		let params = self.convert(*params); // For now
 
 		let returns = self.block_of(vec![Ir::Type(Type::U64)]);
 
-		let body = self.block(body, Self::function_body_block);
+		let body = self.convert(body);
 
 		self.push(Ir::Deffun {
 			iden,
@@ -144,17 +144,53 @@ impl<'a> IrGenerator<'a> {
 		})
 	}
 
-	fn iden(&mut self, iden: AstId) -> IrId {
-		let AstType::Iden = self.ast(iden) else {
-			return self.error(format!("Expected iden, found {:?}", self.asts[iden]));
+	fn number_literal(&mut self, span: &Span) -> IrId {
+		let n = span.to_string().parse::<u64>();
+
+		let Ok(n) = n else {
+			return self.error(format!(
+				"Error while parsing {}: {}",
+				span.to_string(),
+				n.unwrap_err()
+			));
 		};
 
-		let iden_span = self.asts[iden].span.to_string();
+		let typ = self.push(Ir::Type(Type::U64));
+		let number = self.push(Ir::Number(n));
 
-		return self.push(Ir::Iden(iden_span));
+		self.push(Ir::Value {
+			value: number,
+			r#type: typ,
+		})
 	}
 
-	fn add(&mut self, left: AstId, right: AstId) -> IrId {
-		todo!()
+	fn r#return(&mut self, ast_id: AstId) -> IrId {
+		// TODO Figure out function nesting
+		let value = self.convert(ast_id);
+
+		self.push(Ir::Return {
+			value,
+			block: u32::MAX.into(),
+		})
+	}
+
+	fn add(&mut self, left_id: AstId, right_id: AstId) -> IrId {
+		let left = self.convert(left_id);
+		let right = self.convert(right_id);
+
+		self.push(Ir::Add {
+			lhs: left,
+			rhs: right,
+		})
+	}
+
+	fn function_call(&mut self, function_id: AstId, _args_id: AstId) -> IrId {
+		let function = self.convert(function_id);
+		let args = u32::MAX.into();
+
+		self.push(Ir::Call {
+			fun: function,
+			args,
+		})
 	}
 }

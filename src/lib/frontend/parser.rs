@@ -224,14 +224,18 @@ impl<'m> Parser<'m> {
 		Ok(self.new_ast(AT::Program(block), &start, &end))
 	}
 
-	fn iden(&mut self) -> ParserResult {
+	fn iden(&mut self, is_symbol: bool) -> ParserResult {
 		let n = self.next()?;
 		if let Token {
 			span: s,
 			ttype: TT::Iden,
 		} = n
 		{
-			Ok(self.new_ast(AT::Iden, s, s)) // TODO extract specific characters?
+			if is_symbol {
+				Ok(self.new_ast(AT::Symbol, s, s))
+			} else {
+				Ok(self.new_ast(AT::Iden, s, s)) // TODO extract specific characters?
+			}
 		} else {
 			let t = n.span;
 			Ok(self.new_ast(AT::ErrorAst, &t, &t))
@@ -258,7 +262,7 @@ impl<'m> Parser<'m> {
 			end = self.peek().unwrap_or(self.module.eof_token()).span;
 		}
 
-		Ok(self.new_ast(AT::Block(asts), &start, &end))
+		Ok(self.new_ast(AT::TopBlock(asts), &start, &end))
 	}
 
 	fn top_level_statement(&mut self) -> ParserResult {
@@ -296,7 +300,7 @@ impl<'m> Parser<'m> {
 
 		self.expect_is_and_skip(TT::CloseBrace); // }
 
-		Ok(self.new_ast(AT::Block(asts), &start, &end))
+		Ok(self.new_ast(AT::FunctionBlock(asts), &start, &end))
 	}
 
 	fn statement(&mut self) -> ParserResult {
@@ -344,7 +348,7 @@ impl<'m> Parser<'m> {
 			return Ok(self.new_error_ast());
 		};
 
-		let name = self.iden()?;
+		let name = self.iden(false)?;
 
 		// TODO Constant parameters
 
@@ -358,7 +362,7 @@ impl<'m> Parser<'m> {
 		Ok(self.new_ast(
 			AT::FunctionType {
 				name,
-				constant_params: AstId::from(u32::MAX),
+				constant_params: u32::MAX.into(),
 				params,
 			},
 			&fun_span,
@@ -395,7 +399,7 @@ impl<'m> Parser<'m> {
 
 				let retexpr = self.new_ast(AT::Return(expr), &expr_span, &expr_span);
 
-				Ok(self.new_ast(AT::Block(vec![retexpr]), &start_span, &expr_span))
+				Ok(self.new_ast(AT::FunctionBlock(vec![retexpr]), &start_span, &expr_span))
 			}
 			_ => Ok(self.new_ast(AT::ErrorAst, &error_span, &error_span)),
 		}
@@ -455,7 +459,7 @@ impl<'m> Parser<'m> {
 				self.skip(); // Integer
 				self.new_ast(AT::NumberLiteral, &tok_span, &tok_span)
 			}
-			TT::Iden => self.iden()?,
+			TT::Iden => self.iden(true)?,
 			_ => {
 				let tok_span = tok.span;
 				self.skip(); // ???
@@ -485,7 +489,7 @@ impl<'m> Parser<'m> {
 					self.new_ast(
 						AT::FunctionCall {
 							function: res,
-							params: AstId::from(u32::MAX),
+							args: u32::MAX.into(),
 						},
 						&res_span,
 						&close_span,

@@ -4,16 +4,17 @@ use crate::util::indexed_vector::{IndexedVec, IndexedVector};
 
 pub type IrId = <IndexedVec<Ir> as IndexedVector>::Index;
 
+#[derive(Debug)]
 pub enum Type {
 	U64,
-	Fun { params: IrId, returns: IrId },
+	_Fun { params: IrId, returns: IrId },
 }
 
 impl Display for Type {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Type::U64 => write!(f, "u64"),
-			Type::Fun {
+			Type::_Fun {
 				params: p,
 				returns: r,
 			} => write!(f, "fun[](%{} -> %{})", p, r),
@@ -21,11 +22,13 @@ impl Display for Type {
 	}
 }
 
+#[derive(Debug)]
 pub enum Ir {
 	Error(String),
 	Reserved,
 	Type(Type),
 	Iden(String),
+	Symbol(String),
 	Block(Vec<IrId>),
 	Number(u64),
 	Value {
@@ -40,7 +43,6 @@ pub enum Ir {
 		value: IrId,
 		block: IrId,
 	},
-	Decl(String),
 	Call {
 		fun: IrId,
 		args: IrId,
@@ -61,12 +63,12 @@ impl Display for Ir {
 			Ir::Reserved => write!(f, "Reserved"),
 			Ir::Type(t) => write!(f, "Type: {}", t),
 			Ir::Iden(i) => write!(f, "Iden: $\"{}\"", i),
+			Ir::Symbol(i) => write!(f, "Symbol: {}", i),
 			Ir::Block(v) => write!(f, "Block: {} items", v.len()),
 			Ir::Number(n) => write!(f, "Number: {}", n),
 			Ir::Value { value, r#type } => write!(f, "Value: %{} as %{}", value, r#type),
 			Ir::Add { lhs, rhs } => write!(f, "Add: %{} + %{}", lhs, rhs),
 			Ir::Return { value, block } => write!(f, "Return: %{} from %{}", value, block),
-			Ir::Decl(i) => write!(f, "Decl: $\"{}\"", i),
 			Ir::Call { fun, args } => write!(f, "Call: %{} with %{}", fun, args),
 			Ir::Deffun {
 				iden,
@@ -75,7 +77,7 @@ impl Display for Ir {
 				body,
 			} => write!(
 				f,
-				"Deffun: {} with params %{}, returns %{} and body %{}",
+				"Deffun: %{} with params %{}, returns %{} and body %{}",
 				iden, params, returns, body
 			),
 		}

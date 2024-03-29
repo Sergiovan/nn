@@ -6,7 +6,7 @@ use std::ops::IndexMut;
 
 use std::marker::PhantomData;
 
-#[derive(Eq, Debug)]
+#[derive(Eq)]
 pub struct IndexedVecIndex<T>(u32, PhantomData<T>);
 
 // Traits manually implemented to avoid T requirements, which are pointless
@@ -21,6 +21,36 @@ impl<T> Copy for IndexedVecIndex<T> {}
 impl<T> PartialEq for IndexedVecIndex<T> {
 	fn eq(&self, other: &Self) -> bool {
 		self.0 == other.0
+	}
+}
+
+impl<T> PartialEq<u32> for IndexedVecIndex<T> {
+	fn eq(&self, other: &u32) -> bool {
+		self.0 == *other
+	}
+}
+
+impl<T> PartialEq<usize> for IndexedVecIndex<T> {
+	fn eq(&self, other: &usize) -> bool {
+		self.0 as usize == *other
+	}
+}
+
+impl<T> PartialOrd for IndexedVecIndex<T> {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		self.0.partial_cmp(&other.0)
+	}
+}
+
+impl<T> PartialOrd<u32> for IndexedVecIndex<T> {
+	fn partial_cmp(&self, other: &u32) -> Option<std::cmp::Ordering> {
+		self.0.partial_cmp(other)
+	}
+}
+
+impl<T> PartialOrd<usize> for IndexedVecIndex<T> {
+	fn partial_cmp(&self, other: &usize) -> Option<std::cmp::Ordering> {
+		(self.0 as usize).partial_cmp(other)
 	}
 }
 
@@ -39,7 +69,13 @@ impl<T> From<usize> for IndexedVecIndex<T> {
 
 impl<T> Display for IndexedVecIndex<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
+		self.0.fmt(f)
+	}
+}
+
+impl<T> core::fmt::Debug for IndexedVecIndex<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_tuple("Index").field(&self.0).finish()
 	}
 }
 

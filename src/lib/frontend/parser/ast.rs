@@ -7,11 +7,24 @@ pub type AstId = <IndexedVec<Ast> as IndexedVector>::Index;
 
 #[derive(Debug, PartialEq)]
 pub enum AstType {
+	/// Top level AST
 	Program(AstId),
+	/// Placeholder for error
 	ErrorAst, // TODO Proper errors
 
+	/// A new name that will create a symbol
 	Iden,
-	Block(Vec<AstId>),
+	/// A name with a meaning
+	Symbol,
+
+	/// A sequence of statements at the file level
+	TopBlock(Vec<AstId>),
+
+	/// The body of a function
+	FunctionBlock(Vec<AstId>),
+
+	/// A sequence of statements inside a function
+	_Block(Vec<AstId>),
 
 	FunctionDefinition {
 		ftype: AstId,
@@ -34,7 +47,7 @@ pub enum AstType {
 	},
 	FunctionCall {
 		function: AstId,
-		params: AstId,
+		args: AstId,
 	},
 	FunctionParams(/* TODO */),
 	_FunctionParam(/* TODO */),
@@ -46,7 +59,10 @@ impl Display for AstType {
 			AstType::Program(b) => write!(f, "Program: ${b}"),
 			AstType::ErrorAst => write!(f, "ErrorAst"),
 			AstType::Iden => write!(f, "Iden"),
-			AstType::Block(b) => write!(f, "Block: {} elements", b.len()),
+			AstType::Symbol => write!(f, "Symbol"),
+			AstType::TopBlock(b) => write!(f, "Top block: {} elements", b.len()),
+			AstType::FunctionBlock(b) => write!(f, "Function body: {} elements", b.len()),
+			AstType::_Block(b) => write!(f, "Block: {} elements", b.len()),
 			AstType::FunctionDefinition { ftype, body } => write!(f, "FunctionDefinition: type ${ftype}, body ${body}"),
 			AstType::NumberLiteral => write!(f, "NumberLiteral"),
 			AstType::FunctionType {
@@ -56,7 +72,7 @@ impl Display for AstType {
 			} => write!(f, "FunctionType: name ${name}, constant_params: ${constant_params}, params: ${params}"),
 			AstType::Return(r) => write!(f, "Return: ${r}"),
 			AstType::Add { left, right } => write!(f, "Add: ${left} + ${right}"),
-			AstType::FunctionCall { function, params } => write!(f, "FunctionCall: ${function}[](${params})"),
+			AstType::FunctionCall { function, args } => write!(f, "FunctionCall: ${function}[](${args})"),
 			AstType::FunctionParams() => write!(f, "FunctionParams"),
 			AstType::_FunctionParam() => write!(f, "_FunctionParam"),
 		}

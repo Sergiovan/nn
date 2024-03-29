@@ -2,6 +2,8 @@ pub mod span;
 
 use self::span::Span;
 
+use super::ir_gen::ir::{Ir, IrId};
+use super::ir_gen::IrGenerator;
 use super::lexer::{token::Token, Lexer};
 use super::parser::{
 	ast::{Ast, AstId, AstType},
@@ -23,6 +25,7 @@ pub struct Module {
 	tokens: RefCell<Vec<Token>>,
 	eof_token: Token,
 	ast_nodes: RefCell<IndexedVec<Ast>>,
+	ir: RefCell<IndexedVec<Ir>>,
 }
 
 impl Module {
@@ -57,6 +60,7 @@ impl Module {
 				},
 			},
 			ast_nodes: RefCell::new(ivec![]),
+			ir: RefCell::new(ivec![]),
 		}
 	}
 
@@ -88,6 +92,10 @@ impl Module {
 		self.ast_nodes.borrow()
 	}
 
+	pub fn ir(&self) -> Ref<IndexedVec<Ir>> {
+		self.ir.borrow()
+	}
+
 	pub fn lex(&self) {
 		let tokens = {
 			let lexer = Lexer::new(self);
@@ -105,6 +113,21 @@ impl Module {
 			parser.get_results()
 		};
 		*self.ast_nodes.borrow_mut() = asts;
+		for error in errors.into_iter() {
+			println!("{:?}", error);
+		}
+	}
+
+	pub fn gen_ir(&self) {
+		let (ir, errors) = {
+			let ast = self.ast_nodes();
+
+			let mut ir_generator = IrGenerator::new(&ast);
+			ir_generator.generate();
+			ir_generator.get_results()
+		};
+
+		*self.ir.borrow_mut() = ir;
 		for error in errors.into_iter() {
 			println!("{:?}", error);
 		}
@@ -177,7 +200,7 @@ impl Module {
 
 		let add_header = |txt| {
 			format!(
-				"{: >padding$}: {}{}",
+				"${: <padding$}: {}{}",
 				node.id.to_string(),
 				side,
 				txt,
@@ -187,7 +210,7 @@ impl Module {
 		let new_side = convert_side(&side);
 		let add_child = |txt| {
 			format!(
-				"{: >padding$}: {}{}",
+				"${: <padding$}: {}{}",
 				node.id.to_string(),
 				new_side,
 				txt,
@@ -206,8 +229,18 @@ impl Module {
 			AT::Iden => {
 				res += &add_header(&format!("Iden: {}\n", node.span.to_string()));
 			}
-			AT::Block(elems) => {
-				res += &add_header(&format!("Block ({} elements)\n", elems.len()));
+			AT::Symbol => {
+				res += &add_header(&format!("Symbol: {}\n", node.span.to_string()));
+			}
+			AT::TopBlock(elems) | AT::FunctionBlock(elems) | AT::_Block(elems) => {
+				let name = if let AT::TopBlock(..) = &node.atype {
+					"Top level block"
+				} else if let AT::FunctionBlock(..) = &node.atype {
+					"Function body"
+				} else {
+					"Block"
+				};
+				res += &add_header(&format!("{} ({} elements)\n", name, elems.len()));
 				for id in elems.iter().take(elems.len() - 1) {
 					res += &self.print_ast_helper(
 						*id,
@@ -300,7 +333,7 @@ impl Module {
 	}
 
 	pub fn print_ast(&self) {
-		let padding = self.ast_nodes().len().to_string().len() + 1;
+		let padding = self.ast_nodes().len().to_string().len(); // $ and :
 		print!(
 			"{}",
 			self.print_ast_helper(
@@ -309,6 +342,69 @@ impl Module {
 				padding
 			)
 		);
+	}
+
+	pub fn enumerate_ir(&self) {
+		let padding = self.ir().len().to_string().len();
+		let mut level = 0usize;
+		let mut enders = vec![];
+
+		for (idx, ir) in self.ir().iter().enumerate() {
+			let indent = level * 2;
+			println!("%{: <padding$}: {}{}", idx, " ".repeat(indent), ir,);
+			if let Ir::Block(b) = ir {
+				enders.push(*b.last().unwrap_or(&0u32.into()));
+				level += 1;
+			}
+
+			if enders.last().is_some_and(|e| *e <= idx) {
+				enders.pop();
+				level -= 1;
+			}
+		}
+	}
+
+	pub fn print_ir(&self) {
+		let padding = self.ir().len().to_string().len();
+		Self::print_ir_helper(&self.ir(), 0usize.into(), padding, 0)
+	}
+
+	fn print_ir_helper(irs: &IndexedVec<Ir>, idx: IrId, padding: usize, indent: usize) {
+		let ir = &irs[idx];
+		println!("%{: <padding$}: {}{}", idx, " ".repeat(indent), ir,);
+		match ir {
+			Ir::Block(v) => {
+				for &e in v {
+					Self::print_ir_helper(irs, e, padding, indent + 2);
+				}
+			}
+			Ir::Value { value, r#type } => {
+				Self::print_ir_helper(irs, *value, padding, indent + 2);
+				Self::print_ir_helper(irs, *r#type, padding, indent + 2);
+			}
+			Ir::Add { lhs, rhs } => {
+				Self::print_ir_helper(irs, *lhs, padding, indent + 2);
+				Self::print_ir_helper(irs, *rhs, padding, indent + 2);
+			}
+			Ir::Return { value, block: _ } => {
+				Self::print_ir_helper(irs, *value, padding, indent + 2);
+			}
+			Ir::Call { fun, args: _ } => {
+				Self::print_ir_helper(irs, *fun, padding, indent + 2);
+			}
+			Ir::Deffun {
+				iden,
+				params,
+				returns,
+				body,
+			} => {
+				Self::print_ir_helper(irs, *iden, padding, indent + 2);
+				Self::print_ir_helper(irs, *params, padding, indent + 2);
+				Self::print_ir_helper(irs, *returns, padding, indent + 2);
+				Self::print_ir_helper(irs, *body, padding, indent + 2);
+			}
+			_ => (),
+		}
 	}
 }
 
