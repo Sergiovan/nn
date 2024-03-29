@@ -32,9 +32,9 @@ pub struct Token {
 	pub ttype: TokenType,
 }
 
-impl ToString for Token {
-	fn to_string(&self) -> String {
-		format!("{:?} {}", self.ttype, self.span.to_string())
+impl std::fmt::Display for Token {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{:?} {}", self.ttype, self.span)
 	}
 }
 

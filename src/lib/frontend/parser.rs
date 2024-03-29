@@ -7,12 +7,17 @@ use super::module::{span::Span, Module};
 
 use crate::util::indexed_vector::{ivec, IndexedVec};
 
-use std::iter::Iterator;
 use std::iter::Peekable;
 use std::slice;
 
 #[derive(Debug)]
 pub struct ParserError(String);
+
+impl std::fmt::Display for ParserError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
+}
 
 pub struct Parser<'m> {
 	module: &'m Module,

@@ -12,6 +12,12 @@ pub mod ir;
 #[derive(Debug)]
 pub struct IrGeneratorError(String);
 
+impl std::fmt::Display for IrGeneratorError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
+}
+
 pub struct IrGenerator<'a> {
 	asts: &'a IndexedVec<Ast>,
 
@@ -62,10 +68,9 @@ impl<'a> IrGenerator<'a> {
 		let ast = self.ast(ast_id);
 		match ast {
 			AstType::Program(block) => self.convert(*block),
-			AstType::ErrorAst => self.error(format!(
-				"Found error AST @ {}",
-				self.asts[ast_id].span.to_string()
-			)),
+			AstType::ErrorAst => {
+				self.error(format!("Found error AST @ {}", self.asts[ast_id].span))
+			}
 			AstType::Iden => self.push(Ir::Iden(self.asts[ast_id].span.to_string())),
 			AstType::Symbol => self.push(Ir::Symbol(self.asts[ast_id].span.to_string())),
 			AstType::TopBlock(stmts) => self.block(stmts),
@@ -75,16 +80,15 @@ impl<'a> IrGenerator<'a> {
 			AstType::NumberLiteral => self.number_literal(&self.asts[ast_id].span),
 			AstType::FunctionType { .. } => self.error(format!(
 				"Found function type where it's not available (yet): {}",
-				self.asts[ast_id].span.to_string()
+				self.asts[ast_id].span
 			)),
 			AstType::Return(r) => self.r#return(*r),
 			AstType::Add { left, right } => self.add(*left, *right),
 			AstType::FunctionCall { function, args } => self.function_call(*function, *args),
 			AstType::FunctionParams() => self.empty_block(),
-			AstType::_FunctionParam() => self.error(format!(
-				"Found invalid AST @ {}",
-				self.asts[ast_id].span.to_string()
-			)),
+			AstType::_FunctionParam() => {
+				self.error(format!("Found invalid AST @ {}", self.asts[ast_id].span))
+			}
 		}
 	}
 
@@ -148,11 +152,7 @@ impl<'a> IrGenerator<'a> {
 		let n = span.to_string().parse::<u64>();
 
 		let Ok(n) = n else {
-			return self.error(format!(
-				"Error while parsing {}: {}",
-				span.to_string(),
-				n.unwrap_err()
-			));
+			return self.error(format!("Error while parsing {}: {}", span, n.unwrap_err()));
 		};
 
 		let typ = self.push(Ir::Type(Type::U64));

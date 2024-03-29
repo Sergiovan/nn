@@ -53,7 +53,7 @@ impl Module {
 				ttype: TokenType::Eof,
 				span: Span {
 					text: "",
-					module_idx: id,
+					_module_idx: id,
 					start: source_len as u32 - 1_u32,
 					line: last_line as u32,
 					col: last_col as u32,
@@ -69,7 +69,7 @@ impl Module {
 	pub fn new_span(&self, start: u32, end: u32, line: u32, col: u32) -> Span {
 		Span {
 			text: &self.source()[(start as usize)..(end as usize)],
-			module_idx: self.id,
+			_module_idx: self.id,
 			start,
 			line,
 			col,
@@ -227,10 +227,10 @@ impl Module {
 				res += &add_header("ErrorAst\n");
 			}
 			AT::Iden => {
-				res += &add_header(&format!("Iden: {}\n", node.span.to_string()));
+				res += &add_header(&format!("Iden: {}\n", node.span));
 			}
 			AT::Symbol => {
-				res += &add_header(&format!("Symbol: {}\n", node.span.to_string()));
+				res += &add_header(&format!("Symbol: {}\n", node.span));
 			}
 			AT::TopBlock(elems) | AT::FunctionBlock(elems) | AT::_Block(elems) => {
 				let name = if let AT::TopBlock(..) = &node.atype {
@@ -275,7 +275,7 @@ impl Module {
 				);
 			}
 			AT::NumberLiteral => {
-				res += &add_header(&format!("Integer: {}\n", node.span.to_string()));
+				res += &add_header(&format!("Integer: {}\n", node.span));
 			}
 			AT::FunctionType { name, .. } => {
 				let s = "Function type\n".to_string();
@@ -344,7 +344,7 @@ impl Module {
 		);
 	}
 
-	pub fn enumerate_ir(&self) {
+	pub fn _enumerate_ir(&self) {
 		let padding = self.ir().len().to_string().len();
 		let mut level = 0usize;
 		let mut enders = vec![];
