@@ -7,7 +7,7 @@ use std::ops::IndexMut;
 use std::marker::PhantomData;
 
 #[derive(Eq)]
-pub struct IndexedVecIndex<T>(u32, PhantomData<T>);
+pub struct IndexedVecIndex<T>(pub u32, PhantomData<T>);
 
 // Traits manually implemented to avoid T requirements, which are pointless
 impl<T> Clone for IndexedVecIndex<T> {

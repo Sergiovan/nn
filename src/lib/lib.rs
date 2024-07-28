@@ -1,5 +1,8 @@
+#![feature(mapped_lock_guards)]
+
 mod compiler;
 mod frontend;
+mod middleend;
 mod util;
 
 use std::fs;
@@ -34,4 +37,8 @@ pub fn compile(path: &Path) {
 	println!();
 
 	module.print_ir();
+
+	println!();
+
+	module.prepare();
 }

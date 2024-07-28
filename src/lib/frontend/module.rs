@@ -10,6 +10,7 @@ use super::parser::{
 	Parser,
 };
 
+use crate::middleend::prepare::Prepare;
 use crate::util::indexed_vector::{ivec, IndexedVec, IndexedVector};
 
 use std::cell::{Ref, RefCell};
@@ -131,6 +132,14 @@ impl Module {
 		for error in errors.into_iter() {
 			println!("{:?}", error);
 		}
+	}
+
+	pub fn prepare(&self) {
+		let ir = self.ir();
+
+		let mut prepare = Prepare::new(&ir);
+
+		prepare.prepare();
 	}
 
 	pub fn print_token_table(&self) {
