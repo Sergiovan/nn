@@ -1,19 +1,10 @@
-# Rust
-debug/
-target/
-
-Cargo.lock
-
-**/*.rs.bk
+# CMake
+build/
 
 # VSCode
 .vscode/
 .vscodeignore
 *.vsix
 
-# Node
-package-lock.json
-
-# Added by cargo
-
-/target
+# clangd
+.cache
