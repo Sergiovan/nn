@@ -1,0 +1,5 @@
+def fun foo() => 1;
+
+def fun bar() {
+  return 2;
+}

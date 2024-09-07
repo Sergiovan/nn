@@ -1,1 +1,5 @@
 BasedOnStyle: LLVM
+
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Empty
+PointerAlignment: Left
