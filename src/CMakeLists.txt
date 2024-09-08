@@ -3,13 +3,19 @@ cmake_minimum_required(VERSION 3.29)
 list(APPEND CORE_HEADERS
   "common/token.hpp"
 
+  "driver/driver.hpp"
+
   "frontend/lexer.hpp"
 
   "util/assert.hpp"
+  "util/enum_map.hpp"
   "util/types.hpp"
+  "util/format.hpp"
 )
 
 list(APPEND CORE_SOURCES
+  "driver/driver.cpp"
+
   "frontend/lexer.cpp"
 )
 

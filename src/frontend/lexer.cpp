@@ -1,71 +1,51 @@
 #include "lexer.hpp"
 #include "common/token.hpp"
 
-#include <limits>
-
 using lexer::Lexer;
 using token::Token;
 using token::TokenType;
 
-std::vector<Token> Lexer::lex(std::string_view code) {
+Lexer::Lexer(std::string_view content) : content{content} {
+  if (!content.empty()) {
+    current_char = content[current_pos];
+  }
+}
+
+Token Lexer::next() {
   using enum LexerState;
 
-  if (code.empty()) {
-    return {};
+  std::string_view code = content;
+
+  if (finished || code.empty()) {
+    return {TokenType::END, {}};
   }
 
-  u32 start = 0;
-  u32 end = 0;
-
-  std::vector<Token> res{};
-
-  u32 i = 0;
-  c8 c = code[0];
-
-  auto reset = [this]() {
-    state = FIND;
-    substate = LexerSubState::NONE;
-  };
-
-  auto advance = [&i, &c, &code]() {
-    c = code[++i];
-  };
-
-  auto add_token = [&res, &start, &end, &code](TokenType type) {
-    res.emplace_back(type, std::span{code.substr(start, end - start)});
-  };
-
   while (true) {
-    if (i >= code.length()) {
-      res.emplace_back(token::TokenType::END, std::span<c8>{});
-      break;
+    if (current_pos >= code.length()) {
+      finished = true;
+      return {token::TokenType::END, {}};
     }
 
     switch (state) {
     case FIND:
-      start = i;
-      handle_find(c);
+      current_token_start = current_pos;
+      handle_find(current_char);
       continue;
     case WHITESPACE:
-      if (!handle_whitespace(c)) {
-        end = i;
-        add_token(TokenType::WHITESPACE);
-        reset();
-        continue;
+      if (!handle_whitespace(current_char)) {
+        reset_state();
+        return {TokenType::WHITESPACE, current_span()};
       }
       break;
     case COMMENT:
-      if (!handle_comment(c)) {
-        end = i;
-        add_token(TokenType::COMMENT);
-        reset();
-        continue;
+      if (!handle_comment(current_char)) {
+        reset_state();
+        return {TokenType::COMMENT, current_span()};
       }
       break;
     case IDENTIFIER:
-      if (!handle_identifier(c)) {
-        end = i;
-        auto keyword = code.substr(start, end - start);
+      if (!handle_identifier(current_char)) {
+        auto keyword = current_span();
         TokenType tt = TokenType::IDENTIFIER;
         if (keyword == "def") {
           tt = TokenType::KW_DEF;
@@ -74,15 +54,13 @@ std::vector<Token> Lexer::lex(std::string_view code) {
         } else if (keyword == "return") {
           tt = TokenType::KW_RETURN;
         }
-        res.emplace_back(tt, keyword);
-        reset();
-        continue;
+        reset_state();
+        return {tt, keyword};
       }
       break;
     case SYMBOL:
-      if (!handle_symbol(c)) {
-        end = i;
-        auto keyword = code.substr(start, end - start);
+      if (!handle_symbol(current_char)) {
+        auto keyword = current_span();
         TokenType tt = TokenType::POISON;
         if (keyword == "=>") {
           tt = TokenType::SYM_STRONG_ARROW_RIGHT;
@@ -97,29 +75,40 @@ std::vector<Token> Lexer::lex(std::string_view code) {
         } else if (keyword == ";") {
           tt = TokenType::SYM_SEMICOLON;
         }
-        res.emplace_back(tt, keyword);
-        reset();
+        reset_state();
+        return {tt, keyword};
         continue;
       }
       break;
     case NUMBER:
       [[fallthrough]];
     case INTEGER:
-      if (!handle_number(c)) {
-        end = i;
-        add_token(TokenType::INTEGER);
-        reset();
-        continue;
+      if (!handle_number(current_char)) {
+        reset_state();
+        return {TokenType::INTEGER, current_span()};
       }
       break;
-    case ERROR:
-      i = std::numeric_limits<decltype(i)>::max();
-      continue;
-    case END:
+    case ERROR: {
+      current_pos++;
+      Token res{TokenType::UNKNOWN, current_span()};
+      reset_state();
+      advance_char();
       return res;
     }
+    case END:
+      finished = true;
+      return {TokenType::END, {}};
+    }
 
-    advance();
+    advance_char();
+  }
+}
+
+std::vector<Token> Lexer::collect() {
+  std::vector<Token> res{};
+
+  while (!finished) {
+    res.push_back(next());
   }
 
   return res;
@@ -230,4 +219,18 @@ bool Lexer::handle_symbol(c8 c) {
 
 bool Lexer::handle_number(c8 c) {
   return (c >= '0' && c <= '9');
+}
+
+void Lexer::reset_state() {
+  state = LexerState::FIND;
+  substate = LexerSubState::NONE;
+}
+
+void Lexer::advance_char() {
+  current_char = content[++current_pos];
+}
+
+std::string_view Lexer::current_span() {
+  return std::string_view{content}.substr(current_token_start,
+                                          current_pos - current_token_start);
 }

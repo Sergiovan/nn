@@ -8,6 +8,7 @@
 namespace token {
 
 enum class TokenType : u16 {
+  UNKNOWN,
   POISON,
   END,
 
@@ -95,7 +96,8 @@ struct std::formatter<token::TokenType> : std::formatter<std::string_view> {
   }
 };
 
-template <> struct std::formatter<token::Token> {
+template <>
+struct std::formatter<token::Token> {
   constexpr auto parse(std::format_parse_context& ctx) {
     return ctx.begin();
   }

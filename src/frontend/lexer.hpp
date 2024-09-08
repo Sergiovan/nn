@@ -11,7 +11,10 @@ namespace lexer {
 
 class Lexer {
 public:
-  std::vector<token::Token> lex(std::string_view code);
+  Lexer(std::string_view content);
+
+  token::Token next();
+  std::vector<token::Token> collect();
   bool had_error();
 
 private:
@@ -50,11 +53,22 @@ private:
   bool handle_symbol(c8 c);
   bool handle_number(c8 c);
 
+  void reset_state();
+  void advance_char();
+  std::string_view current_span();
+
+  std::string content;
+
+  u32 current_token_start = 0;
+  u32 current_pos = 0;
+  c8 current_char = '\0';
+
   LexerState state = LexerState::FIND;
   LexerSubState substate = LexerSubState::NONE;
   u32 comment_recursion = 0;
 
   bool _had_error = false;
+  bool finished = false;
 };
 
 } // namespace lexer
