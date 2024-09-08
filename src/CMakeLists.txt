@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.29)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
 list(APPEND CORE_HEADERS
   "common/token.hpp"
 
@@ -18,7 +16,7 @@ list(APPEND CORE_SOURCES
 add_library(core STATIC)
 
 target_compile_options(core
-  PRIVATE
+  PUBLIC
   -Wall
   -Wextra
   -Wconversion
@@ -29,8 +27,8 @@ target_compile_options(core
 )
 
 target_include_directories(core
-  PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}
+  PUBLIC
+  "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
 target_precompile_headers(core

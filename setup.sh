@@ -1,6 +1,18 @@
 #!/bin/bash
 
-rm -rf build/
 mkdir -p build
 cd build
-CXX=clang++ CC=clang cmake -DCMAKE_BUILD_TYPE=Debug -GNinja ..
+
+(
+# Debug
+mkdir -p debug
+cd debug
+CXX=clang++ CC=clang cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -GNinja ../..
+)
+
+(
+# Release
+mkdir -p release
+cd release
+CXX=clang++ CC=clang cmake -DCMAKE_BUILD_TYPE=Release -GNinja ../..
+)

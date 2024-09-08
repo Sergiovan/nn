@@ -1,7 +1,6 @@
 #include <filesystem>
 #include <fstream>
 #include <print>
-#include <set>
 #include <span>
 
 #include "frontend/lexer.hpp"
@@ -67,7 +66,7 @@ int main(int argc, char** argv) {
 
   if (lex_stop) {
     std::println("[");
-    u32 padding = std::to_string(res.size() - 1).length();
+    u64 padding = std::to_string(res.size() - 1).length();
     for (auto [i, tok] : std::views::enumerate(res)) {
       std::println("  {:>{}}# {},", i, padding, tok);
     }
