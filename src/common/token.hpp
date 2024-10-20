@@ -3,6 +3,7 @@
 #include <span>
 #include <type_traits>
 
+#include "common/source.hpp"
 #include "util/types.hpp"
 
 namespace token {
@@ -35,7 +36,7 @@ enum class TokenType : u16 {
 
 struct Token {
   TokenType tt;
-  std::span<const c8> span;
+  source::SourceLocation loc;
 };
 
 } // namespace token
@@ -106,18 +107,19 @@ struct std::formatter<token::Token> {
   }
 
   auto format(const token::Token& tok, std::format_context& ctx) const {
-    std::string_view sv{tok.span};
     std::format_to(
         ctx.out(), "{} [{}]: ", tok.tt,
         static_cast<std::underlying_type_t<decltype(tok.tt)>>(tok.tt));
 
-    if (auto newline = sv.find('\n'); newline < 32) {
+    std::string value = tok.loc.get();
+
+    if (auto newline = value.find('\n'); newline < 32) {
       newline = std::min(newline, 29uz);
-      return std::format_to(ctx.out(), "\"{}\\n*\"", sv.substr(0, newline));
-    } else if (sv.length() > 32) {
-      return std::format_to(ctx.out(), "\"{}...\"", sv.substr(0, 29));
+      return std::format_to(ctx.out(), "\"{}\\n*\"", value.substr(0, newline));
+    } else if (value.length() > 32) {
+      return std::format_to(ctx.out(), "\"{}...\"", value.substr(0, 29));
     } else {
-      return std::format_to(ctx.out(), "\"{}\"", sv);
+      return std::format_to(ctx.out(), "\"{}\"", value);
     }
   }
 };

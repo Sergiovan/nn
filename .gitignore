@@ -9,6 +9,7 @@ output/
 
 # clangd
 .cache
+.clangd
 
 # Program output
 *.dot

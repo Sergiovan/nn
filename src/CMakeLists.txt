@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.29)
 
 list(APPEND CORE_HEADERS
   "common/ast.hpp"
+  "common/error.hpp"
+  "common/source.hpp"
   "common/token.hpp"
 
   "driver/driver.hpp"
@@ -17,6 +19,8 @@ list(APPEND CORE_HEADERS
 
 list(APPEND CORE_SOURCES
   "common/ast.cpp"
+  "common/error.cpp"
+  "common/source.cpp"
 
   "driver/driver.cpp"
 

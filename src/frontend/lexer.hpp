@@ -3,6 +3,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/source.hpp"
 #include "common/token.hpp"
 
 #include "util/types.hpp"
@@ -11,7 +12,7 @@ namespace lexer {
 
 class Lexer {
 public:
-  Lexer(std::string_view content);
+  Lexer(const std::string& content);
 
   token::Token next();
   std::vector<token::Token> collect();
@@ -55,12 +56,18 @@ private:
 
   void reset_state();
   void advance_char();
-  std::string_view current_span();
+  source::SourceLocation current_loc();
 
-  std::string content;
+  std::shared_ptr<source::Source> source;
+  std::string_view content;
 
   u32 current_token_start = 0;
+  u32 token_start_line = 0;
+  u32 token_start_col = 0;
+
   u32 current_pos = 0;
+  u32 current_line = 0;
+  u32 current_col = 0;
   c8 current_char = '\0';
 
   LexerState state = LexerState::FIND;

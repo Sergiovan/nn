@@ -1,11 +1,16 @@
 #include "lexer.hpp"
+
+#include <memory>
+
 #include "common/token.hpp"
 
 using lexer::Lexer;
 using token::Token;
 using token::TokenType;
 
-Lexer::Lexer(std::string_view content) : content{content} {
+Lexer::Lexer(const std::string& content)
+    : source{std::make_shared<source::Source>(content)},
+      content{source->get()} {
   if (!content.empty()) {
     current_char = content[current_pos];
   }
@@ -29,23 +34,27 @@ Token Lexer::next() {
     switch (state) {
     case FIND:
       current_token_start = current_pos;
+      token_start_line = current_line;
+      token_start_col = current_col;
       handle_find(current_char);
       continue;
     case WHITESPACE:
       if (!handle_whitespace(current_char)) {
         reset_state();
-        return {TokenType::WHITESPACE, current_span()};
+        return {TokenType::WHITESPACE, current_loc()};
       }
       break;
     case COMMENT:
       if (!handle_comment(current_char)) {
         reset_state();
-        return {TokenType::COMMENT, current_span()};
+        return {TokenType::COMMENT, current_loc()};
       }
       break;
     case IDENTIFIER:
       if (!handle_identifier(current_char)) {
-        auto keyword = current_span();
+        auto token_loc = current_loc();
+        auto keyword = token_loc.get();
+
         TokenType tt = TokenType::IDENTIFIER;
         if (keyword == "def") {
           tt = TokenType::KW_DEF;
@@ -54,13 +63,16 @@ Token Lexer::next() {
         } else if (keyword == "return") {
           tt = TokenType::KW_RETURN;
         }
+
         reset_state();
-        return {tt, keyword};
+        return {tt, token_loc};
       }
       break;
     case SYMBOL:
       if (!handle_symbol(current_char)) {
-        auto keyword = current_span();
+        auto token_loc = current_loc();
+        auto keyword = token_loc.get();
+
         TokenType tt = TokenType::POISON;
         if (keyword == "=>") {
           tt = TokenType::SYM_STRONG_ARROW_RIGHT;
@@ -75,8 +87,9 @@ Token Lexer::next() {
         } else if (keyword == ";") {
           tt = TokenType::SYM_SEMICOLON;
         }
+
         reset_state();
-        return {tt, keyword};
+        return {tt, token_loc};
       }
       break;
     case NUMBER:
@@ -84,12 +97,12 @@ Token Lexer::next() {
     case INTEGER:
       if (!handle_number(current_char)) {
         reset_state();
-        return {TokenType::INTEGER, current_span()};
+        return {TokenType::INTEGER, current_loc()};
       }
       break;
     case ERROR: {
       current_pos++;
-      Token res{TokenType::UNKNOWN, current_span()};
+      Token res{TokenType::UNKNOWN, current_loc()};
       reset_state();
       advance_char();
       return res;
@@ -226,10 +239,15 @@ void Lexer::reset_state() {
 }
 
 void Lexer::advance_char() {
+  if (current_char == '\n') {
+    current_line++;
+    current_col = 0;
+  }
+
   current_char = content[++current_pos];
 }
 
-std::string_view Lexer::current_span() {
-  return std::string_view{content}.substr(current_token_start,
-                                          current_pos - current_token_start);
+source::SourceLocation Lexer::current_loc() {
+  return {current_token_start, token_start_line, token_start_col,
+          current_pos - current_token_start, source};
 }
