@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.29)
 
 list(APPEND CORE_HEADERS
+  "common/ast.hpp"
   "common/token.hpp"
 
   "driver/driver.hpp"
 
   "frontend/lexer.hpp"
+  "frontend/parser.hpp"
 
   "util/assert.hpp"
   "util/enum_map.hpp"
@@ -14,9 +16,12 @@ list(APPEND CORE_HEADERS
 )
 
 list(APPEND CORE_SOURCES
+  "common/ast.cpp"
+
   "driver/driver.cpp"
 
   "frontend/lexer.cpp"
+  "frontend/parser.cpp"
 )
 
 add_library(core STATIC)

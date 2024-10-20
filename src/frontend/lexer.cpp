@@ -21,7 +21,7 @@ Token Lexer::next() {
   }
 
   while (true) {
-    if (current_pos >= code.length()) {
+    if (current_pos >= code.length() && substate == LexerSubState::NONE) {
       finished = true;
       return {token::TokenType::END, {}};
     }
@@ -77,7 +77,6 @@ Token Lexer::next() {
         }
         reset_state();
         return {tt, keyword};
-        continue;
       }
       break;
     case NUMBER:

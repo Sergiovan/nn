@@ -7,7 +7,7 @@
 
 inline void print_relevant_stacktrace(const std::stacktrace& trace) {
   std::string fmt;
-  u32 padding = std::to_string(trace.size() - 1).length();
+  u64 padding = std::to_string(trace.size() - 1).length();
   for (auto [i, entry] : std::views::enumerate(trace)) {
     fmt = std::format("{}", entry);
     std::println("{:>{}}# {}", i, padding, fmt);
@@ -17,9 +17,7 @@ inline void print_relevant_stacktrace(const std::stacktrace& trace) {
   }
 }
 
-#undef assert
-
-#define assert(EXPR)                                                           \
+#define nn_assert(EXPR)                                                        \
   do {                                                                         \
     if (!(EXPR)) {                                                             \
       assert_fail(#EXPR, std::stacktrace::current());                          \

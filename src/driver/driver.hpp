@@ -8,6 +8,8 @@ namespace driver {
 enum class Option {
   ShowHelp,
   StopAfterLex,
+  StopAfterParse,
+  ParseShowDot,
 
   LAST
 };

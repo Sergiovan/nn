@@ -2,7 +2,6 @@
 build/
 output/
 
-
 # VSCode
 .vscode/
 .vscodeignore
@@ -10,3 +9,6 @@ output/
 
 # clangd
 .cache
+
+# Program output
+*.dot

@@ -43,8 +43,11 @@ struct Token {
 template <>
 struct std::formatter<token::TokenType> : std::formatter<std::string_view> {
   auto format(const token::TokenType& tok, std::format_context& ctx) const {
-    std::string name = "";
+    std::string name = "UNKNOWN_UNKNOWN";
     switch (tok) {
+    case token::TokenType::UNKNOWN:
+      name = "KNOWN_UNKNOWN";
+      break;
     case token::TokenType::POISON:
       name = "POISON";
       break;
@@ -105,7 +108,7 @@ struct std::formatter<token::Token> {
   auto format(const token::Token& tok, std::format_context& ctx) const {
     std::string_view sv{tok.span};
     std::format_to(
-        ctx.out(), "{} ({}): ", tok.tt,
+        ctx.out(), "{} [{}]: ", tok.tt,
         static_cast<std::underlying_type_t<decltype(tok.tt)>>(tok.tt));
 
     if (auto newline = sv.find('\n'); newline < 32) {
