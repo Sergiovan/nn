@@ -16,5 +16,7 @@ add_subdirectory(src)
 add_executable(nn src/main.cpp)
 
 set_target_properties(nn PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/output/${CMAKE_BUILD_TYPE}")
+# target_compile_options(nn PUBLIC -fsanitize=undefined,address)
+# target_link_options(nn PUBLIC -fsanitize=undefined,address)
 
 target_link_libraries(nn PRIVATE core)

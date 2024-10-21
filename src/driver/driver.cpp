@@ -90,23 +90,31 @@ void lispy_print(const std::string& str) {
   std::cout << std::flush;
 }
 
-std::string escape_quotes(std::string in) {
-  size_t index = 0;
-  while (true) {
-    /* Locate the substring to replace. */
-    index = in.find("\"", index);
-    if (index == std::string::npos)
+std::string escape(std::string in) {
+  std::stringstream out;
+  for (char c : in) {
+    switch (c) {
+    case '\"':
+      out << "\\\"";
       break;
-
-    /* Make the replacement. */
-    in.erase(index, 1);
-    in.insert(index, "\\\"");
-
-    /* Advance index forward so the next iteration doesn't pick it up as well.
-     */
-    index += 2;
+    case '>':
+      out << "\\>";
+      break;
+    case '{':
+      out << "\\{";
+      break;
+    case '}':
+      out << "\\}";
+      break;
+    case '\n':
+      out << "\\n";
+      break;
+    default:
+      out << c;
+      break;
+    }
   }
-  return in;
+  return out.str();
 }
 
 class DotWriter {
@@ -127,17 +135,20 @@ private:
     u64 elem_node = counter++;
 
     std::stringstream label{};
-    label << "{" << ast.get_name() << "(" << elem_node << ")";
+    label << "{";
+    label << ast.get_name();
+    label << "(" << elem_node << ")";
+    label << escape(std::format("| {} ", ast.source_location().get()));
 
     ast.visit([this, &label, elem_node]<AstLike T>(T& ast) {
       if constexpr (std::is_same_v<T, AstNone>) {
         // Nothing
       } else if constexpr (std::is_same_v<T, AstToken>) {
-        label << escape_quotes(std::format("| {}", ast.t));
+        label << escape(std::format("| {}", ast.t));
       } else if constexpr (std::is_same_v<T, AstInteger>) {
-        label << escape_quotes(std::format("| {}", ast.t));
+        label << escape(std::format("| {}", ast.t));
       } else if constexpr (std::is_same_v<T, AstIdentifier>) {
-        label << escape_quotes(std::format("| {}", ast.t));
+        label << escape(std::format("| {}", ast.t));
       } else if constexpr (std::is_same_v<T, AstUnary>) {
         u64 child = to_dot_helper(*ast.child);
         std::println(ss, "{} -> {};", elem_node, child);

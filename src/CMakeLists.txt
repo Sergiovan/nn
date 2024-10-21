@@ -59,3 +59,5 @@ target_sources(core
 )
 
 target_link_libraries(core PUBLIC -lstdc++exp)
+# target_compile_options(core PUBLIC -fsanitize=undefined,address)
+# target_link_options(core PUBLIC -fsanitize=undefined,address)

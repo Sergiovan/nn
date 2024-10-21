@@ -242,6 +242,8 @@ void Lexer::advance_char() {
   if (current_char == '\n') {
     current_line++;
     current_col = 0;
+  } else {
+    current_col++;
   }
 
   current_char = content[++current_pos];

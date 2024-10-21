@@ -36,6 +36,7 @@ Ast Parser::top_level_statement() {
   case KW_DEF:
     return def_statement();
   default:
+    get(); // ?
     return error("Expected {} but got {} instead", KW_DEF, t.tt);
   }
 }
@@ -60,7 +61,7 @@ Ast Parser::function_definition() {
   peek();
   assert_is(token::TokenType::KW_FUN);
 
-  get(); // fun
+  Token fun = get(); // fun
 
   Ast name = identifier();
   Token t = peek();
@@ -80,7 +81,7 @@ Ast Parser::function_definition() {
   switch (t.tt) {
     using enum token::TokenType;
   case SYM_STRONG_ARROW_RIGHT: {
-    get(); // =>
+    Token arrow = get(); // =>
     Ast ret = expression();
     t = peek();
     if (!is(SYM_SEMICOLON)) {
@@ -89,20 +90,23 @@ Ast Parser::function_definition() {
     get(); // ;
 
     ast::AstList body = ast::AstList{};
-    body.asts.push_back(Ast{ast::AstReturn{std::move(ret)}}.as_ptr());
+    body.asts.push_back(Ast{ast::AstReturn{arrow, std::move(ret)}}.as_ptr());
 
     return ast::AstFunction{
+        fun,
         std::move(name),
         std::move(body),
     };
   }
   case SYM_OPEN_BRACE:
     return ast::AstFunction{
+        fun,
         std::move(name),
         block(),
     };
   default:
     return ast::AstFunction{
+        fun,
         std::move(name),
         error("Expected one of {} or {}, but got {} instead",
               SYM_STRONG_ARROW_RIGHT, SYM_OPEN_BRACE, t.tt),
@@ -156,7 +160,7 @@ Ast Parser::return_statement() {
   peek();
   assert_is(token::TokenType::KW_RETURN);
 
-  get(); // return
+  Token l_return = get(); // return
   Ast expr = expression();
 
   Token t = peek();
@@ -166,7 +170,7 @@ Ast Parser::return_statement() {
   }
   get(); // ;
 
-  return ast::AstReturn{std::move(expr)};
+  return ast::AstReturn{l_return, std::move(expr)};
 }
 
 Ast Parser::expression_or_assignment() {
@@ -199,9 +203,9 @@ Ast Parser::integer() {
   Token t = peek();
   assert_is(token::TokenType::INTEGER);
 
-  Ast identifier = ast::AstIdentifier{t};
+  Ast integer = ast::AstInteger{t};
   get(); // Integer
-  return identifier;
+  return integer;
 }
 
 Ast Parser::error(const std::string& str) {

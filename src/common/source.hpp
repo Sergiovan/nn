@@ -42,14 +42,18 @@ private:
 };
 
 struct SourceLocation {
-  u64 pos;
-  u32 line;
-  u32 column;
-  u32 length;
+  u64 pos{};
+  u32 line{};
+  u32 column{};
+  u32 length{};
 
-  std::weak_ptr<Source> source;
+  std::weak_ptr<Source> source{};
 
   std::string get() const;
 };
+
+SourceLocation operator+(const SourceLocation& lhs, const SourceLocation& rhs);
+
+const SourceLocation nullloc{{}, {}, {}, {}, {}};
 
 } // namespace source

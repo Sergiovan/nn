@@ -79,3 +79,23 @@ std::string SourceLocation::get() const {
     return {};
   }
 }
+
+SourceLocation source::operator+(const SourceLocation& lhs,
+                                 const SourceLocation& rhs) {
+  auto lhs_source = lhs.source.lock();
+  auto rhs_source = rhs.source.lock();
+
+  nn_assert(lhs_source == rhs_source);
+
+  if (lhs_source) {
+    if (lhs.pos < rhs.pos) {
+      return {lhs.pos, lhs.line, lhs.column,
+              (u32)((rhs.pos + rhs.length) - lhs.pos), lhs.source};
+    } else {
+      return {rhs.pos, rhs.line, rhs.column,
+              (u32)((lhs.pos + lhs.length) - rhs.pos), rhs.source};
+    }
+  } else {
+    return nullloc;
+  }
+}
