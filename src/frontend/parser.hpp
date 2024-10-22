@@ -34,7 +34,19 @@ private:
 
   // Other functions
   token::Token peek();
-  token::Token get();
+  token::Token consume();
+
+  template <token::TokenType T, token::TokenType... Ts>
+  token::Token consume_expect() {
+    expect<T, Ts...>();
+    return consume();
+  }
+
+  template <token::TokenType T, token::TokenType... Ts>
+  token::Token consume_require() {
+    require<T, Ts...>();
+    return consume();
+  }
 
   ast::Ast error(const std::string& str);
 
@@ -44,18 +56,39 @@ private:
     return error(err);
   }
 
-  template <token::TokenType... Ts>
-  void assert_is() {
-    (assert_is(Ts), ...);
+  template <token::TokenType T, token::TokenType... Ts>
+  ast::Ast error_token_expected(token::TokenType tt) {
+    std::stringstream ss;
+    std::print(ss, "{}", T);
+    (std::print(ss, ", {}", Ts), ...);
+    return error("Expected one of {}, but got {} instead", ss.str(),
+                 current->tt);
   }
 
-  template <token::TokenType... Ts>
-  bool is() {
-    return (is(Ts) || ...);
-  }
-
-  void assert_is(token::TokenType t);
   bool is(token::TokenType t);
+
+  template <token::TokenType T, token::TokenType... Ts>
+  bool is() {
+    return is(T) || (is(Ts) || ...);
+  }
+
+  bool expect(token::TokenType t);
+
+  template <token::TokenType T, token::TokenType... Ts>
+  bool expect() {
+    if (!is<T, Ts...>()) {
+      error_token_expected<T, Ts...>(peek().tt);
+      return false;
+    }
+    return true;
+  }
+
+  void require(token::TokenType t);
+
+  template <token::TokenType T, token::TokenType... Ts>
+  void require() {
+    nn_assert(is(T) || (is(Ts) || ...));
+  }
 
   lexer::Lexer& lexer;
   std::optional<token::Token> current;

@@ -10,19 +10,21 @@
 using namespace parser;
 
 using ast::Ast;
+using ast::AstPtr;
+
 using lexer::Lexer;
+
 using token::Token;
+using token::TokenType;
+using enum TokenType;
 
 Parser::Parser(Lexer& lexer) : lexer{lexer}, current{std::nullopt} {}
 
 Ast Parser::parse() {
-  std::vector<ast::AstPtr> asts{};
+  std::vector<AstPtr> asts{};
 
-  peek();
-
-  while (!is(token::TokenType::END)) {
+  while (!is(END)) {
     asts.push_back(top_level_statement().as_ptr());
-    peek();
   }
 
   return ast::AstList{std::move(asts)};
@@ -32,62 +34,42 @@ Ast Parser::top_level_statement() {
   Token t = peek();
 
   switch (t.tt) {
-    using enum token::TokenType;
   case KW_DEF:
     return def_statement();
   default:
-    get(); // ?
-    return error("Expected {} but got {} instead", KW_DEF, t.tt);
+    consume(); // ?
+    return error_token_expected<KW_DEF>(t.tt);
   }
 }
 
 Ast Parser::def_statement() {
-  peek();
-  assert_is(token::TokenType::KW_DEF);
+  consume_require<KW_DEF>();
 
-  get(); // def
   Token t = peek();
 
   switch (t.tt) {
-    using enum token::TokenType;
-  case token::TokenType::KW_FUN:
+  case KW_FUN:
     return function_definition();
   default:
-    return error("Expected {} but got {} instead", KW_FUN, t.tt);
+    consume(); // ?
+    return error_token_expected<KW_FUN>(t.tt);
   }
 }
 
 Ast Parser::function_definition() {
-  peek();
-  assert_is(token::TokenType::KW_FUN);
-
-  Token fun = get(); // fun
+  Token fun = consume_require<KW_FUN>();
 
   Ast name = identifier();
+  consume_expect<SYM_OPEN_PAREN>();
+  consume_expect<SYM_CLOSE_PAREN>();
+
   Token t = peek();
-  if (!is(token::TokenType::SYM_OPEN_PAREN)) {
-    error("Expected {} but got {} instead", token::TokenType::SYM_OPEN_PAREN,
-          t.tt);
-  }
-  get(); // (
-  t = peek();
-  if (!is(token::TokenType::SYM_CLOSE_PAREN)) {
-    error("Expected {} but got {} instead", token::TokenType::SYM_CLOSE_PAREN,
-          t.tt);
-  }
-  get(); // )
-  t = peek();
 
   switch (t.tt) {
-    using enum token::TokenType;
   case SYM_STRONG_ARROW_RIGHT: {
-    Token arrow = get(); // =>
+    Token arrow = consume_require<SYM_STRONG_ARROW_RIGHT>(); // =>
     Ast ret = expression();
-    t = peek();
-    if (!is(SYM_SEMICOLON)) {
-      error("Expected {} but got {} instead", SYM_SEMICOLON, t.tt);
-    }
-    get(); // ;
+    consume_expect<SYM_SEMICOLON>();
 
     ast::AstList body = ast::AstList{};
     body.asts.push_back(Ast{ast::AstReturn{arrow, std::move(ret)}}.as_ptr());
@@ -108,67 +90,42 @@ Ast Parser::function_definition() {
     return ast::AstFunction{
         fun,
         std::move(name),
-        error("Expected one of {} or {}, but got {} instead",
-              SYM_STRONG_ARROW_RIGHT, SYM_OPEN_BRACE, t.tt),
+        error_token_expected<SYM_STRONG_ARROW_RIGHT, SYM_OPEN_BRACE>(t.tt),
     };
   }
 }
 
 Ast Parser::block() {
-  peek();
-  assert_is(token::TokenType::SYM_OPEN_BRACE);
+  consume_require<SYM_OPEN_BRACE>();
 
   ast::AstList body = ast::AstList{};
-  get(); // {
 
-  Token t = peek();
-  while (!is<token::TokenType::END, token::TokenType::SYM_CLOSE_BRACE>()) {
+  while (!is<END, SYM_CLOSE_BRACE>()) {
     body.asts.push_back(statement().as_ptr());
-    t = peek();
   }
 
-  if (!is(token::TokenType::SYM_CLOSE_BRACE)) {
-    error("Expected {} but got {} instead", token::TokenType::SYM_CLOSE_BRACE,
-          t.tt);
-  }
-
-  get(); // }
+  consume_expect<SYM_CLOSE_BRACE>();
 
   return body;
 }
 
 Ast Parser::statement() {
-  Token t = peek();
-
-  switch (t.tt) {
-    using enum token::TokenType;
+  switch (peek().tt) {
   case KW_RETURN:
     return return_statement();
   default: {
     Ast ret = expression_or_assignment();
-    if (!is(SYM_SEMICOLON)) {
-      error("Expected {} but got {} instead", token::TokenType::SYM_SEMICOLON,
-            t.tt);
-    }
-    get(); // ;
+    consume_expect<SYM_SEMICOLON>();
     return ret;
   }
   }
 }
 
 Ast Parser::return_statement() {
-  peek();
-  assert_is(token::TokenType::KW_RETURN);
+  Token l_return = consume_require<KW_RETURN>();
 
-  Token l_return = get(); // return
   Ast expr = expression();
-
-  Token t = peek();
-  if (!is(token::TokenType::SYM_SEMICOLON)) {
-    error("Expected {} but got {} instead", token::TokenType::SYM_SEMICOLON,
-          t.tt);
-  }
-  get(); // ;
+  consume_expect<SYM_SEMICOLON>();
 
   return ast::AstReturn{l_return, std::move(expr)};
 }
@@ -181,31 +138,22 @@ Ast Parser::expression() {
   Token t = peek();
 
   switch (t.tt) {
-    using enum token::TokenType;
-  case INTEGER: {
+  case INTEGER:
     return integer(); // TODO Operators and all that
-  }
   default:
-    return error("Cannot make an expression out of {}", t.tt);
+    consume(); // ?
+    return error_token_expected<INTEGER>(t.tt);
   }
 }
 
 Ast Parser::identifier() {
-  Token t = peek();
-  assert_is(token::TokenType::IDENTIFIER);
-
-  Ast identifier = ast::AstIdentifier{t};
-  get(); // Identifier
-  return identifier;
+  Token t = consume_require<IDENTIFIER>();
+  return ast::AstIdentifier{t};
 }
 
 Ast Parser::integer() {
-  Token t = peek();
-  assert_is(token::TokenType::INTEGER);
-
-  Ast integer = ast::AstInteger{t};
-  get(); // Integer
-  return integer;
+  Token t = consume_require<INTEGER>();
+  return ast::AstInteger{t};
 }
 
 Ast Parser::error(const std::string& str) {
@@ -220,10 +168,10 @@ Token Parser::peek() {
     return *current;
   }
 
-  return *(current = get());
+  return *(current = consume());
 }
 
-Token Parser::get() {
+Token Parser::consume() {
   if (current.has_value()) {
     Token t = *current;
     current = std::nullopt;
@@ -233,7 +181,6 @@ Token Parser::get() {
   Token t = lexer.next();
   do {
     switch (t.tt) {
-      using enum token::TokenType;
     case WHITESPACE:
       [[fallthrough]];
     case COMMENT:
@@ -245,11 +192,18 @@ Token Parser::get() {
   } while (true);
 }
 
-void Parser::assert_is(token::TokenType t) {
-  nn_assert(current.has_value());
-  nn_assert(current->tt == t);
+bool Parser::is(TokenType tt) {
+  return peek().tt == tt;
 }
 
-bool Parser::is(token::TokenType t) {
-  return current.has_value() && current->tt == t;
+bool Parser::expect(TokenType tt) {
+  if (!is(tt)) {
+    error(std::format("Expected {} but got {} instead", tt, peek().tt));
+    return false;
+  }
+  return true;
+}
+
+void Parser::require(TokenType tt) {
+  nn_assert(is(tt));
 }
