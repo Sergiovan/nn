@@ -4,13 +4,14 @@
 #include <string>
 
 #include "common/ast.hpp"
+#include "common/error.hpp"
 #include "frontend/lexer.hpp"
 
 namespace parser {
 
 class Parser {
 public:
-  Parser(lexer::Lexer& lexer);
+  Parser(lexer::Lexer& lexer, error::ErrorManager& error_manager);
 
   ast::Ast parse();
 
@@ -57,12 +58,16 @@ private:
   }
 
   template <token::TokenType T, token::TokenType... Ts>
-  ast::Ast error_token_expected(token::TokenType tt) {
+  ast::Ast
+  error_token_expected(token::TokenType tt,
+                       const std::optional<token::Token>& t = std::nullopt) {
     std::stringstream ss;
     std::print(ss, "{}", T);
     (std::print(ss, ", {}", Ts), ...);
-    return error("Expected one of {}, but got {} instead", ss.str(),
-                 current->tt);
+    error_manager.add_error(error::Error{
+        t.value_or(peek()),
+        std::format("Expected one of {}, but got {} instead", ss.str(), tt)});
+    return ast::Ast{};
   }
 
   bool is(token::TokenType t);
@@ -91,6 +96,7 @@ private:
   }
 
   lexer::Lexer& lexer;
+  error::ErrorManager& error_manager;
   std::optional<token::Token> current;
 };
 

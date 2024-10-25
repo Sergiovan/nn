@@ -24,7 +24,8 @@ public:
   bool get_option(Option option);
 
 private:
-  lexer::Lexer get_lexer(const std::string& filename);
+  lexer::Lexer get_lexer(const std::string& filename,
+                         error::ErrorManager& error_manager);
 
   void print_help();
 

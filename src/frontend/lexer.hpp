@@ -3,6 +3,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/error.hpp"
 #include "common/source.hpp"
 #include "common/token.hpp"
 
@@ -12,7 +13,8 @@ namespace lexer {
 
 class Lexer {
 public:
-  Lexer(const std::string& content);
+  Lexer(std::shared_ptr<source::Source> content,
+        error::ErrorManager& error_manager);
 
   token::Token next();
   std::vector<token::Token> collect();
@@ -56,10 +58,13 @@ private:
 
   void reset_state();
   void advance_char();
+
   source::SourceLocation current_loc();
 
   std::shared_ptr<source::Source> source;
   std::string_view content;
+
+  error::ErrorManager& error_manager;
 
   u32 current_token_start = 0;
   u32 token_start_line = 0;

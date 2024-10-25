@@ -13,8 +13,9 @@ list(APPEND CORE_HEADERS
 
   "util/assert.hpp"
   "util/enum_map.hpp"
-  "util/types.hpp"
   "util/format.hpp"
+  "util/string.hpp"
+  "util/types.hpp"
 )
 
 list(APPEND CORE_SOURCES
@@ -26,6 +27,8 @@ list(APPEND CORE_SOURCES
 
   "frontend/lexer.cpp"
   "frontend/parser.cpp"
+
+  "util/string.cpp"
 )
 
 add_library(core STATIC)

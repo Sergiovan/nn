@@ -4,6 +4,13 @@
 
 using namespace source;
 
+Source::Source(const std::string& filename, const std::string& original)
+    : filename{filename}, original{original} {}
+
+std::string_view Source::get_filename() const {
+  return filename;
+}
+
 std::string_view Source::get() const {
   return original;
 }
@@ -15,8 +22,6 @@ Source::citerator Source::LocationIterator::begin() const {
 Source::citerator Source::LocationIterator::end() const {
   return _end;
 }
-
-Source::Source(const std::string& original) : original{original} {}
 
 Source::citerator Source::begin() const {
   return original.cbegin();
@@ -70,6 +75,10 @@ void Source::prepare_lines() {
   line_starts.push_back(index + 1);
 }
 
+std::shared_ptr<Source> SourceLocation::get_source() const {
+  return source.lock();
+}
+
 std::string SourceLocation::get() const {
   auto shared = source.lock();
 
@@ -77,6 +86,27 @@ std::string SourceLocation::get() const {
     return shared->get_location(pos, length);
   } else {
     return {};
+  }
+}
+
+std::string SourceLocation::get_full_line() const {
+  auto shared = source.lock();
+
+  if (shared) {
+    return shared->get_line(line);
+  } else {
+    return {};
+  }
+}
+
+std::string SourceLocation::get_file_location() const {
+  auto shared = source.lock();
+
+  if (shared) {
+    return std::format("{} [line: {}, col: {}]", shared->get_filename(),
+                       line + 1, column + 1);
+  } else {
+    return std::format("???????.?? [line: {}, col: {}]", line + 1, column + 1);
   }
 }
 

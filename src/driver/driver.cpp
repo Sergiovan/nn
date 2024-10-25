@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 
+#include "common/error.hpp"
 #include "frontend/parser.hpp"
 #include "util/format.hpp" // IWYU pragma: keep
 
@@ -44,7 +45,7 @@ void ast_print_helper(ast::Ast& ast, std::stringstream& ss) {
   ss << ")";
 }
 
-void lispy_print(const std::string& str) {
+void lispy_print(std::ostream& os, const std::string& str) {
   s64 indent = 0;
   bool escaped = false;
   bool in_string = false;
@@ -52,18 +53,18 @@ void lispy_print(const std::string& str) {
   for (auto c : str) {
     if (c == '(' && !in_string) {
       indent += 2;
-      std::cout << c << '\n' << std::string(indent, ' ');
+      os << c << '\n' << std::string(indent, ' ');
       last_newline = true;
       escaped = false;
       continue;
     } else if (c == ')' && !in_string) {
       indent -= 2;
       if (last_newline) {
-        std::cout << '\b' << '\b';
+        os << '\b' << '\b';
       } else {
-        std::cout << '\n' << std::string(indent, ' ');
+        os << '\n' << std::string(indent, ' ');
       }
-      std::cout << c << "\n" << std::string(indent, ' ');
+      os << c << "\n" << std::string(indent, ' ');
       last_newline = true;
       escaped = false;
       continue;
@@ -71,23 +72,23 @@ void lispy_print(const std::string& str) {
       if (!escaped) {
         in_string = !in_string;
       }
-      std::cout << c;
+      os << c;
     } else if (c == '\\') {
       if (!escaped) {
         escaped = true;
       }
-      std::cout << c;
+      os << c;
       last_newline = false;
       continue; // Specifically skip over escaping
     } else {
-      std::cout << c;
+      os << c;
     }
 
     escaped = false;
     last_newline = false;
   }
 
-  std::cout << std::flush;
+  os << std::flush;
 }
 
 std::string escape(std::string in) {
@@ -220,25 +221,32 @@ int Driver::run() {
     return 1;
   }
 
-  auto lexer = get_lexer(entry_point);
+  auto error_manager = error::ErrorManager{};
+
+  auto lexer = get_lexer(entry_point, error_manager);
 
   if (get_option(Option::StopAfterLex)) {
     auto tokens = lexer.collect();
-    std::println("[  LEN: {}", tokens.size());
+    std::println(std::cerr, "[  LEN: {}", tokens.size());
     u64 padding = std::to_string(tokens.size() - 1).length();
     for (auto [i, tok] : std::views::enumerate(tokens)) {
       if (tok.tt == token::TokenType::WHITESPACE) {
         continue;
       }
 
-      std::println("  {:>{}}# {},", i, padding, tok);
+      std::println(std::cerr, "  {:>{}}# {},", i, padding, tok);
     }
-    std::println("]");
+    std::println(std::cerr, "]");
 
-    return lexer.had_error();
+    if (lexer.had_error()) {
+      error_manager.print_all_simple();
+      return 1;
+    }
+
+    return 0;
   }
 
-  parser::Parser p{lexer};
+  parser::Parser p{lexer, error_manager};
 
   auto r = p.parse();
 
@@ -250,10 +258,17 @@ int Driver::run() {
     } else {
       std::stringstream ss{};
       ast_print_helper(r, ss);
-      lispy_print(ss.str());
+      lispy_print(std::cerr, ss.str());
     }
+  }
 
-    return 0; // TODO parser.had_error()
+  if (error_manager.has_errors()) {
+    error_manager.print_all_simple();
+    return 1;
+  }
+
+  if (get_option(Option::StopAfterParse)) {
+    return 0;
   }
 
   return 0;
@@ -267,12 +282,15 @@ bool Driver::get_option(Option option) {
   return options[option];
 }
 
-lexer::Lexer Driver::get_lexer(const std::string& filename) {
+lexer::Lexer Driver::get_lexer(const std::string& filename,
+                               error::ErrorManager& error_manager) {
   std::ifstream file{filename};
   std::string content{std::istreambuf_iterator<char>{file},
                       std::istreambuf_iterator<char>{}};
 
-  lexer::Lexer lex{content};
+  auto source = std::make_shared<source::Source>(filename, content);
+
+  lexer::Lexer lex{source, error_manager};
 
   return lex;
 }

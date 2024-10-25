@@ -1,6 +1,5 @@
 #include "frontend/parser.hpp"
 
-#include <iostream>
 #include <print>
 
 #include "common/ast.hpp"
@@ -18,7 +17,8 @@ using token::Token;
 using token::TokenType;
 using enum TokenType;
 
-Parser::Parser(Lexer& lexer) : lexer{lexer}, current{std::nullopt} {}
+Parser::Parser(Lexer& lexer, error::ErrorManager& error_manager)
+    : lexer{lexer}, error_manager{error_manager}, current{std::nullopt} {}
 
 Ast Parser::parse() {
   std::vector<AstPtr> asts{};
@@ -37,8 +37,8 @@ Ast Parser::top_level_statement() {
   case KW_DEF:
     return def_statement();
   default:
-    consume(); // ?
-    return error_token_expected<KW_DEF>(t.tt);
+    t = consume(); // ?
+    return error_token_expected<KW_DEF>(t.tt, t);
   }
 }
 
@@ -51,8 +51,8 @@ Ast Parser::def_statement() {
   case KW_FUN:
     return function_definition();
   default:
-    consume(); // ?
-    return error_token_expected<KW_FUN>(t.tt);
+    t = consume(); // ?
+    return error_token_expected<KW_FUN>(t.tt, t);
   }
 }
 
@@ -87,10 +87,11 @@ Ast Parser::function_definition() {
         block(),
     };
   default:
+    t = consume(); // ?
     return ast::AstFunction{
         fun,
         std::move(name),
-        error_token_expected<SYM_STRONG_ARROW_RIGHT, SYM_OPEN_BRACE>(t.tt),
+        error_token_expected<SYM_STRONG_ARROW_RIGHT, SYM_OPEN_BRACE>(t.tt, t),
     };
   }
 }
@@ -141,8 +142,8 @@ Ast Parser::expression() {
   case INTEGER:
     return integer(); // TODO Operators and all that
   default:
-    consume(); // ?
-    return error_token_expected<INTEGER>(t.tt);
+    t = consume(); // ?
+    return error_token_expected<INTEGER>(t.tt, t);
   }
 }
 
@@ -157,8 +158,7 @@ Ast Parser::integer() {
 }
 
 Ast Parser::error(const std::string& str) {
-  // TODO Save errors
-  std::cout << str << "\n";
+  error_manager.add_error(error::Error{str});
 
   return Ast{};
 }

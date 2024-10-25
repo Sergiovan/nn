@@ -2,15 +2,18 @@
 
 #include <memory>
 
+#include "common/error.hpp"
 #include "common/token.hpp"
 
+using error::Error;
+using error::ErrorManager;
 using lexer::Lexer;
 using token::Token;
 using token::TokenType;
 
-Lexer::Lexer(const std::string& content)
-    : source{std::make_shared<source::Source>(content)},
-      content{source->get()} {
+Lexer::Lexer(std::shared_ptr<source::Source> source,
+             ErrorManager& error_manager)
+    : source{source}, content{source->get()}, error_manager{error_manager} {
   if (!content.empty()) {
     current_char = content[current_pos];
   }
@@ -22,13 +25,13 @@ Token Lexer::next() {
   std::string_view code = content;
 
   if (finished || code.empty()) {
-    return {TokenType::END, {}};
+    return {TokenType::END, {.source = source}};
   }
 
   while (true) {
     if (current_pos >= code.length() && substate == LexerSubState::NONE) {
       finished = true;
-      return {token::TokenType::END, {}};
+      return {token::TokenType::END, {.source = source}};
     }
 
     switch (state) {
@@ -101,15 +104,15 @@ Token Lexer::next() {
       }
       break;
     case ERROR: {
-      current_pos++;
-      Token res{TokenType::UNKNOWN, current_loc()};
-      reset_state();
       advance_char();
+      Token res{TokenType::UNKNOWN, current_loc()};
+      error_manager.add_error(Error{res, "Unknown token found"});
+      reset_state();
       return res;
     }
     case END:
       finished = true;
-      return {TokenType::END, {}};
+      return {TokenType::END, {.source = source}};
     }
 
     advance_char();

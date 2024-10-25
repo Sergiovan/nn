@@ -21,7 +21,9 @@ public:
     citerator _end;
   };
 
-  Source(const std::string& original);
+  Source(const std::string& filename, const std::string& original);
+
+  std::string_view get_filename() const;
 
   std::string_view get() const;
 
@@ -37,6 +39,7 @@ public:
 private:
   void prepare_lines();
 
+  const std::string filename;
   const std::string original;
   std::vector<u64> line_starts{};
 };
@@ -49,7 +52,10 @@ struct SourceLocation {
 
   std::weak_ptr<Source> source{};
 
+  std::shared_ptr<Source> get_source() const;
   std::string get() const;
+  std::string get_full_line() const;
+  std::string get_file_location() const;
 };
 
 SourceLocation operator+(const SourceLocation& lhs, const SourceLocation& rhs);
