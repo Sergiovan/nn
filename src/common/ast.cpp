@@ -65,16 +65,16 @@ SourceLocation AstUnary::source_location() const {
   return t.loc + child->source_location();
 }
 
+AstBinary::AstBinary(Token t, Ast&& lhs, Ast&& rhs)
+    : t{t}, lhs{std::move(lhs).as_ptr()}, rhs{std::move(rhs).as_ptr()} {}
+
 std::optional<Token> AstBinary::main_token() const {
   return t;
 }
 
 SourceLocation AstBinary::source_location() const {
-  return lhs->source_location() + rhs->source_location();
+  return lhs->source_location() + rhs->source_location(); // TODO + t.loc?
 }
-
-AstBinary::AstBinary(Token t, Ast&& lhs, Ast&& rhs)
-    : t{t}, lhs{std::move(lhs).as_ptr()}, rhs{std::move(rhs).as_ptr()} {}
 
 AstList::AstList() : asts{} {}
 
@@ -90,9 +90,11 @@ SourceLocation AstList::source_location() const {
   } else if (asts.size() == 1) {
     return asts.front()->source_location();
   } else {
+    // The idea is that all AST lists usually just go back to front
     return asts.front()->source_location() + asts.back()->source_location();
   }
 }
+
 AstFunction::AstFunction(Token t, Ast&& name, Ast&& body)
     : t{t}, name{std::move(name).as_ptr()}, body{std::move(body).as_ptr()} {}
 

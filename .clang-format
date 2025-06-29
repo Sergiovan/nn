@@ -4,3 +4,4 @@ AllowShortFunctionsOnASingleLine: Empty
 AllowShortLambdasOnASingleLine: Empty
 AlwaysBreakTemplateDeclarations: Yes
 PointerAlignment: Left
+ReflowComments: false

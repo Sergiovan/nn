@@ -5,6 +5,7 @@
 
 #include "types.hpp"
 
+/* Concept for enums that have a LAST value */
 template <typename T>
 concept BoundedEnum = std::is_scoped_enum_v<T> && requires {
   { T::LAST } -> std::same_as<T>;
@@ -12,6 +13,8 @@ concept BoundedEnum = std::is_scoped_enum_v<T> && requires {
 
 namespace _enum_map_detail {
 
+/* Helper function to determine the amount of bits required to store 
+   a number in a bitmap*/
 template <BoundedEnum T>
 consteval auto bits() {
   using U = std::underlying_type_t<T>;
@@ -30,6 +33,7 @@ consteval auto bits() {
 
 } // namespace _enum_map_detail
 
+/* Stores enum values as a bitmap */
 template <BoundedEnum T>
 class EnumBitMap {
 public:

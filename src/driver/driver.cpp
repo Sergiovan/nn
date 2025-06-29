@@ -11,6 +11,7 @@
 using namespace driver;
 namespace fs = std::filesystem;
 
+/** Prints an AST `ast` into `ss`. Recursively prints all ASTs it finds inside */
 void ast_print_helper(ast::Ast& ast, std::stringstream& ss) {
   using namespace ast;
   ss << "(" << ast.get_name() << " ";
@@ -45,6 +46,7 @@ void ast_print_helper(ast::Ast& ast, std::stringstream& ss) {
   ss << ")";
 }
 
+/** Prints the output of `ast_print_helper` in a "readable" manner */
 void lispy_print(std::ostream& os, const std::string& str) {
   s64 indent = 0;
   bool escaped = false;
@@ -91,7 +93,8 @@ void lispy_print(std::ostream& os, const std::string& str) {
   os << std::flush;
 }
 
-std::string escape(std::string in) {
+/** Escapes a string for dot format */
+std::string escape_dot(std::string in) {
   std::stringstream out;
   for (char c : in) {
     switch (c) {
@@ -118,8 +121,10 @@ std::string escape(std::string in) {
   return out.str();
 }
 
+/** Converts an AST into a dot format string */
 class DotWriter {
 public:
+  /** Converts ast `ast` into a dot format string */
   auto to_dot(ast::Ast& ast) {
     ss << "digraph AST {\n";
     ss << "node [shape=record];\n";
@@ -130,6 +135,8 @@ public:
   }
 
 private:
+  /** Recursively converst the given ast into dot format strings.
+      Returns the dot ID of the ast it parsed */
   u64 to_dot_helper(ast::Ast& ast) {
     using namespace ast;
 
@@ -139,17 +146,17 @@ private:
     label << "{";
     label << ast.get_name();
     label << "(" << elem_node << ")";
-    label << escape(std::format("| {} ", ast.source_location().get()));
+    label << escape_dot(std::format("| {} ", ast.source_location().get()));
 
     ast.visit([this, &label, elem_node]<AstLike T>(T& ast) {
       if constexpr (std::is_same_v<T, AstNone>) {
         // Nothing
       } else if constexpr (std::is_same_v<T, AstToken>) {
-        label << escape(std::format("| {}", ast.t));
+        label << escape_dot(std::format("| {}", ast.t));
       } else if constexpr (std::is_same_v<T, AstInteger>) {
-        label << escape(std::format("| {}", ast.t));
+        label << escape_dot(std::format("| {}", ast.t));
       } else if constexpr (std::is_same_v<T, AstIdentifier>) {
-        label << escape(std::format("| {}", ast.t));
+        label << escape_dot(std::format("| {}", ast.t));
       } else if constexpr (std::is_same_v<T, AstUnary>) {
         u64 child = to_dot_helper(*ast.child);
         std::println(ss, "{} -> {};", elem_node, child);
@@ -234,7 +241,10 @@ int Driver::run() {
         continue;
       }
 
-      std::println(std::cerr, "  {:>{}}# {},", i, padding, tok);
+      std::cerr << "  " << std::setw(static_cast<int>(padding)) << std::left
+                << i << "# " << std::format("{}", tok) << ",";
+      // See assert.hpp for why this line is off
+      // std::println(std::cerr, "  {:>{}}# {},", i, padding, tok);
     }
     std::println(std::cerr, "]");
 

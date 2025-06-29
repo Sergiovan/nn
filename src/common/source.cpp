@@ -5,7 +5,7 @@
 using namespace source;
 
 Source::Source(const std::string& filename, const std::string& original)
-    : filename{filename}, original{original} {}
+    : filename{filename}, original{original + '\0'} {}
 
 std::string_view Source::get_filename() const {
   return filename;

@@ -12,9 +12,6 @@
 
 using namespace error;
 
-using ast::Ast;
-using token::Token;
-
 ErrorManager::ErrorManager() : errors{} {}
 
 void ErrorManager::add_error(Error&& e) {

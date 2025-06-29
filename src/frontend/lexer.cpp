@@ -24,6 +24,7 @@ Token Lexer::next() {
 
   std::string_view code = content;
 
+  // Generate END tokens infinitely after we're done
   if (finished || code.empty()) {
     return {TokenType::END, {.source = source}};
   }
@@ -36,6 +37,7 @@ Token Lexer::next() {
 
     switch (state) {
     case FIND:
+      /* Start a token */
       current_token_start = current_pos;
       token_start_line = current_line;
       token_start_col = current_col;
@@ -76,6 +78,7 @@ Token Lexer::next() {
         auto token_loc = current_loc();
         auto keyword = token_loc.get();
 
+        // TODO Find a better way to do this...
         TokenType tt = TokenType::POISON;
         if (keyword == "=>") {
           tt = TokenType::SYM_STRONG_ARROW_RIGHT;

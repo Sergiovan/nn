@@ -8,32 +8,52 @@
 
 namespace token {
 
+/** Type of a single token from a source file */
 enum class TokenType : u16 {
+  /* An invalid, unknown token */
   UNKNOWN,
+  /* An invalid token that propagats an error */
   POISON,
+  /* A token marking the end of input/source */
   END,
 
+  /* A token containing whitespace */
   WHITESPACE,
+  /* A token containing a comment */
   COMMENT,
+  /* A token containing a block comment */
   // COMMENT_BLOCK,
 
+  /* A token containing an identifier */
   IDENTIFIER,
+  /* A token contianing an integer */
   INTEGER,
 
+  /* Keyword token `def` */
   KW_DEF,
+  /* Keyword token `fun` */
   KW_FUN,
+  /* Keywork token `return` */
   KW_RETURN,
 
+  /* Symbol token `+` */
   // SYM_PLUS,
+  /* Symbol token `=>` */
   SYM_STRONG_ARROW_RIGHT,
+  /* Symbol token `(` */
   SYM_OPEN_PAREN,
+  /* Symbol token `)` */
   SYM_CLOSE_PAREN,
+  /* Symbol token `{` */
   SYM_OPEN_BRACE,
+  /* Symbol token `}` */
   SYM_CLOSE_BRACE,
 
+  /* Symbol token `;` */
   SYM_SEMICOLON,
 };
 
+/** Represents a single token of the source code */
 struct Token {
   TokenType tt;
   source::SourceLocation loc;
