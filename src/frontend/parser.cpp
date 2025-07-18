@@ -148,13 +148,21 @@ Ast Parser::expression() {
 }
 
 Ast Parser::identifier() {
-  Token t = consume_require<IDENTIFIER>();
-  return ast::AstIdentifier{t};
+  if (is<IDENTIFIER>()) {
+    return ast::AstIdentifier{consume_require<IDENTIFIER>()};
+  } else {
+    Token t = consume(); // ?
+    return error_token_expected<IDENTIFIER>(t.tt, t);
+  }
 }
 
 Ast Parser::integer() {
-  Token t = consume_require<INTEGER>();
-  return ast::AstInteger{t};
+  if (is<INTEGER>()) {
+    return ast::AstInteger{consume_require<INTEGER>()};
+  } else {
+    Token t = consume(); // ?
+    return error_token_expected<INTEGER>(t.tt, t);
+  }
 }
 
 Ast Parser::error(const std::string& str) {

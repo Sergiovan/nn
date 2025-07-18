@@ -12,8 +12,8 @@ inline void print_relevant_stacktrace(const std::stacktrace& trace) {
   u64 padding = std::to_string(trace.size() - 1).length();
   for (auto [i, entry] : std::views::enumerate(trace)) {
     fmt = std::format("{}", entry);
-    std::cout << std::setw(static_cast<int>(padding)) << std::left << i << "# "
-              << fmt;
+    std::cout << std::setw(static_cast<int>(padding) + 1) << std::left << i
+              << "# " << fmt << "\n";
     // Note: For some reason clang 20.1.6 does not compile the following line
     // so I have replaced it with old timey std::cout. In the future, fix this
     // issue
