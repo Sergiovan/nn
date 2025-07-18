@@ -64,7 +64,7 @@ private:
     /* While lexing a symbol the first character was an = */
     SYMBOL_EQUAL,
     /* While lexing a symbol the first character was a / */
-    // SYMBOL_FORWARD_SLASH,
+    SYMBOL_FORWARD_SLASH,
     /* Lexing a symbol finished */
     SYMBOL_DONE,
   };

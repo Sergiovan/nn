@@ -274,7 +274,7 @@ int Driver::run() {
 
   if (error_manager.has_errors()) {
     error_manager.print_all_simple();
-    return 1;
+    return 2;
   }
 
   if (get_option(Option::StopAfterParse)) {

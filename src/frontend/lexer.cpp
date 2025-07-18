@@ -164,7 +164,7 @@ void Lexer::handle_find(c8 c) {
   case '}':
   case ';':
   case '=':
-    // case '/':
+  case '/':
     state = SYMBOL;
     break;
   case '\0':
@@ -221,6 +221,9 @@ bool Lexer::handle_symbol(c8 c) {
     case '=':
       substate = SYMBOL_EQUAL;
       return true;
+    case '/':
+      substate = SYMBOL_FORWARD_SLASH;
+      return true;
     default:
       return false;
     }
@@ -232,6 +235,13 @@ bool Lexer::handle_symbol(c8 c) {
     return false;
   case SYMBOL_DONE:
     return false;
+  case SYMBOL_FORWARD_SLASH:
+    if (c == '/') {
+      state = LexerState::COMMENT;
+      return true;
+    }
+    substate = SYMBOL_DONE;
+    return true;
   }
 }
 
