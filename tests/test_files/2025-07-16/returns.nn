@@ -1,0 +1,5 @@
+//! PARSE
+//! Misspelled keywords are not valid
+def fun main() {
+  returns 0;
+}

@@ -1,0 +1,5 @@
+//! PARSE
+//! Return value must be an expression
+def fun main() {
+  return fun;
+}

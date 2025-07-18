@@ -1,0 +1,5 @@
+//! PARSE
+//! Semicolons after each statement are mandatory
+def fun main() {
+  return 0
+}

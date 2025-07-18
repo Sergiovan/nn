@@ -1,0 +1,4 @@
+//! LEX
+//! Strong arrows are written =>
+// TODO Make PARSE test when >= is implemented
+def fun main() >= 0;

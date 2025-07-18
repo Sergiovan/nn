@@ -1,0 +1,5 @@
+//! PARSE
+//! Program cannot end after return keyword
+
+def fun main() {
+  return

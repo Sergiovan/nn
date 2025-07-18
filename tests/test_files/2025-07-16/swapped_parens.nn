@@ -1,0 +1,3 @@
+//! PARSE
+//! Parenthesis for functions start by opening and then closing
+def fun main)( => 0;

@@ -1,0 +1,5 @@
+//! PARSE
+//! Function bodies are not wrapped in parenthesis
+def fun main()(
+  return 0;
+)

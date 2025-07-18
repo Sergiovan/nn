@@ -1,0 +1,4 @@
+//! PARSE
+//! Function body braces must be closed
+def fun main() {
+  return 0;

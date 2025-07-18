@@ -1,0 +1,3 @@
+//! PARSE
+//! Function names cannot be integers
+def fun 3() => 0;
