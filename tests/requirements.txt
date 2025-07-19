@@ -1,0 +1,15 @@
+beartype==0.21.0
+casefy==1.1.0
+Jinja2==3.1.6
+markdown-it-py==3.0.0
+MarkupSafe==3.0.2
+mdurl==0.1.2
+mypy_extensions==1.1.0
+plum-dispatch==2.5.7
+Pygments==2.19.2
+pyserde==0.24.0
+rich==14.0.0
+tomli==2.2.1
+tomli_w==1.2.0
+typing-inspect==0.9.0
+typing_extensions==4.12.2

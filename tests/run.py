@@ -2,14 +2,28 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime
 import enum
+from enum import auto
 import glob
-import time
 import termios
+import time
 import os
 import sys
 
 from pathlib import Path
+
+from serde import serde
+from serde.toml import from_toml, to_toml
+
+TEST_DIR = Path(__file__).resolve().parent
+THIS_DIR = Path(os.getcwd()).resolve()
+
+COLOR_PASS = '\x1b[38;2;34;181;115m'
+COLOR_SKIP = '\x1b[38;2;255;204;0m'
+COLOR_FAIL = '\x1b[38;2;204;51;0m'
+
+LOADING_CHARS = ["⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄", "⡆"]
 
 def set_echo(enabled: bool) -> None:
   stdin = sys.stdin.fileno()
@@ -21,82 +35,27 @@ def set_echo(enabled: bool) -> None:
 
   termios.tcsetattr(stdin, termios.TCSANOW, stdin_attr)
 
-TEST_DIR = Path(__file__).resolve().parent
-THIS_DIR = Path(os.getcwd()).resolve()
-
 class TestSpecificationException(Exception):
   pass
 
 class SkipTest(Exception):
   pass
 
-@dataclass
-class Arguments:
-  show_passes: bool = False
-  test_filter: list[str] = field(default_factory=list[str])
-  test_files: list[Path] = field(default_factory=list[Path])
-  compiler_path: Path | None = None
+class RerunType(enum.Enum):
+  NO_RERUN = auto()
+  ALL = auto()
+  FAILED = auto()
 
   @staticmethod
-  def parse_args() -> Arguments:
-    import argparse
-    p = argparse.ArgumentParser(prog="NN Compiler test runner", usage=Path(__file__).name, description="Test runner for the nn compiler")
+  def from_string(string: str) -> RerunType:
+    VALUES = {str(x): x for x in RerunType}
+    try:
+      return VALUES[string]
+    except KeyError as e:
+      raise ValueError(f"Invalid value for Rerun Type: {string}") from e
 
-    def path_from_this_dir(arg: str) -> Path:
-      p = Path(arg).resolve().relative_to(THIS_DIR)
-      return p
-
-    p.add_argument("test_filter", nargs="*", type=str, help="Filters for tests to run. All tests that include any of the text in any of the filters in their path will be run")
-    p.add_argument("--show-passes", dest="show_passes", action="store_true", default=False, help="Show passed tests in addition to failures")
-    p.add_argument("--test-file", dest="test_files", type=path_from_this_dir, action="append", help="Run test on specific file(s) explicitly")
-    p.add_argument("--compiler", dest="compiler_path", type=path_from_this_dir, default=None, help="Path to compiler to use")
-
-    args = p.parse_args(namespace=Arguments())
-
-    for test_file in args.test_files:
-      if not test_file.exists():
-        p.error(f"Test file \"{test_file}\" does not exist")
-
-    if args.compiler_path and not args.compiler_path.exists():
-      p.error(f"Compiler \"{args.compiler_path}\" does not exist")
-
-    return args
-
-@dataclass
-class TestData:
-  compiler_path: Path
-
-LOADING_CHARS = ["⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄", "⡆"]
-
-@dataclass
-class ProcessingData:
-  text: str = ""
-  state: int = 0
-  done: bool = False
-
-  @property
-  def is_available(self) -> bool:
-    return self.done == True or self.text == ""
-  
-  def print(self):
-    if self.text:
-      print(self.text, end='')
-    else:
-      print("Waiting", end='')
-      return
-    
-    if self.done:
-      print(": Done", end='')
-    else:
-      print(f": {LOADING_CHARS[self.state]}", end='')
-    print("\x1b[0K", end='', flush=True)
-    
-  def advance(self):
-    self.state = (self.state + 1) & 7
-
-COLOR_PASS = '\x1b[38;2;34;181;115m'
-COLOR_SKIP = '\x1b[38;2;255;204;0m'
-COLOR_FAIL = '\x1b[38;2;204;51;0m'
+  def __str__(self) -> str:
+    return str(self.name)
 
 class TestResult(enum.Enum):
   PASS = enum.auto()
@@ -162,6 +121,42 @@ class CompilerPhase(enum.Enum):
         return 0
 
 @dataclass
+class ProgramOutput:
+  retcode: int = -1
+  stdout: bytes = b""
+  stderr: bytes = b""
+
+@dataclass
+class TestData:
+  compiler_path: Path
+
+@dataclass
+class ProcessingData:
+  text: str = ""
+  state: int = 0
+  done: bool = False
+
+  @property
+  def is_available(self) -> bool:
+    return self.done == True or self.text == ""
+  
+  def print(self):
+    if self.text:
+      print(self.text, end='')
+    else:
+      print("Waiting", end='')
+      return
+    
+    if self.done:
+      print(": Done", end='')
+    else:
+      print(f": {LOADING_CHARS[self.state]}", end='')
+    print("\x1b[0K", end='', flush=True)
+    
+  def advance(self):
+    self.state = (self.state + 1) & 7
+
+@dataclass
 class TestExpectations:
   stage_reached: CompilerPhase = CompilerPhase.LEX
 
@@ -171,11 +166,92 @@ class TestExpectations:
 
   xfail: bool = False
 
-@dataclass
-class ProgramOutput:
-  retcode: int = -1
-  stdout: bytes = b""
-  stderr: bytes = b""
+def compiler_path_factory() -> Path:
+  return (TEST_DIR / Path('..') / 'output' / 'Debug' / 'nn').resolve().relative_to(THIS_DIR)
+
+def past_runs_toml_path_factory() -> Path:
+  return (TEST_DIR / 'past_runs.toml').resolve().relative_to(THIS_DIR)
+
+@serde
+class Arguments:
+  show_passes: bool = False
+  test_filter: list[str] = field(default_factory=list[str])
+  test_files: list[Path] = field(default_factory=list[Path])
+  compiler_path: Path = field(default_factory=compiler_path_factory)
+  past_runs_toml_path: Path = field(default_factory=past_runs_toml_path_factory)
+  past_runs_limit: int = 100
+  rerun_previous: RerunType = RerunType.NO_RERUN 
+
+  @staticmethod
+  def parse_args() -> Arguments:
+    import argparse
+    p = argparse.ArgumentParser(
+      prog="NN Compiler test runner", 
+      usage=Path(__file__).name, 
+      description="Test runner for the nn compiler",
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    def path_from_this_dir(arg: str) -> Path:
+      p = Path(arg).resolve().relative_to(THIS_DIR)
+      return p
+
+    # Choose what to run
+    p.add_argument("test_filter", nargs="*", type=str, help="Filters for tests to run. All tests that include any of the text in any of the filters in their path will be run")
+    # Show tests that were successful in the output
+    p.add_argument("--show-passes", dest="show_passes", action="store_true", default=False, help="Show passed tests in addition to failures")
+    # Test one or more files directly instead of globbing
+    p.add_argument("--test-file", dest="test_files", type=path_from_this_dir, action="append", help="Run test on specific file(s) explicitly")
+    # Path to the compiler to use
+    p.add_argument("--compiler", dest="compiler_path", type=path_from_this_dir, default=compiler_path_factory(), help="Path to compiler to use")
+    # Where to store data about previous runs, and how many to keep
+    p.add_argument("--past-runs", dest="past_runs_toml_path", type=path_from_this_dir, default=past_runs_toml_path_factory(), help="Path to past runs toml")
+    p.add_argument("--past-runs-limit", dest="past_runs_limit", type=int, default=100, help="Amount of past runs to keep in toml file")
+    # If we should rerun the last set of tests
+    p.add_argument("--rerun", dest="rerun_previous", type=RerunType.from_string, choices=RerunType, default=RerunType.NO_RERUN, help="If previous run should be done")
+
+    args = p.parse_args(namespace=Arguments())
+
+    for test_file in args.test_files:
+      if not test_file.exists():
+        p.error(f"Test file \"{test_file}\" does not exist")
+
+    if args.compiler_path and not args.compiler_path.exists():
+      p.error(f"Compiler \"{args.compiler_path}\" does not exist")
+
+    return args
+
+@serde
+class PastSingleFileTest:
+  file: Path
+  result: TestResult
+  start_time: datetime
+  end_time: datetime
+  compiler_output: ProgramOutput
+  compiled_program_output: ProgramOutput
+  test_expectation: TestExpectations
+  error: str
+
+@serde
+class PastRun:
+  start_time: datetime
+  run_args: Arguments
+  file_tests: list[PastSingleFileTest] 
+
+@serde
+class PastRuns:
+  runs: list[PastRun]
+
+  @staticmethod
+  def load(file: Path) -> PastRuns:
+    if not file.exists():
+      return PastRuns([])
+    else:
+      return from_toml(PastRuns, open(file, 'r').read())
+    
+  def store(self, file: Path, run_limit: int = 100):
+    as_toml = to_toml(PastRuns(self.runs[:run_limit]))
+    open(file, 'w').write(as_toml)
 
 class SingleFileTest:
   def __init__(self, runner: TestRunner, file: Path, *, test_data: TestData):
@@ -225,6 +301,8 @@ class SingleFileTest:
       try:
         self.compiler_output.stdout, self.compiler_output.stderr = await asyncio.wait_for(proc.communicate(), timeout)
       except asyncio.TimeoutError as e:
+        proc.kill() # Finish him
+        await proc.communicate()
         raise Exception(f"Test timed out after {timeout}s") from e
 
       # Compare result with expectation
@@ -381,9 +459,17 @@ class SingleFileTest:
 class TestRunner:
   def __init__(self):
     self.arguments = Arguments.parse_args()
+    self.past_runs = PastRuns.load(self.arguments.past_runs_toml_path)
 
-    self.test_files = self.arguments.test_files or [Path(x) for x in glob.glob(str((TEST_DIR / "test_files" / "**" / "*.nn").relative_to(THIS_DIR)))]
-    self.test_data = TestData(self.arguments.compiler_path or (TEST_DIR / Path('..') / 'output' / 'Debug' / 'nn').relative_to(THIS_DIR))
+    match self.arguments.rerun_previous:
+      case RerunType.NO_RERUN:
+        self.test_files = self.arguments.test_files or [Path(x) for x in glob.glob(str((TEST_DIR / "test_files" / "**" / "*.nn").relative_to(THIS_DIR)))]
+      case RerunType.FAILED:
+        self.test_files = [x.file for x in self.past_runs.runs[-1].file_tests if not x.result.is_pass()]
+      case RerunType.ALL:
+        self.test_files = [x.file for x in self.past_runs.runs[-1].file_tests]
+
+    self.test_data = TestData(self.arguments.compiler_path)
     
     self.task_limit = 8
     self.column_limit = 16
@@ -505,7 +591,6 @@ class TestRunner:
 
   def _read_args(self):
     pass
-
 
 if __name__ == "__main__":
   exit(TestRunner().run())
