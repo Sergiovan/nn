@@ -6,7 +6,7 @@ from dataclasses import field
 from enum import Enum, auto
 from pathlib import Path
 
-from dataclasses import dataclass
+from serde import serde, field as serde_field
 
 
 class RerunType(Enum):
@@ -14,16 +14,16 @@ class RerunType(Enum):
   ALL = auto()
   FAILED = auto()
 
+  def __str__(self) -> str:
+    return self.name
+
   @staticmethod
-  def from_string(string: str) -> RerunType:
+  def from_str(string: str) -> RerunType:
     VALUES = {str(x): x for x in RerunType}
     try:
       return VALUES[string]
     except KeyError as e:
       raise ValueError(f"Invalid value for Rerun Type: {string}") from e
-
-  def __str__(self) -> str:
-    return str(self.name)
 
 
 def compiler_path_factory() -> Path:
@@ -34,7 +34,7 @@ def past_runs_toml_path_factory() -> Path:
   return (TEST_DIR / "past_runs.toml").resolve().relative_to(THIS_DIR)
 
 
-@dataclass
+@serde
 class Arguments:
   show_passes: bool = False
   test_filter: list[str] = field(default_factory=list[str])
@@ -42,7 +42,9 @@ class Arguments:
   compiler_path: Path = field(default_factory=compiler_path_factory)
   past_runs_toml_path: Path = field(default_factory=past_runs_toml_path_factory)
   past_runs_limit: int = 100
-  rerun_previous: RerunType = RerunType.NO_RERUN
+  rerun_previous: RerunType = serde_field(
+    default=RerunType.NO_RERUN, serializer=RerunType.__str__, deserializer=RerunType.from_str
+  )
 
   @staticmethod
   def parse_args() -> Arguments:
@@ -109,7 +111,7 @@ class Arguments:
     p.add_argument(
       "--rerun",
       dest="rerun_previous",
-      type=RerunType.from_string,
+      type=RerunType.from_str,
       choices=RerunType,
       default=RerunType.NO_RERUN,
       help="If previous run should be done",

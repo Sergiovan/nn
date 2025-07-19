@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 from .cli import Arguments
-from .test import TestResult, ProgramOutput, TestExpectations
+from .test_data import TestResult, ProgramOutput, TestExpectations
 
 from datetime import datetime
 from pathlib import Path
 
-from serde import serde
+from serde import serde, field as serde_field
 from serde.toml import from_toml, to_toml
 
 
 @serde
 class PastSingleFileTest:
   file: Path
-  result: TestResult
+  result: TestResult = serde_field(serializer=TestResult.__str__, deserializer=TestResult.from_str)
   start_time: datetime
-  end_time: datetime
+  runtime: int
   compiler_output: ProgramOutput
   compiled_program_output: ProgramOutput
   test_expectation: TestExpectations
@@ -41,5 +41,5 @@ class PastRuns:
       return from_toml(PastRuns, open(file, "r").read())
 
   def store(self, file: Path, run_limit: int = 100):
-    as_toml = to_toml(PastRuns(self.runs[:run_limit]))
+    as_toml = to_toml(PastRuns(self.runs[-run_limit:]))
     open(file, "w").write(as_toml)

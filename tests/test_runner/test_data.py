@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
+
+from serde import serde, field as serde_field
 
 COLOR_PASS = "\x1b[38;2;34;181;115m"
 COLOR_SKIP = "\x1b[38;2;255;204;0m"
@@ -87,6 +91,17 @@ class TestResult(Enum):
   def is_pass(self) -> bool:
     return self in (TestResult.PASS, TestResult.XFAIL)
 
+  def __str__(self) -> str:
+    return self.name
+
+  @staticmethod
+  def from_str(string: str) -> TestResult:
+    VALUES = {str(x): x for x in TestResult}
+    try:
+      return VALUES[string]
+    except KeyError as e:
+      raise ValueError(f"Invalid value for Test Result: {string}") from e
+
 
 class CompilerPhase(Enum):
   LEX = auto()
@@ -105,20 +120,35 @@ class CompilerPhase(Enum):
       case CompilerPhase.RUN:
         return 0
 
+  def __str__(self) -> str:
+    return self.name
+
+  @staticmethod
+  def from_str(string: str) -> CompilerPhase:
+    VALUES = {str(x): x for x in CompilerPhase}
+    try:
+      return VALUES[string]
+    except KeyError as e:
+      raise ValueError(f"Invalid value for Compiler Phase: {string}") from e
+
 
 @dataclass
 class ProgramOutput:
   retcode: int = -1
-  stdout: bytes = b""
-  stderr: bytes = b""
+  stdout: str = ""
+  stderr: str = ""
 
 
-@dataclass
+@serde
 class TestExpectations:
-  stage_reached: CompilerPhase = CompilerPhase.LEX
+  stage_reached: CompilerPhase = serde_field(
+    default=CompilerPhase.LEX, serializer=CompilerPhase.__str__, deserializer=CompilerPhase.from_str
+  )
 
-  retcode: int | None = None
+  # Only having these sentinels because python's toml capabilities
+  # are quite pathetic and they constantly trip on Nones
+  retcode: int | None = serde_field(default=None, skip_if_default=True)
   stdout_exact: bool = False
-  stdout: str | None = None
+  stdout: str | None = serde_field(default=None, skip_if_default=True)
 
   xfail: bool = False

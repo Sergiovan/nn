@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import time
 
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .past_runs import PastSingleFileTest
 from .test_data import CompilerPhase, TestData, TestResult, ProgramOutput, TestExpectations
 
 if TYPE_CHECKING:
@@ -37,6 +39,7 @@ class SingleFileTest:
     self.error: Exception | None = None
 
     self.start_time: int = -1
+    self.start_date: datetime = datetime.now()
     self.end_time: int = -1
 
   async def run(self):
@@ -44,6 +47,7 @@ class SingleFileTest:
     processing = self.runner.add_processing(str(self.file))
     try:
       self.start_time = time.perf_counter_ns()
+      self.start_date = datetime.now()
       # Read file
       text = open(self.file, "r").readlines()
       self.find_expectations(text)
@@ -68,9 +72,9 @@ class SingleFileTest:
         *compilation_params, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
       )
       try:
-        self.compiler_output.stdout, self.compiler_output.stderr = await asyncio.wait_for(
-          proc.communicate(), timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout)
+        self.compiler_output.stdout = stdout.decode(errors="backslash").strip()
+        self.compiler_output.stderr = stderr.decode(errors="backslash").strip()
       except asyncio.TimeoutError as e:
         proc.kill()  # Finish him
         await proc.communicate()
@@ -89,16 +93,10 @@ class SingleFileTest:
           self.result = TestResult.FAIL
         elif self.test_expectations.stdout is not None:
           if self.test_expectations.stdout_exact:
-            if (
-              self.compiler_output.stdout.decode(errors="backslash").strip()
-              != self.test_expectations.stdout
-            ):
+            if self.compiler_output.stdout != self.test_expectations.stdout:
               self.result = TestResult.FAIL
           else:
-            if (
-              self.test_expectations.stdout
-              not in self.compiler_output.stdout.decode(errors="backslash").strip()
-            ):
+            if self.test_expectations.stdout not in self.compiler_output.stdout:
               self.result = TestResult.FAIL
 
       if self.test_expectations.xfail:
@@ -239,7 +237,7 @@ class SingleFileTest:
         )
         print("Compiler stdout:")
         if self.compiler_output.stdout:
-          print("\t" + self.compiler_output.stdout.decode(errors="backslash").replace("\n", "\n\t"))
+          print("\t" + self.compiler_output.stdout.replace("\n", "\n\t"))
         else:
           print("\t <BLANK>")
         if self.test_expectations.stdout is not None:
@@ -250,13 +248,22 @@ class SingleFileTest:
         print(f"Program return: Expected 0, got {self.compiled_program_output.retcode}")
         print("Program stdout:")
         if self.compiled_program_output.stdout:
-          print(
-            "\t"
-            + self.compiled_program_output.stdout.decode(errors="backslash").replace("\n", "\n\t")
-          )
+          print("\t" + self.compiled_program_output.stdout.replace("\n", "\n\t"))
         else:
           print("\t <BLANK>")
         if self.test_expectations.stdout is not None:
           print(
             f'Expected {"exactly" if self.test_expectations.stdout_exact else "to find"} "{self.test_expectations.stdout}"'
           )
+
+  def archive(self) -> PastSingleFileTest:
+    return PastSingleFileTest(
+      self.file,
+      self.result,
+      self.start_date,
+      self.end_time - self.start_time,
+      self.compiler_output,
+      self.compiled_program_output,
+      self.test_expectations,
+      str(self.error),
+    )

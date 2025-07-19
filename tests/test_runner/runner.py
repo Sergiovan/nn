@@ -4,17 +4,18 @@ import sys
 import termios
 import time
 
+from datetime import datetime
 from pathlib import Path
 
 from . import TEST_DIR, THIS_DIR
 
 from .cli import Arguments, RerunType
-from .past_runs import PastRuns
+from .past_runs import PastRuns, PastRun
 from .test import SingleFileTest
 from .test_data import TestData, TestResult, ProcessingData
 
 
-def set_echo(enabled: bool) -> None:
+def set_echo(enabled: bool):
   stdin = sys.stdin.fileno()
   stdin_attr = termios.tcgetattr(stdin)
   if enabled:
@@ -37,10 +38,14 @@ class TestRunner:
           for x in glob.glob(str((TEST_DIR / "test_files" / "**" / "*.nn").relative_to(THIS_DIR)))
         ]
       case RerunType.FAILED:
+        if len(self.past_runs.runs) == 0:
+          raise ValueError("No past runs to rerun")
         self.test_files = [
           x.file for x in self.past_runs.runs[-1].file_tests if not x.result.is_pass()
         ]
       case RerunType.ALL:
+        if len(self.past_runs.runs) == 0:
+          raise ValueError("No past runs to rerun")
         self.test_files = [x.file for x in self.past_runs.runs[-1].file_tests]
 
     self.test_data = TestData(self.arguments.compiler_path)
@@ -54,6 +59,9 @@ class TestRunner:
     self.finished_tests = 0
     self.test_time = 0
 
+    self.test_date = datetime.now()
+    self.file_tests: list[SingleFileTest] = []
+
     self.processing_lines = [ProcessingData() for _ in range(self.task_limit)]
 
   def run(self) -> int:
@@ -61,9 +69,22 @@ class TestRunner:
     res = asyncio.run(self._run())
     end_time = time.perf_counter_ns()
 
+    shown_tests = self.file_tests[:]
+    shown_tests.sort(key=lambda t: not t.result.is_pass())
+    if not self.arguments.show_passes:
+      shown_tests = [test for test in shown_tests if not test.result.is_pass()]
+
+    for test in shown_tests:
+      test.print()
+      self.test_time += test.end_time - test.start_time
+
     print(
       f"Finished in {(end_time - start_time) / 1_000_000_000:.3f}s, real test time was {self.test_time / 1_000_000_000:.3f}s"
     )
+
+    this_run = PastRun(self.test_date, self.arguments, [test.archive() for test in self.file_tests])
+    self.past_runs.runs.append(this_run)
+    self.past_runs.store(self.arguments.past_runs_toml_path, self.arguments.past_runs_limit)
 
     return res
 
@@ -78,7 +99,6 @@ class TestRunner:
     raise Exception("add_processing called with no slots free")
 
   async def _run(self) -> int:
-    # TODO Filter tests
     if not self.arguments.test_filter:
       filtered_tests = self.test_files
     else:
@@ -94,29 +114,23 @@ class TestRunner:
       return 0
 
     tests = asyncio.Queue[SingleFileTest]()
-    file_tests = [SingleFileTest(self, test, test_data=self.test_data) for test in filtered_tests]
-    for test in file_tests:
+    self.file_tests = [
+      SingleFileTest(self, test, test_data=self.test_data) for test in filtered_tests
+    ]
+    for test in self.file_tests:
       tests.put_nowait(test)
 
     tasks = [asyncio.create_task(self._single_runner(tests)) for _ in range(self.task_limit)]
     try:
       set_echo(False)
       self._setup_screen()
-      await asyncio.gather(self._screen_updater(len(filtered_tests)), *tasks)
+      await asyncio.gather(self._screen_updater(len(self.file_tests)), *tasks)
       self._update_screen()
       print(flush=True)
     finally:
       set_echo(True)
 
-    file_tests.sort(key=lambda t: not t.result.is_pass())
-    if not self.arguments.show_passes:
-      file_tests = [test for test in file_tests if not test.result.is_pass()]
-
-    for test in file_tests:
-      test.print()
-      self.test_time += test.end_time - test.start_time
-
-    return 0 if all(test.result.is_pass() for test in file_tests) else 1
+    return 0 if all(test.result.is_pass() for test in self.file_tests) else 1
 
   def _finish_test(self):
     self.finished_tests += 1
