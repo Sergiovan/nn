@@ -13,3 +13,7 @@ output/
 
 # Program output
 *.dot
+
+# Python
+.venv
+past_runs.toml
