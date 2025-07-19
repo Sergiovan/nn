@@ -17,3 +17,4 @@ output/
 # Python
 .venv
 past_runs.toml
+__pycache__

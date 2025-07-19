@@ -1,0 +1,5 @@
+[tool.ruff]
+line-length = 100
+indent-width = 2
+
+[tool.ruff.format]
