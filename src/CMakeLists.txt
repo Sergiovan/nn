@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.29)
 
 list(APPEND CORE_HEADERS
+  "backend/output_gnu_as.hpp"
+
   "common/ast.hpp"
+  "common/asm_ast.hpp"
   "common/error.hpp"
   "common/source.hpp"
   "common/token.hpp"
@@ -11,6 +14,8 @@ list(APPEND CORE_HEADERS
   "frontend/lexer.hpp"
   "frontend/parser.hpp"
 
+  "transform/asm_parser.hpp"
+
   "util/assert.hpp"
   "util/enum_map.hpp"
   "util/format.hpp"
@@ -19,7 +24,10 @@ list(APPEND CORE_HEADERS
 )
 
 list(APPEND CORE_SOURCES
+  "backend/output_gnu_as.cpp"
+
   "common/ast.cpp"
+  "common/asm_ast.cpp"
   "common/error.cpp"
   "common/source.cpp"
 
@@ -27,6 +35,8 @@ list(APPEND CORE_SOURCES
 
   "frontend/lexer.cpp"
   "frontend/parser.cpp"
+
+  "transform/asm_parser.cpp"
 
   "util/string.cpp"
 )

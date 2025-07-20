@@ -191,11 +191,40 @@ public:
   /** Returns the source location for this AST node */
   source::SourceLocation source_location() const;
 
+  template <AstLike T>
+  bool has() const {
+    return std::holds_alternative<T>(data);
+  }
+
+  template <AstLike T, AstLike U, AstLike... Vs>
+  bool has() const {
+    return has<T>() || has<U>() || (has<Vs> || ...);
+  }
+
+  template <AstLike T>
+  void require() const {
+    nn_assert(has<T>());
+  }
+
+  template <AstLike T, AstLike U, AstLike... Vs>
+  void require() const {
+    nn_assert((has<T, U, Vs...>()));
+  }
+
   /** Gets the inner AST struct with the proper type, if that is
       the current AST struct */
   template <AstLike T>
   T& get() {
-    nn_assert(std::holds_alternative<T>(data));
+    require<T>();
+
+    return std::get<T>(data);
+  }
+
+  /** Gets the inner AST struct with the proper type, if that is
+      the current AST struct... but const */
+  template <AstLike T>
+  const T& get() const {
+    require<T>();
 
     return std::get<T>(data);
   }
@@ -204,8 +233,19 @@ public:
       type, otherwise nullopt */
   template <AstLike T>
   std::optional<T*> get_if() {
-    if (std::holds_alternative<T>(data)) {
-      return std::get<T>(data);
+    if (has<T>()) {
+      return &std::get<T>(data);
+    } else {
+      return std::nullopt;
+    }
+  }
+
+  /** Conditionally gets the inner AST struct if it is of a certain
+      type, otherwise nullopt */
+  template <AstLike T>
+  std::optional<T const*> get_if() const {
+    if (has<T>()) {
+      return &std::get<T>(data);
     } else {
       return std::nullopt;
     }
@@ -215,7 +255,7 @@ public:
       proper type */
   template <AstLike T, std::invocable<T&> F>
   auto visit(F&& f) -> std::invoke_result_t<F, T&> {
-    nn_assert(std::holds_alternative<T>(data));
+    require<T>();
 
     return std::visit(std::forward<F>(f), data);
   }
@@ -224,7 +264,7 @@ public:
       proper type */
   template <AstLike T, std::invocable<T&> F>
   auto visit(F&& f) const -> std::invoke_result_t<F, const T&> {
-    nn_assert(std::holds_alternative<T>(data));
+    require<T>();
 
     return std::visit(std::forward<F>(f), data);
   }

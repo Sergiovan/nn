@@ -6,6 +6,7 @@
 
 #include "common/error.hpp"
 #include "frontend/parser.hpp"
+#include "transform/asm_parser.hpp"
 #include "util/format.hpp" // IWYU pragma: keep
 
 using namespace driver;
@@ -211,6 +212,10 @@ Driver::Driver(int argc, char** argv) {
       set_option(Option::StopAfterParse, true);
     } else if (arg == "--dot") {
       set_option(Option::ParseShowDot, true);
+    } else if (arg == "--codegen") {
+      set_option(Option::StopAfterCodegen, true);
+    } else if (arg == "--silent") {
+      set_option(Option::Silent, true);
     } else {
       entry_point = arg;
     }
@@ -228,25 +233,29 @@ int Driver::run() {
     return 1;
   }
 
+  bool silent = get_option(Option::Silent);
+
   auto error_manager = error::ErrorManager{};
 
   auto lexer = get_lexer(entry_point, error_manager);
 
   if (get_option(Option::StopAfterLex)) {
     auto tokens = lexer.collect();
-    std::println(std::cerr, "[  LEN: {}", tokens.size());
-    u64 padding = std::to_string(tokens.size() - 1).length();
-    for (auto [i, tok] : std::views::enumerate(tokens)) {
-      if (tok.tt == token::TokenType::WHITESPACE) {
-        continue;
-      }
+    if (!silent) {
+      std::println(std::cerr, "[  LEN: {}", tokens.size());
+      u64 padding = std::to_string(tokens.size() - 1).length();
+      for (auto [i, tok] : std::views::enumerate(tokens)) {
+        if (tok.tt == token::TokenType::WHITESPACE) {
+          continue;
+        }
 
-      std::cerr << "  " << std::setw(static_cast<int>(padding)) << std::left
-                << i << "# " << std::format("{}", tok) << ",";
-      // See assert.hpp for why this line is off
-      // std::println(std::cerr, "  {:>{}}# {},", i, padding, tok);
+        std::cerr << "  " << std::setw(static_cast<int>(padding)) << std::left
+                  << i << "# " << std::format("{}", tok) << ",";
+        // See assert.hpp for why this line is off
+        // std::println(std::cerr, "  {:>{}}# {},", i, padding, tok);
+      }
+      std::println(std::cerr, "]");
     }
-    std::println(std::cerr, "]");
 
     if (lexer.had_error()) {
       error_manager.print_all_simple();
@@ -261,14 +270,16 @@ int Driver::run() {
   auto r = p.parse();
 
   if (get_option(Option::StopAfterParse)) {
-    if (get_option(Option::ParseShowDot)) {
-      DotWriter dw{};
+    if (!silent) {
+      if (get_option(Option::ParseShowDot)) {
+        DotWriter dw{};
 
-      std::print("{}", dw.to_dot(r));
-    } else {
-      std::stringstream ss{};
-      ast_print_helper(r, ss);
-      lispy_print(std::cerr, ss.str());
+        std::print(std::cerr, "{}", dw.to_dot(r));
+      } else {
+        std::stringstream ss{};
+        ast_print_helper(r, ss);
+        lispy_print(std::cerr, ss.str());
+      }
     }
   }
 
@@ -278,6 +289,25 @@ int Driver::run() {
   }
 
   if (get_option(Option::StopAfterParse)) {
+    return 0;
+  }
+
+  asm_parser::AsmParser ap{r};
+
+  auto& asm_output = ap.get();
+
+  if (get_option(Option::StopAfterCodegen)) {
+    if (!silent) {
+      std::cerr << asm_output;
+    }
+  }
+
+  if (error_manager.has_errors()) {
+    error_manager.print_all_simple();
+    return 4;
+  }
+
+  if (get_option(Option::StopAfterCodegen)) {
     return 0;
   }
 
@@ -316,7 +346,9 @@ USAGE: nn <FILE> [--help] [--lex]
   --help: Show this help
   --lex: Only go up to lexing, then print the tokens
   --parse: Only go up to parsing, then print the asts
-  --dot: Show parse output as a dot file
+  --codegen: Only go up to codegen, then print the program
+  --dot: Show parse output as a dot file instead
+  --silent: Do not output to stdout after finishing phases
 )";
   // clang-format on
 

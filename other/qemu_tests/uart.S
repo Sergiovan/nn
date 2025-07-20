@@ -1,3 +1,6 @@
+# From https://github.com/safinsingh/ns16550a/blob/master/src/ns16550a.s with
+# some modifications by me
+
 .globl uart_init
 .globl uart_putc
 .globl uart_getc

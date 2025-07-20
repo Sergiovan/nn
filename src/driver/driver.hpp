@@ -12,8 +12,12 @@ enum class Option {
   StopAfterLex,
   /** Stop processing the source after the parsing phase */
   StopAfterParse,
+  /** Stop processing the source after the codegen phase */
+  StopAfterCodegen,
   /** Show dotfile syntax of the AST parsed */
   ParseShowDot,
+  /** Do not print to output */
+  Silent,
 
   LAST
 };
