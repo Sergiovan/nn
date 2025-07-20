@@ -1,0 +1,108 @@
+
+test.elf:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080000000 <_start>:
+    80000000:	010000ef          	jal	80000010 <uart_init>
+    80000004:	00300513          	li	a0,3
+    80000008:	054000ef          	jal	8000005c <print_number>
+    8000000c:	10500073          	wfi
+
+0000000080000010 <uart_init>:
+    80000010:	100002b7          	lui	t0,0x10000
+    80000014:	00300313          	li	t1,3
+    80000018:	006281a3          	sb	t1,3(t0) # 10000003 <UART_ADDRESS+0x3>
+    8000001c:	00100313          	li	t1,1
+    80000020:	006281a3          	sb	t1,3(t0)
+    80000024:	006280a3          	sb	t1,1(t0)
+    80000028:	00008067          	ret
+
+000000008000002c <uart_getc>:
+    8000002c:	100002b7          	lui	t0,0x10000
+    80000030:	0052c303          	lbu	t1,5(t0) # 10000005 <UART_ADDRESS+0x5>
+    80000034:	00137313          	andi	t1,t1,1
+    80000038:	00031663          	bnez	t1,80000044 <_uart_read>
+    8000003c:	00000513          	li	a0,0
+    80000040:	00c0006f          	j	8000004c <_uart_get_end>
+
+0000000080000044 <_uart_read>:
+    80000044:	0002c503          	lbu	a0,0(t0)
+    80000048:	0040006f          	j	8000004c <_uart_get_end>
+
+000000008000004c <_uart_get_end>:
+    8000004c:	00008067          	ret
+
+0000000080000050 <uart_putc>:
+    80000050:	100002b7          	lui	t0,0x10000
+    80000054:	00a28023          	sb	a0,0(t0) # 10000000 <UART_ADDRESS>
+    80000058:	00008067          	ret
+
+000000008000005c <print_number>:
+    8000005c:	100002b7          	lui	t0,0x10000
+    80000060:	03000313          	li	t1,48
+    80000064:	00628023          	sb	t1,0(t0) # 10000000 <UART_ADDRESS>
+    80000068:	07800313          	li	t1,120
+    8000006c:	00628023          	sb	t1,0(t0)
+    80000070:	00050313          	mv	t1,a0
+    80000074:	00a00393          	li	t2,10
+    80000078:	04000e13          	li	t3,64
+    8000007c:	00000e93          	li	t4,0
+    80000080:	00008f13          	mv	t5,ra
+
+0000000080000084 <_loop_start>:
+    80000084:	ffce0e13          	addi	t3,t3,-4
+    80000088:	020e4863          	bltz	t3,800000b8 <_loop_end>
+    8000008c:	00030513          	mv	a0,t1
+    80000090:	01c55533          	srl	a0,a0,t3
+    80000094:	00f57513          	andi	a0,a0,15
+    80000098:	00aeeeb3          	or	t4,t4,a0
+    8000009c:	fe0e84e3          	beqz	t4,80000084 <_loop_start>
+    800000a0:	00756663          	bltu	a0,t2,800000ac <_is_number>
+    800000a4:	04150513          	addi	a0,a0,65
+    800000a8:	0080006f          	j	800000b0 <_do_putc>
+
+00000000800000ac <_is_number>:
+    800000ac:	03050513          	addi	a0,a0,48
+
+00000000800000b0 <_do_putc>:
+    800000b0:	fa1ff0ef          	jal	80000050 <uart_putc>
+    800000b4:	fd1ff06f          	j	80000084 <_loop_start>
+
+00000000800000b8 <_loop_end>:
+    800000b8:	000f0093          	mv	ra,t5
+    800000bc:	00008067          	ret
+
+Disassembly of section .riscv.attributes:
+
+0000000000000000 <.riscv.attributes>:
+   0:	4f41                	.insn	2, 0x4f41
+   2:	0000                	.insn	2, 0x
+   4:	7200                	.insn	2, 0x7200
+   6:	7369                	.insn	2, 0x7369
+   8:	01007663          	bgeu	zero,a6,14 <LINE_STATUS_REGISTER+0xf>
+   c:	0045                	.insn	2, 0x0045
+   e:	0000                	.insn	2, 0x
+  10:	7205                	.insn	2, 0x7205
+  12:	3676                	.insn	2, 0x3676
+  14:	6934                	.insn	2, 0x6934
+  16:	7032                	.insn	2, 0x7032
+  18:	5f31                	.insn	2, 0x5f31
+  1a:	326d                	.insn	2, 0x326d
+  1c:	3070                	.insn	2, 0x3070
+  1e:	615f 7032 5f31      	.insn	6, 0x5f317032615f
+  24:	3266                	.insn	2, 0x3266
+  26:	3270                	.insn	2, 0x3270
+  28:	645f 7032 5f32      	.insn	6, 0x5f327032645f
+  2e:	697a                	.insn	2, 0x697a
+  30:	32727363          	bgeu	tp,t2,356 <FIRST_HEX+0x315>
+  34:	3070                	.insn	2, 0x3070
+  36:	7a5f 6669 6e65      	.insn	6, 0x6e6566697a5f
+  3c:	32696563          	bltu	s2,t1,366 <FIRST_HEX+0x325>
+  40:	3070                	.insn	2, 0x3070
+  42:	7a5f 6d6d 6c75      	.insn	6, 0x6c756d6d7a5f
+  48:	7031                	.insn	2, 0x7031
+  4a:	0030                	.insn	2, 0x0030
+  4c:	0108                	.insn	2, 0x0108
+  4e:	0b0a                	.insn	2, 0x0b0a
