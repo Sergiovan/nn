@@ -25,7 +25,7 @@ AstInstructionLi::AstInstructionLi(std::unique_ptr<AstOperandImmediate> src,
     : source{std::move(src)}, destination{std::move(dst)} {}
 
 void AstInstructionLi::into_stream(std::ostream& os) const {
-  os << "  li " << *destination << " " << *source;
+  os << "  li " << *destination << ", " << *source;
 }
 
 void AstInstructionRet::into_stream(std::ostream& os) const {
@@ -45,7 +45,7 @@ AstProgram::AstProgram(AstFunctionDef&& fn) : function{std::move(fn)} {}
 
 void AstProgram::into_stream(std::ostream& os) const {
   os << function << "\n";
-  os << "  .section .note.GNU-stack,\"\",@progbits";
+  os << ".section .note.GNU-stack,\"\",@progbits\n";
 }
 
 std::ostream& operator<<(std::ostream& os, const IPrintable& p) {

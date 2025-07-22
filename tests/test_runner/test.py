@@ -63,7 +63,7 @@ class SingleFileTest:
         case CompilerPhase.CODEGEN:
           compilation_params.append("--codegen")
         case CompilerPhase.RUN:
-          pass
+          compilation_params += ["-o", self.file]
 
       self.compilation_command = " ".join(compilation_params)
       timeout = 5

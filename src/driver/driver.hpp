@@ -14,9 +14,11 @@ enum class Option {
   StopAfterParse,
   /** Stop processing the source after the codegen phase */
   StopAfterCodegen,
+  /** Instead of assmbling and linking an executable,  */
+  EmitAsmFile,
   /** Show dotfile syntax of the AST parsed */
   ParseShowDot,
-  /** Do not print to output */
+  /** Do not print secondary output to stdout */
   Silent,
 
   LAST
@@ -36,6 +38,8 @@ public:
   bool get_option(Option option);
 
 private:
+  int32_t finish_compilation(const asm_ast::AstProgram& program);
+
   /** Creates a lexer from a filename and error manager. Will open and read the file */
   lexer::Lexer get_lexer(const std::string& filename,
                          error::ErrorManager& error_manager);
@@ -47,6 +51,8 @@ private:
   EnumBitMap<Option> options{};
   /** Entry point source file to compile */
   std::string entry_point{};
+  /** Output file name */
+  std::string output_file{"out"};
 };
 
 } // namespace driver

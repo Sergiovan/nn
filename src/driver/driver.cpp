@@ -1,9 +1,16 @@
 #include "driver.hpp"
 
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <iostream>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include "common/asm_ast.hpp"
 #include "common/error.hpp"
 #include "frontend/parser.hpp"
 #include "transform/asm_parser.hpp"
@@ -203,6 +210,8 @@ Driver::Driver(int argc, char** argv) {
       }) |
       std::ranges::to<std::vector>();
 
+  enum class OptionState { NONE, OUTPUT } option_state = OptionState::NONE;
+
   for (auto& arg : args) {
     if (arg == "--help") {
       set_option(Option::ShowHelp, true);
@@ -216,8 +225,19 @@ Driver::Driver(int argc, char** argv) {
       set_option(Option::StopAfterCodegen, true);
     } else if (arg == "--silent") {
       set_option(Option::Silent, true);
+    } else if (arg == "--output" || arg == "-o") {
+      // Not particularly robust, but that's okay for now
+      option_state = OptionState::OUTPUT;
     } else {
-      entry_point = arg;
+      switch (option_state) {
+      case OptionState::NONE:
+        entry_point = arg;
+        break;
+      case OptionState::OUTPUT:
+        output_file = arg;
+        option_state = OptionState::NONE;
+        break;
+      }
     }
   }
 }
@@ -311,6 +331,19 @@ int Driver::run() {
     return 0;
   }
 
+  if (get_option(Option::EmitAsmFile)) {
+    std::string output_file_asm = std::format("{}.S", output_file);
+    std::ofstream output{output_file_asm, std::ios_base::out};
+    output << asm_output << "\n";
+
+    if (output.bad()) {
+      std::print("Writing to {} failed!", output_file_asm);
+    }
+    return 5;
+  } else {
+    return finish_compilation(asm_output);
+  }
+
   return 0;
 }
 
@@ -320,6 +353,200 @@ void Driver::set_option(Option option, bool value) {
 
 bool Driver::get_option(Option option) {
   return options[option];
+}
+
+// More or less accurate...
+bool which(const std::string& program) {
+  const char* c_path = std::getenv("PATH");
+
+  if (!c_path) {
+    std::println("Could not determine value of $PATH, so could not find if {} "
+                 "is installed",
+                 program);
+    return false;
+  }
+
+  // Disgusting C++ code tbh
+  std::stringstream ss{c_path};
+  std::string path{};
+
+  while (std::getline(ss, path, ':')) {
+    auto exec_path = std::filesystem::path{path} / program;
+
+    if (std::filesystem::exists(exec_path)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+template <std::same_as<std::string>... Ts>
+bool run_with_arguments(const std::string& program, const Ts&... args) {
+  int link_stdout[2] = {0, 0};
+  int link_stderr[2] = {0, 0};
+
+  if (pipe(link_stdout) == -1) {
+    std::println("Creating a stdout pipe for {} failed: {}", program,
+                 std::strerror(errno));
+    return false;
+  }
+
+  if (pipe(link_stderr) == -1) {
+    std::println("Creating a stderr pipe for {} failed: {}", program,
+                 std::strerror(errno));
+    return false;
+  }
+
+  pid_t pid = fork(); // Shenanigans
+
+  if (pid == 0) {
+    // Child
+    dup2(link_stdout[1], STDOUT_FILENO);
+    close(link_stdout[1]);
+    close(link_stdout[0]);
+
+    dup2(link_stderr[1], STDERR_FILENO);
+    close(link_stderr[1]);
+    close(link_stderr[0]);
+
+    execlp(program.c_str(), program.c_str(), args.c_str()..., nullptr);
+
+    std::println("Executing {} failed: {}", program, std::strerror(errno));
+
+    exit(1); // execlp must have failed
+  } else if (pid == -1) {
+    std::println("Fork failed: {}", std::strerror(errno));
+    return false;
+  } else {
+    // Original process
+
+    close(link_stdout[1]);
+    close(link_stderr[1]);
+
+    auto print_from_link = [&program](int fd, bool is_stdout = true) {
+      constexpr size_t buff_size = 1024;
+      char buff[buff_size + 1] = {0};
+
+      ssize_t bytes_read = read(fd, buff, buff_size);
+      if (bytes_read == -1) {
+        std::println("Error while reading {} from {}: {}",
+                     is_stdout ? "stdout" : "stderr", program,
+                     std::strerror(errno));
+        return;
+      } else if (bytes_read == 0) {
+        return;
+      } else {
+        buff[bytes_read] = '\0';
+      }
+
+      std::println("{} {}:", program, is_stdout ? "out" : "err");
+      std::print("{}", buff);
+      while (true) {
+        bytes_read = read(fd, buff, buff_size);
+        if (bytes_read == -1) {
+          std::println("Error while reading {} from {}: {}",
+                       is_stdout ? "stdout" : "stderr", program,
+                       std::strerror(errno));
+          break;
+        } else if (bytes_read > 0) {
+          buff[bytes_read] = '\0';
+          std::print("{}", buff);
+        } else {
+          std::println();
+          break;
+        }
+      }
+    };
+
+    int status = 0;
+    int res = waitpid(pid, &status, 0);
+
+    if (res == -1) {
+      std::println("Waiting for {} to finish failed: {}", program,
+                   std::strerror(errno));
+      print_from_link(link_stdout[0], true);
+      print_from_link(link_stderr[0], false);
+      return false;
+    }
+
+    if (!WIFEXITED(status)) {
+      std::println("{} did not exit properly", program);
+      print_from_link(link_stdout[0], true);
+      print_from_link(link_stderr[0], false);
+      return false;
+    }
+
+    if (WEXITSTATUS(status) != 0) {
+      std::println("{} did not exit properly: Exit code was {}", program,
+                   WEXITSTATUS(status));
+      print_from_link(link_stdout[0], true);
+      print_from_link(link_stderr[0], false);
+      return false;
+    }
+
+    print_from_link(link_stdout[0], true);
+    print_from_link(link_stderr[0], false);
+
+    return true;
+  }
+}
+
+int32_t Driver::finish_compilation(const asm_ast::AstProgram& asm_output) {
+  using namespace std::string_literals;
+  constexpr const char PROGRAM_AS[] = "riscv64-elf-as";
+  constexpr const char PROGRAM_LD[] = "riscv64-elf-ld";
+  constexpr const char PROGRAM_OBJCOPY[] = "riscv64-elf-objcopy";
+
+  std::filesystem::path output_path{output_file};
+
+  std::string tmp_name = output_path.parent_path() /
+                         std::format(".0.{}", output_path.filename().string());
+
+  /* Output to temporary file */
+  std::string asm_file = std::format("{}.S", tmp_name);
+  std::ofstream asm_out_file{asm_file, std::ios_base::out};
+  asm_out_file << asm_output;
+  asm_out_file.close();
+
+  /* Verify programs are installed */
+  if (!which(PROGRAM_AS)) {
+    std::println("Could not find {}", PROGRAM_AS);
+    return 6;
+  }
+  if (!which(PROGRAM_LD)) {
+    std::println("Could not find {}", PROGRAM_LD);
+    return 6;
+  }
+  if (!which(PROGRAM_OBJCOPY)) {
+    std::println("Could not find {}", PROGRAM_OBJCOPY);
+    return 6;
+  }
+
+  /* Assemble */
+  std::string obj_file = std::format("{}.o", tmp_name);
+  if (!run_with_arguments(PROGRAM_AS, asm_file, "-o"s, obj_file)) {
+    std::println("Failed to assemble {}", asm_file);
+    return 7;
+  }
+
+  /* Link */
+  std::string elf_file = std::format("{}.elf", tmp_name);
+  if (!run_with_arguments(PROGRAM_LD, "-melf64lriscv"s, "-nostdlib"s,
+                          "-Ttext=0x80000000"s, obj_file, "-o"s, elf_file)) {
+    std::println("Failed to link {}", obj_file);
+    return 7;
+  }
+
+  /* Objcopy */
+  std::string binary_file = std::format("{}.bin", output_file);
+  if (!run_with_arguments(PROGRAM_OBJCOPY, elf_file, "-O"s, "binary"s,
+                          binary_file)) {
+    std::println("Failed to objcopy {}", elf_file);
+    return 7;
+  }
+
+  return 0;
 }
 
 lexer::Lexer Driver::get_lexer(const std::string& filename,
@@ -341,8 +568,15 @@ void Driver::print_help() {
 constexpr char help_text[] =
 R"(nn : Compiler for the nn language
 
-USAGE: nn <FILE> [--help] [--lex]
+Compiles .nn files into RISC-V binary blobs, or RISC-V assembly files.
+Currently requires riscv64-elf-{as, ld, objcopy} to be installed on the system.
 
+USAGE: nn <FILE> [--help] [--lex] [--parse] [--codegen] [--dot] [--silent] [--output <PATH>] [-S]
+
+OPTIONAL PARAMETERS
+  -o, --output: Path to output file, without extension
+  -S: Emit an assembly file instead of a binary
+  
   --help: Show this help
   --lex: Only go up to lexing, then print the tokens
   --parse: Only go up to parsing, then print the asts
