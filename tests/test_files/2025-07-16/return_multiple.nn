@@ -1,5 +1,5 @@
 //! PARSE
-//! Returns must return at most one thing
+//! DESC(Returns must return at most one thing)
 def fun main() {
   return 0 0;
 }

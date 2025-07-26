@@ -1,5 +1,5 @@
 //! PARSE
-//! Semicolons after each statement are mandatory
+//! DESC(Semicolons after each statement are mandatory)
 def fun main() {
   return 0
 }

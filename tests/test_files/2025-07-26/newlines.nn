@@ -1,5 +1,5 @@
-//! RUN : 0
-//! Newlines are valid separators
+//! RUN(0)
+//! DESC(Newlines are valid separators)
 def
 fun
 main

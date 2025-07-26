@@ -1,4 +1,4 @@
 //! PARSE
-//! Function body braces must be closed
+//! DESC(Function body braces must be closed)
 def fun main() {
   return 0;

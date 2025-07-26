@@ -13,6 +13,7 @@ from serde.toml import from_toml, to_toml
 @serde
 class PastSingleFileTest:
   file: Path
+  description: str
   result: TestResult = serde_field(serializer=TestResult.__str__, deserializer=TestResult.from_str)
   start_time: datetime
   runtime: int

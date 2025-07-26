@@ -3,6 +3,7 @@ import tempfile
 import glob
 import os
 import shutil
+import serde
 import sys
 import termios
 import time
@@ -15,7 +16,7 @@ from . import TEST_DIR, THIS_DIR
 from .cli import Arguments, RerunType
 from .past_runs import PastRuns, PastRun
 from .test import SingleFileTest
-from .test_data import TestData, TestResult, ProcessingData
+from .test_data import TestrunData, TestResult, ProcessingData
 
 
 def set_echo(enabled: bool):
@@ -32,7 +33,12 @@ def set_echo(enabled: bool):
 class TestRunner:
   def __init__(self):
     self.arguments = Arguments.parse_args()
-    self.past_runs = PastRuns.load(self.arguments.past_runs_toml_path)
+    try:
+      self.past_runs = PastRuns.load(self.arguments.past_runs_toml_path)
+    except serde.compat.SerdeError as e:
+      raise Exception(
+        f"Test format has changed. Delete or rename your past runs from {self.arguments.past_runs_toml_path}"
+      ) from e
 
     match self.arguments.rerun_previous:
       case RerunType.NO_RERUN:
@@ -51,7 +57,7 @@ class TestRunner:
           raise ValueError("No past runs to rerun")
         self.test_files = [x.file for x in self.past_runs.runs[-1].file_tests]
 
-    self.test_data = TestData(compiler_path=self.arguments.compiler_path)
+    self.test_data = TestrunData(compiler_path=self.arguments.compiler_path)
 
     terminal_size = shutil.get_terminal_size()
     cpu_count = os.cpu_count() or 1
@@ -123,7 +129,7 @@ class TestRunner:
 
     tests = asyncio.Queue[SingleFileTest]()
     self.file_tests = [
-      SingleFileTest(self, test, test_data=self.test_data) for test in filtered_tests
+      SingleFileTest(self, test, testrun_data=self.test_data) for test in filtered_tests
     ]
     for test in self.file_tests:
       tests.put_nowait(test)

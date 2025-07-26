@@ -1,5 +1,5 @@
 //! PARSE
-//! Keywords must be lowercase
+//! DESC(Keywords must be lowercase)
 def fun main() {
   RETURN 0;
 }

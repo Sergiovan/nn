@@ -1,3 +1,3 @@
 //! PARSE
-//! A single identifier at the top level is not valid
+//! DESC(A single identifier at the top level is not valid)
 beeb

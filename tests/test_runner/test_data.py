@@ -13,8 +13,12 @@ COLOR_FAIL = "\x1b[38;2;204;51;0m"
 LOADING_CHARS = ["⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄", "⡆"]
 
 
+class SkipTest(Exception):
+  pass
+
+
 @dataclass
-class TestData:
+class TestrunData:
   compiler_path: Path
   temp_directory: Path | None = serde_field(skip=True, default=None)
 

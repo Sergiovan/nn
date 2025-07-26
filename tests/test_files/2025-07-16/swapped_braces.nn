@@ -1,5 +1,5 @@
 //! PARSE
-//! Function bodies start with an opening brace and end with a closing brace
+//! DESC(Function bodies start with an opening brace and end with a closing brace)
 def fun main()}
   return 0;
 {

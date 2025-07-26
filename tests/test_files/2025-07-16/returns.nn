@@ -1,5 +1,5 @@
 //! PARSE
-//! Misspelled keywords are not valid
+//! DESC(Misspelled keywords are not valid)
 def fun main() {
   returns 0;
 }

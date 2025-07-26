@@ -1,5 +1,5 @@
-//! RUN : 100
-//! Return values can have multiple digits
+//! RUN(100)
+//! DESC(Return values can have multiple digits)
 def fun main() {
   return 100;
 }

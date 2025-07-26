@@ -1,5 +1,5 @@
 //! PARSE
-//! Function bodies are not wrapped in parenthesis
+//! DESC(Function bodies are not wrapped in parenthesis)
 def fun main()(
   return 0;
 )

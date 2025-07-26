@@ -1,5 +1,5 @@
 //! PARSE
-//! Program cannot end after return keyword
+//! DESC(Program cannot end after return keyword)
 
 def fun main() {
   return

@@ -1,3 +1,3 @@
 //! PARSE
-//! Functions require the fun keyword in addition to def
+//! DESC(Functions require the fun keyword in addition to def)
 def main() => 0;

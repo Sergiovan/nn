@@ -8,31 +8,32 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .test_parser import TestParser
 from .monitored_qemu import MonitoredQemu
 from .past_runs import PastSingleFileTest
-from .test_data import CompilerPhase, TestData, TestResult, ProgramOutput, TestExpectations
+from .test_data import (
+  CompilerPhase,
+  TestrunData,
+  TestResult,
+  ProgramOutput,
+  TestExpectations,
+  SkipTest,
+)
 
 if TYPE_CHECKING:
   from .runner import TestRunner
 
 
-class TestSpecificationException(Exception):
-  pass
-
-
-class SkipTest(Exception):
-  pass
-
-
 class SingleFileTest:
-  def __init__(self, runner: TestRunner, file: Path, *, test_data: TestData):
-    assert test_data.temp_directory is not None
+  def __init__(self, runner: TestRunner, file: Path, *, testrun_data: TestrunData):
+    assert testrun_data.temp_directory is not None
 
     self.runner = runner
     self.file = file
-    self.test_data = test_data
+    self.description: str = ""
+    self.testrun_data = testrun_data
 
-    self.output_dir = test_data.temp_directory / self.file.stem
+    self.output_dir = testrun_data.temp_directory / self.file.stem
     self.output_bin = self.output_dir / "out.bin"
 
     self.result = TestResult.UNKNOWN
@@ -57,12 +58,12 @@ class SingleFileTest:
       self.start_date = datetime.now()
       # Read file
       text = open(self.file, "r").readlines()
-      self.find_expectations(text)
+      self.parse_test_data(text)
       # Run compiler on it
       self.result = TestResult.PASS  # Just for checking
 
       compilation_params: list[str] = [
-        str(self.test_data.compiler_path),
+        str(self.testrun_data.compiler_path),
         str(self.file),
         "--silent",  # Please no extraneous output
       ]
@@ -121,103 +122,10 @@ class SingleFileTest:
     self.compiled_program_output.retcode = monitor.get_result()
     self.compiled_program_output.stdout, self.compiled_program_output.stderr = monitor.get_output()
 
-  def find_expectations(self, lines: list[str]):
-    if len(lines) == 0:
-      return
-    line = lines[0].strip()
-    if not line.startswith("//!"):
-      return
-
-    tokens = line[3:].split()
-
-    while True:
-      if len(tokens) == 0:
-        raise TestSpecificationException(
-          f"Empty compiler test directive in {self.file}: Must be LEX, PARSE, CODEGEN or RUN"
-        )
-
-      head: str = tokens[0]
-      match head:
-        case "XFAIL":
-          if self.test_expectations.xfail:
-            raise TestSpecificationException(
-              f"Invalid compiler test directive in {self.file}: XFAIL can only appear once"
-            )
-          self.test_expectations.xfail = True
-          tokens.pop(0)
-        case "LEX":
-          self.test_expectations.stage_reached = CompilerPhase.LEX
-          break
-        case "PARSE":
-          self.test_expectations.stage_reached = CompilerPhase.PARSE
-          break
-        case "CODEGEN":
-          self.test_expectations.stage_reached = CompilerPhase.CODEGEN
-          break
-        case "RUN":
-          self.test_expectations.stage_reached = CompilerPhase.RUN
-          break
-        case "SKIP":
-          raise SkipTest(line[line.find("SKIP") + 4 :])
-        case o:
-          raise TestSpecificationException(
-            f'Unknown compiler test directive "{o}" in {self.file}: Must be LEX, PARSE, CODEGEN or RUN'
-          )
-
-    tokens.pop(0)
-
-    while True:
-      if len(tokens) == 0:
-        return
-
-      head = tokens[0]
-
-      match head:
-        case "XFAIL":
-          if self.test_expectations.xfail:
-            raise TestSpecificationException(
-              f"Invalid compiler test directive in {self.file}: XFAIL can only appear once"
-            )
-          self.test_expectations.xfail = True
-          tokens.pop(0)
-        case ":":
-          if self.test_expectations.retcode is not None:
-            raise TestSpecificationException(
-              f"Invalid compiler test directive return code in {self.file}: Only one return code is allowed"
-            )
-          if self.test_expectations.stage_reached != CompilerPhase.RUN:
-            raise TestSpecificationException(
-              f"Invalid compiler test directive return code in {self.file}: Return code only allowed for RUN phases"
-            )
-          if len(tokens) == 1:
-            raise TestSpecificationException(
-              f"Invalid compiler test directive return code in {self.file}: Must be present and be an integer between 0 and 255"
-            )
-          try:
-            ret = int(tokens[1])
-            if ret < 0 or ret > 255:
-              raise TestSpecificationException(
-                f"Invalid compiler test directive return code in {self.file}: Must be between 0 and 255, is {ret}"
-              )
-            self.test_expectations.retcode = ret
-          except ValueError as e:
-            raise TestSpecificationException(
-              f'Invalid compiler test directive return code in {self.file}: Must be an integer, found "{tokens[3]}"'
-            ) from e
-          tokens.pop(0)
-          tokens.pop(0)
-        case "=":
-          self.test_expectations.stdout = line[line.find("=") + 1 :].strip()
-          self.test_expectations.stdout_exact = True
-          return
-        case "~":
-          self.test_expectations.stdout = line[line.find("~") + 1 :].strip()
-          self.test_expectations.stdout_exact = False
-          return
-        case _:
-          raise TestSpecificationException(
-            f'Unknown compiler test directive "{0}" in {self.file}: Must be ":" for return code, "=" for stdout equals or "~" for stdout contains'
-          )
+  def parse_test_data(self, lines: list[str]):
+    parser = TestParser(lines, self.file)
+    self.test_expectations = parser.parse()
+    self.description = parser.description or ""
 
   def check_compiler_expectations(self):
     if self.test_expectations.stage_reached == CompilerPhase.RUN:
@@ -266,6 +174,8 @@ class SingleFileTest:
     import traceback
 
     print(f"===== \x1b[1m{self.file.name}\x1b[0m =====")
+    if self.description:
+      print(self.description)
     print(f"Ran in \x1b[1m{(self.end_time - self.start_time) / 1_000_000_000:.3f}\x1b[0ms")
     print(f"Result: \x1b[1m{self.result.repr()}\x1b[0m")
 
@@ -317,6 +227,7 @@ class SingleFileTest:
   def archive(self) -> PastSingleFileTest:
     return PastSingleFileTest(
       self.file,
+      self.description,
       self.result,
       self.start_date,
       self.end_time - self.start_time,
