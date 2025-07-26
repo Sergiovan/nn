@@ -27,7 +27,11 @@ class RerunType(Enum):
 
 
 def compiler_path_factory() -> Path:
-  return (TEST_DIR / Path("..") / "output" / "Debug" / "nn").resolve().relative_to(THIS_DIR)
+  return (
+    (TEST_DIR / Path("..") / "output" / "Debug" / "nn")
+    .resolve()
+    .relative_to(THIS_DIR, walk_up=True)
+  )
 
 
 def past_runs_toml_path_factory() -> Path:

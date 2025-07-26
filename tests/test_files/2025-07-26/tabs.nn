@@ -1,0 +1,3 @@
+//! RUN : 0
+//! Tabs are valid separation
+		def		fun		main		(		)		{		return		0		;		}   

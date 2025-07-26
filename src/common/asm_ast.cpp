@@ -34,7 +34,9 @@ void AstInstructionRet::into_stream(std::ostream& os) const {
 
 void AstFunctionDef::into_stream(std::ostream& os) const {
   // Temporarily for now
-  os << ".globl _start\n_start:\n  call main\n  ebreak\n\n# Compiled program\n";
+  // Calls main, sets mscratch to 1, then calls debugger
+  os << ".globl _start\n_start:\n  call main\n  csrrwi zero, mscratch, 1\n  "
+        "ebreak\n\n# Compiled program\n";
   os << ".globl " << name << "\n" << name << ":\n";
   for (auto& instruction : instructions) {
     os << *instruction << "\n";

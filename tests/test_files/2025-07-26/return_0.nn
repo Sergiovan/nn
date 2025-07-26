@@ -1,0 +1,3 @@
+//! RUN : 0
+//! Returns 0
+def fun main() => 0;

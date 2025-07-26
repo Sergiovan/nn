@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .monitored_qemu import MonitoredQemu
 from .past_runs import PastSingleFileTest
 from .test_data import CompilerPhase, TestData, TestResult, ProgramOutput, TestExpectations
 
@@ -24,9 +26,14 @@ class SkipTest(Exception):
 
 class SingleFileTest:
   def __init__(self, runner: TestRunner, file: Path, *, test_data: TestData):
+    assert test_data.temp_directory is not None
+
     self.runner = runner
     self.file = file
     self.test_data = test_data
+
+    self.output_dir = test_data.temp_directory / self.file.stem
+    self.output_bin = self.output_dir / "out.bin"
 
     self.result = TestResult.UNKNOWN
 
@@ -54,7 +61,11 @@ class SingleFileTest:
       # Run compiler on it
       self.result = TestResult.PASS  # Just for checking
 
-      compilation_params: list[str] = [str(self.test_data.compiler_path), str(self.file)]
+      compilation_params: list[str] = [
+        str(self.test_data.compiler_path),
+        str(self.file),
+        "--silent",  # Please no extraneous output
+      ]
       match self.test_expectations.stage_reached:
         case CompilerPhase.LEX:
           compilation_params.append("--lex")
@@ -63,7 +74,8 @@ class SingleFileTest:
         case CompilerPhase.CODEGEN:
           compilation_params.append("--codegen")
         case CompilerPhase.RUN:
-          compilation_params += ["-o", self.file]
+          os.makedirs(self.output_dir, exist_ok=True)
+          compilation_params += ["-o", str(self.output_bin.parent / self.output_bin.stem)]
 
       self.compilation_command = " ".join(compilation_params)
       timeout = 5
@@ -76,34 +88,22 @@ class SingleFileTest:
         self.compiler_output.stdout = stdout.decode(errors="backslash").strip()
         self.compiler_output.stderr = stderr.decode(errors="backslash").strip()
       except asyncio.TimeoutError as e:
-        proc.kill()  # Finish him
-        await proc.communicate()
+        try:
+          proc.kill()  # Finish him
+          await proc.communicate()
+        except OSError:
+          pass
         raise Exception(f"Test timed out after {timeout}s") from e
 
       # Compare result with expectation
       assert proc.returncode is not None
       self.compiler_output.retcode = proc.returncode
 
-      if self.test_expectations.stage_reached == CompilerPhase.RUN:
-        if self.compiler_output.retcode != 0:
-          self.result = TestResult.FAIL
-        # TODO Run the executable as well
-      else:
-        if self.compiler_output.retcode != self.test_expectations.stage_reached.compiler_retcode():
-          self.result = TestResult.FAIL
-        elif self.test_expectations.stdout is not None:
-          if self.test_expectations.stdout_exact:
-            if self.compiler_output.stdout != self.test_expectations.stdout:
-              self.result = TestResult.FAIL
-          else:
-            if self.test_expectations.stdout not in self.compiler_output.stdout:
-              self.result = TestResult.FAIL
+      self.check_compiler_expectations()
 
-      if self.test_expectations.xfail:
-        if self.result == TestResult.FAIL:
-          self.result = TestResult.XFAIL
-        elif self.result == TestResult.PASS:
-          self.result = TestResult.XPASS
+      if self.test_expectations.stage_reached == CompilerPhase.RUN and self.result.is_pass():
+        await self.run_executable()
+        self.check_program_expectations()
 
     except SkipTest as e:
       self.result = TestResult.SKIP
@@ -114,6 +114,12 @@ class SingleFileTest:
     finally:
       processing.done = True
       self.end_time = time.perf_counter_ns()
+
+  async def run_executable(self):
+    monitor = MonitoredQemu(self.output_bin, self.output_dir / "socket")
+    await monitor.complete()
+    self.compiled_program_output.retcode = monitor.get_result()
+    self.compiled_program_output.stdout, self.compiled_program_output.stderr = monitor.get_output()
 
   def find_expectations(self, lines: list[str]):
     if len(lines) == 0:
@@ -150,7 +156,6 @@ class SingleFileTest:
           break
         case "RUN":
           self.test_expectations.stage_reached = CompilerPhase.RUN
-          self.test_expectations.retcode = 0
           break
         case "SKIP":
           raise SkipTest(line[line.find("SKIP") + 4 :])
@@ -189,7 +194,7 @@ class SingleFileTest:
               f"Invalid compiler test directive return code in {self.file}: Must be present and be an integer between 0 and 255"
             )
           try:
-            ret = int(tokens[2])
+            ret = int(tokens[1])
             if ret < 0 or ret > 255:
               raise TestSpecificationException(
                 f"Invalid compiler test directive return code in {self.file}: Must be between 0 and 255, is {ret}"
@@ -214,7 +219,52 @@ class SingleFileTest:
             f'Unknown compiler test directive "{0}" in {self.file}: Must be ":" for return code, "=" for stdout equals or "~" for stdout contains'
           )
 
+  def check_compiler_expectations(self):
+    if self.test_expectations.stage_reached == CompilerPhase.RUN:
+      if self.compiler_output.retcode != 0:
+        self.result = TestResult.FAIL
+    else:
+      if self.compiler_output.retcode != self.test_expectations.stage_reached.compiler_retcode():
+        self.result = TestResult.FAIL
+      elif self.test_expectations.stdout is not None:
+        if self.test_expectations.stdout_exact:
+          if self.compiler_output.stdout != self.test_expectations.stdout:
+            self.result = TestResult.FAIL
+        else:
+          if self.test_expectations.stdout not in self.compiler_output.stdout:
+            self.result = TestResult.FAIL
+
+    if self.test_expectations.xfail:
+      if self.result == TestResult.FAIL:
+        self.result = TestResult.XFAIL
+      elif self.result == TestResult.PASS:
+        self.result = TestResult.XPASS
+
+  def check_program_expectations(self):
+    if self.test_expectations.stage_reached != CompilerPhase.RUN:
+      self.result = TestResult.FAIL
+    elif (
+      self.test_expectations.retcode
+      and self.compiled_program_output.retcode != self.test_expectations.retcode
+    ):
+      self.result = TestResult.FAIL
+    elif self.test_expectations.stdout is not None:
+      if self.test_expectations.stdout_exact:
+        if self.compiled_program_output.stdout != self.test_expectations.stdout:
+          self.result = TestResult.FAIL
+      else:
+        if self.test_expectations.stdout not in self.compiled_program_output.stdout:
+          self.result = TestResult.FAIL
+
+    if self.test_expectations.xfail:
+      if self.result == TestResult.FAIL:
+        self.result = TestResult.XFAIL
+      elif self.result == TestResult.PASS:
+        self.result = TestResult.XPASS
+
   def print(self):
+    import traceback
+
     print(f"===== \x1b[1m{self.file.name}\x1b[0m =====")
     print(f"Ran in \x1b[1m{(self.end_time - self.start_time) / 1_000_000_000:.3f}\x1b[0ms")
     print(f"Result: \x1b[1m{self.result.repr()}\x1b[0m")
@@ -229,7 +279,15 @@ class SingleFileTest:
     print(f"Command executed: {self.compilation_command or '<NO COMMAND EXECUTED>'}")
     if self.result == TestResult.ERROR:
       assert self.error is not None
-      print(self.error)
+      error_text = traceback.format_exception(self.error)
+      for line in error_text:
+        print(f"{line}", end="")
+      if self.compiler_output.stdout:
+        print("Compiler stdout:")
+        print("\t" + self.compiler_output.stdout.replace("\n", "\n\t"))
+      if self.compiled_program_output.stdout:
+        print("Program stdout:")
+        print("\t" + self.compiled_program_output.stdout.replace("\n", "\n\t"))
     else:
       if self.compiled_program_output.retcode == -1:  # Didn't run
         print(

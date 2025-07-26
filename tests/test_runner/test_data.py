@@ -16,6 +16,7 @@ LOADING_CHARS = ["⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄", "⡆"]
 @dataclass
 class TestData:
   compiler_path: Path
+  temp_directory: Path | None = serde_field(skip=True, default=None)
 
 
 @dataclass

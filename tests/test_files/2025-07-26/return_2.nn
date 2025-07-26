@@ -1,0 +1,5 @@
+//! RUN : 2
+//! Returns 2
+def fun main() {
+  return 2;
+}

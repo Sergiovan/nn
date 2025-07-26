@@ -1,5 +1,8 @@
 import asyncio
+import tempfile
 import glob
+import os
+import shutil
 import sys
 import termios
 import time
@@ -48,10 +51,13 @@ class TestRunner:
           raise ValueError("No past runs to rerun")
         self.test_files = [x.file for x in self.past_runs.runs[-1].file_tests]
 
-    self.test_data = TestData(self.arguments.compiler_path)
+    self.test_data = TestData(compiler_path=self.arguments.compiler_path)
 
-    self.task_limit = 8
-    self.column_limit = 16
+    terminal_size = shutil.get_terminal_size()
+    cpu_count = os.cpu_count() or 1
+
+    self.task_limit = min(cpu_count // 2, max(len(self.test_files), 1))
+    self.column_limit = terminal_size.columns - 1
 
     self.result_line = 0
     self.result_column = 0
@@ -65,6 +71,8 @@ class TestRunner:
     self.processing_lines = [ProcessingData() for _ in range(self.task_limit)]
 
   def run(self) -> int:
+    self.test_data.temp_directory = Path(tempfile.mkdtemp(prefix="nn_test_")).resolve()
+
     start_time = time.perf_counter_ns()
     res = asyncio.run(self._run())
     end_time = time.perf_counter_ns()
@@ -160,8 +168,14 @@ class TestRunner:
     print("=" * self.column_limit, flush=True)  # And another newline
 
   def _update_screen(self):
-    print(f"\x1b[{2 + self.result_line + len(self.processing_lines) - 1}F", end="", flush=True)
+    backtrack_amount = 2 + self.result_line + len(self.processing_lines) - 1
+    visible_lines = shutil.get_terminal_size().lines
+    backtrack_miss = backtrack_amount - visible_lines
+    print(f"\x1b[{backtrack_amount}F", end="", flush=True)
     for processing in self.processing_lines:
+      if backtrack_miss > 0:
+        backtrack_miss -= 1
+        continue
       if not processing.done:
         processing.advance()
       processing.print()
