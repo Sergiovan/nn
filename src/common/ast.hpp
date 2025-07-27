@@ -1,8 +1,5 @@
 #pragma once
 
-#include <memory>
-#include <type_traits>
-#include <variant>
 #include <vector>
 
 #include "common/token.hpp"
@@ -62,9 +59,10 @@ struct Tagged {
   }
 };
 
-struct AstIndexGuard {};
+class Ast;
 
-using AstIndex = SRContainerIndex<AstIndexGuard>;
+using AstIndex = SRContainerIndex<Ast>;
+using AstContainer = SelfReferentialContainer<Ast>;
 
 /** Empty AST node */
 struct AstNone : Tagged<Tag::NONE> {
@@ -131,15 +129,9 @@ struct AstFunction : Tagged<Tag::FUNCTION> {
 using AstUnion = TaggedUnion<Tag, AstNone, AstInteger, AstIdentifier, AstReturn,
                              AstList, AstFunction>;
 
-class Ast;
-
-using AstContainer = SelfReferentialContainer<Ast, AstIndexGuard>;
-
 /** Wraps over an AST node variant */
 class Ast {
 public:
-  using IndexGuard = AstIndexGuard;
-
   /** Default constructor is an AstNone */
   Ast();
 

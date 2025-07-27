@@ -44,7 +44,7 @@ std::optional<Token> Ast::main_token(const AstContainer& container) const {
     return std::nullopt;
   case FUNCTION: {
     auto& fn = data.get<FUNCTION>();
-    return container[fn.name].main_token(container).value_or(fn.t);
+    return fn.name.from(container).main_token(container).value_or(fn.t);
   }
   case LAST:
     return std::nullopt;
@@ -63,22 +63,22 @@ SourceLocation Ast::source_location(const AstContainer& container) const {
     return data.get<IDENTIFIER>().t.loc;
   case RETURN: {
     auto& ret = data.get<RETURN>();
-    return ret.t.loc + container[ret.child].source_location(container);
+    return ret.t.loc + ret.child.from(container).source_location(container);
   }
   case LIST: {
     auto& list = data.get<LIST>();
     if (list.asts.empty()) {
       return source::nullloc;
     } else if (list.asts.size() == 1) {
-      return container[list.asts.front()].source_location(container);
+      return list.asts.front().from(container).source_location(container);
     } else {
-      return container[list.asts.front()].source_location(container) +
-             container[list.asts.back()].source_location(container);
+      return list.asts.front().from(container).source_location(container) +
+             list.asts.back().from(container).source_location(container);
     }
   }
   case FUNCTION: {
     auto& fn = data.get<FUNCTION>();
-    return fn.t.loc + container[fn.body].source_location(container);
+    return fn.t.loc + fn.body.from(container).source_location(container);
   }
   case LAST:
     return source::nullloc;

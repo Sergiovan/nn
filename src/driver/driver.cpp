@@ -40,17 +40,17 @@ void ast_print_helper(const ast::Ast& ast, const ast::AstContainer& container,
     std::print(ss, "{}", ast.get<IDENTIFIER>().t);
     return;
   case RETURN:
-    ast_print_helper(container[ast.get<RETURN>().child], container, ss);
+    ast_print_helper(ast.get<RETURN>().child.from(container), container, ss);
     return;
   case LIST:
     for (const auto& elem : ast.get<LIST>().asts) {
-      ast_print_helper(container[elem], container, ss);
+      ast_print_helper(elem.from(container), container, ss);
     }
     return;
   case FUNCTION: {
     auto& fn = ast.get<FUNCTION>();
-    ast_print_helper(container[fn.name], container, ss);
-    ast_print_helper(container[fn.body], container, ss);
+    ast_print_helper(fn.name.from(container), container, ss);
+    ast_print_helper(fn.body.from(container), container, ss);
     return;
   }
   case LAST:
@@ -177,22 +177,22 @@ private:
       return elem_node;
     case RETURN: {
       auto& ret = ast.get<RETURN>();
-      u64 child = to_dot_helper(container[ret.child], container);
+      u64 child = to_dot_helper(ret.child.from(container), container);
       std::println(ss, "{} -> {};", elem_node, child);
       return elem_node;
     }
     case LIST: {
       auto& list = ast.get<LIST>();
-      for (auto& elem : list.asts) {
-        u64 child = to_dot_helper(container[elem], container);
+      for (const auto& elem : container.iterate_content(list.asts)) {
+        u64 child = to_dot_helper(elem, container);
         std::println(ss, "{} -> {};", elem_node, child);
       }
       return elem_node;
     }
     case FUNCTION: {
       auto& fn = ast.get<FUNCTION>();
-      u64 name = to_dot_helper(container[fn.name], container);
-      u64 body = to_dot_helper(container[fn.body], container);
+      u64 name = to_dot_helper(fn.name.from(container), container);
+      u64 body = to_dot_helper(fn.body.from(container), container);
       std::println(ss, "{} -> {} [label=\"name\"];", elem_node, name);
       std::println(ss, "{} -> {} [label=\"body\"];", name, body);
       return elem_node;

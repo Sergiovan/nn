@@ -1,0 +1,9 @@
+-- ASDL's 4 builtin types are:
+-- identifier, int, string, constant
+
+program = Program(function fn)
+function = Function(string name, instruction* instructions)
+instruction = Li(immediate src, register dest) | Ret
+immediate = Immediate(int value)
+register = Register
+operand = Register | Immediate(int value)

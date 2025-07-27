@@ -206,7 +206,7 @@ AstIndex Parser::add_ast(const ast::Ast& ast) {
 }
 
 Ast& Parser::get(AstIndex idx) {
-  return container[idx];
+  return idx.from(container);
 }
 
 bool Parser::is(TokenType tt) {

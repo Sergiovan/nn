@@ -21,8 +21,7 @@ const AstProgram& AsmParser::get() {
 AstProgram AsmParser::program(const ast::Ast& ast) {
   auto& list = ast.get<ast::AstList>();
 
-  for (auto& ast_idx : list.asts) {
-    auto& ast = ast_container[ast_idx];
+  for (const auto& ast : ast_container.iterate_content(list.asts)) {
     ast.require<ast::AstFunction>();
     return AstProgram{parse_function_definition(ast)};
   }
@@ -36,9 +35,9 @@ AstFunctionDef AsmParser::parse_function_definition(const ast::Ast& ast) {
 
   auto& fn = ast.get<ast::AstFunction>();
 
-  def.name = ast_container[fn.name].source_location(ast_container).get();
+  def.name = fn.name.from(ast_container).source_location(ast_container).get();
   auto prev = add_block(def.instructions);
-  parse_list(ast_container[fn.body]);
+  parse_list(fn.body.from(ast_container));
   add_block(prev);
 
   return def;
@@ -47,8 +46,7 @@ AstFunctionDef AsmParser::parse_function_definition(const ast::Ast& ast) {
 void AsmParser::parse_list(const ast::Ast& ast) {
   auto& list = ast.get<ast::AstList>();
 
-  for (auto& ast_idx : list.asts) {
-    auto& ast = ast_container[ast_idx];
+  for (const auto& ast : ast_container.iterate_content(list.asts)) {
     switch (ast.get_tag()) {
       using enum ast::Tag;
     case RETURN:
@@ -62,7 +60,7 @@ void AsmParser::parse_list(const ast::Ast& ast) {
 
 void AsmParser::parse_return(const ast::Ast& ast) {
   auto& ret = ast.get<ast::AstReturn>();
-  auto& child = ast_container[ret.child];
+  auto& child = ret.child.from(ast_container);
 
   if (child.is_a<ast::AstInteger>()) {
     add_to_block(
