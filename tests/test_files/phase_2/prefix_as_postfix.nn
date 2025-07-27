@@ -1,0 +1,5 @@
+//! PARSE
+//! DESC(Prefix operators can't be postfix operators)
+def fun main() {
+  return 4-;
+}

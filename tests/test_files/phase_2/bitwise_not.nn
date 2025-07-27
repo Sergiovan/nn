@@ -1,0 +1,3 @@
+//! RUN(-13)
+//! DESC(Bitwise not works as expected)
+def fun main() => !12;

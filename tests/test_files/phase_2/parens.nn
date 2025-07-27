@@ -1,0 +1,3 @@
+//! RUN(-2)
+//! DESC(Parenthesis wrap an expression)
+def fun main() => (-2);

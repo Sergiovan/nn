@@ -92,6 +92,17 @@ class TestRunner:
       test.print()
       self.test_time += test.end_time - test.start_time
 
+    def count(x: TestResult) -> int:
+      return sum(1 for test in self.file_tests if test.result == x)
+
+    if skipped := count(TestResult.SKIP):
+      print(f"SKIPPED: {skipped}")
+    if failures := count(TestResult.FAIL):
+      print(f"FAILURES: {failures}")
+    if errors := count(TestResult.ERROR):
+      print(f"ERRORS: {errors}")
+    if xpasses := count(TestResult.XPASS):
+      print(f"Unexpected passes: {xpasses}")
     print(
       f"Finished in {(end_time - start_time) / 1_000_000_000:.3f}s, real test time was {self.test_time / 1_000_000_000:.3f}s"
     )
@@ -123,6 +134,10 @@ class TestRunner:
           if filter in str(test_file):
             filtered_tests_set.add(test_file)
       filtered_tests: list[Path] = list(filtered_tests_set)
+
+      self.task_limit = max(min(len(filtered_tests), self.task_limit), 1)
+      self.processing_lines = [ProcessingData() for _ in range(self.task_limit)]
+
     if len(filtered_tests) == 0:
       print("Nothing to do")
       return 0

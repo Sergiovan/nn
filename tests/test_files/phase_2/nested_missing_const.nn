@@ -1,0 +1,3 @@
+//! PARSE
+//! DESC(Nested unary operators need to operate on something)
+def fun main() => -!;

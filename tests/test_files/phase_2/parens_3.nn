@@ -1,0 +1,5 @@
+//! RUN(4)
+//! DESC(Double negation through parenthesis works)
+def fun main() {
+  return -(-4);
+}

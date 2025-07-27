@@ -1,0 +1,5 @@
+//! RUN(-3)
+//! DESC(Parens wrapping an expression that is then operated on works)
+def fun main() {
+  return !(2);
+}

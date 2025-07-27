@@ -1,0 +1,5 @@
+//! PARSE
+//! DESC(Unary operators may not be parenthesized)
+def fun main() {
+  return (-)3;
+}

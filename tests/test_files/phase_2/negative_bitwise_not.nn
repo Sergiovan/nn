@@ -1,0 +1,5 @@
+//! RUN(1)
+//! DESC(Bitwise not followed by negation works)
+def fun main() {
+  return -!0;
+}

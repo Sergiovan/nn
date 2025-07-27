@@ -1,0 +1,5 @@
+//! RUN(1)
+//! DESC(Take bitwise not of minimum possible value)
+def fun main() {
+  return !-2147483647; // Not 2147483648 because that's not a valid positive int32
+}

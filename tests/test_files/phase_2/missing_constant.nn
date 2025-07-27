@@ -1,0 +1,3 @@
+//! PARSE
+//! DESC(Prefix operators must have an expression/constant after)
+def fun main() => !;

@@ -1,0 +1,5 @@
+//! RUN(-2147483647)
+//! DESC(Negative of largest int32 works)
+def fun main() {
+  return -2147483647;
+}

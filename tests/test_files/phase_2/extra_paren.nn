@@ -1,0 +1,5 @@
+//! PARSE
+//! DESC(Parenthesized expressions must have an opening paren)
+def fun main() {
+  return (3));
+}

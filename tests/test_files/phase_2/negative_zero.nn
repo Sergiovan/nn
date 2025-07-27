@@ -1,0 +1,5 @@
+//! RUN(-0)
+//! DESC(Negative zero is zero)
+def fun main() {
+  return -0;
+}

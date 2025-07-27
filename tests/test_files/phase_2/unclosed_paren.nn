@@ -1,0 +1,3 @@
+//! PARSE
+//! DESC(Parenthesized expressions need a closing paren)
+def fun main() => (1;

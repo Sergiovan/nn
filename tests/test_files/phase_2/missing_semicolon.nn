@@ -1,0 +1,5 @@
+//! PARSE
+//! DESC(Unary expressions need parenthesis still)
+def fun main() {
+  return -5
+}

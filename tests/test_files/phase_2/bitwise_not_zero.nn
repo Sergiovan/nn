@@ -1,0 +1,5 @@
+//! RUN(-2147483648)
+//! DESC(Bitwise not of 0 works as well)
+def fun main() {
+  return !0;
+}
