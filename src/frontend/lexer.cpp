@@ -92,6 +92,14 @@ Token Lexer::next() {
           tt = TokenType::SYM_CLOSE_BRACE;
         } else if (keyword == ";") {
           tt = TokenType::SYM_SEMICOLON;
+        } else if (keyword == "-") {
+          tt = TokenType::SYM_MINUS;
+        } else if (keyword == "--") {
+          tt = TokenType::SYM_MINUS_MINUS;
+        } else if (keyword == "!") {
+          tt = TokenType::SYM_BANG;
+        } else if (keyword == "!!") {
+          tt = TokenType::SYM_BANG_BANG;
         }
 
         reset_state();
@@ -165,6 +173,8 @@ void Lexer::handle_find(c8 c) {
   case ';':
   case '=':
   case '/':
+  case '-':
+  case '!':
     state = SYMBOL;
     break;
   case '\0':
@@ -224,24 +234,43 @@ bool Lexer::handle_symbol(c8 c) {
     case '/':
       substate = SYMBOL_FORWARD_SLASH;
       return true;
+    case '-':
+      substate = SYMBOL_MINUS;
+      return true;
+    case '!':
+      substate = SYMBOL_BANG;
+      return true;
     default:
       return false;
     }
   case SYMBOL_EQUAL:
+    substate = SYMBOL_DONE;
     if (c == '>') {
-      substate = SYMBOL_DONE;
+      return true;
+    }
+    return false;
+  case SYMBOL_FORWARD_SLASH:
+    substate = SYMBOL_DONE;
+    if (c == '/') {
+      state = LexerState::COMMENT;
+      return true;
+    }
+
+    return true;
+  case SYMBOL_MINUS:
+    substate = SYMBOL_DONE;
+    if (c == '-') {
+      return true;
+    }
+    return false;
+  case SYMBOL_BANG:
+    substate = SYMBOL_DONE;
+    if (c == '!') {
       return true;
     }
     return false;
   case SYMBOL_DONE:
     return false;
-  case SYMBOL_FORWARD_SLASH:
-    if (c == '/') {
-      state = LexerState::COMMENT;
-      return true;
-    }
-    substate = SYMBOL_DONE;
-    return true;
   }
 }
 

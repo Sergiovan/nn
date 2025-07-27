@@ -1,6 +1,5 @@
 #pragma once
-#include <print>
-#include <span>
+#include <print> // IWYU pragma: keep
 #include <type_traits>
 
 #include "common/source.hpp"
@@ -38,6 +37,14 @@ enum class TokenType : u16 {
 
   /* Symbol token `+` */
   // SYM_PLUS,
+  /* Symbol token `-` */
+  SYM_MINUS,
+  /* Symbol token `--` */
+  SYM_MINUS_MINUS,
+  /* Symbol token `!` */
+  SYM_BANG,
+  /* Symbol token `!!` */
+  SYM_BANG_BANG,
   /* Symbol token `=>` */
   SYM_STRONG_ARROW_RIGHT,
   /* Symbol token `(` */
@@ -66,52 +73,65 @@ struct std::formatter<token::TokenType> : std::formatter<std::string_view> {
   auto format(const token::TokenType& tok, std::format_context& ctx) const {
     std::string name = "UNKNOWN_UNKNOWN";
     switch (tok) {
-    case token::TokenType::UNKNOWN:
+      using enum token::TokenType;
+    case UNKNOWN:
       name = "KNOWN_UNKNOWN";
       break;
-    case token::TokenType::POISON:
+    case POISON:
       name = "POISON";
       break;
-    case token::TokenType::END:
+    case END:
       name = "END";
       break;
-    case token::TokenType::WHITESPACE:
+    case WHITESPACE:
       name = "WHITESPACE";
       break;
-    case token::TokenType::COMMENT:
+    case COMMENT:
       name = "COMMENT";
       break;
-    case token::TokenType::IDENTIFIER:
+    case IDENTIFIER:
       name = "IDENTIFIER";
       break;
-    case token::TokenType::INTEGER:
+    case INTEGER:
       name = "INTEGER";
       break;
-    case token::TokenType::KW_DEF:
+    case KW_DEF:
       name = "KW_DEF";
       break;
-    case token::TokenType::KW_FUN:
+    case KW_FUN:
       name = "KW_FUN";
       break;
-    case token::TokenType::KW_RETURN:
+    case KW_RETURN:
       name = "KW_RETURN";
       break;
-    case token::TokenType::SYM_STRONG_ARROW_RIGHT:
+    case SYM_MINUS:
+      name = "SYM_MINUS";
+      break;
+    case SYM_MINUS_MINUS:
+      name = "SYM_MINUS_MINUS";
+      break;
+    case SYM_BANG:
+      name = "SYM_BANG";
+      break;
+    case SYM_BANG_BANG:
+      name = "SYM_BANG_BANG";
+      break;
+    case SYM_STRONG_ARROW_RIGHT:
       name = "SYM_STRONG_ARROW_RIGHT";
       break;
-    case token::TokenType::SYM_OPEN_PAREN:
+    case SYM_OPEN_PAREN:
       name = "SYM_OPEN_PAREN";
       break;
-    case token::TokenType::SYM_CLOSE_PAREN:
+    case SYM_CLOSE_PAREN:
       name = "SYM_CLOSE_PAREN";
       break;
-    case token::TokenType::SYM_OPEN_BRACE:
+    case SYM_OPEN_BRACE:
       name = "SYM_OPEN_BRACE";
       break;
-    case token::TokenType::SYM_CLOSE_BRACE:
+    case SYM_CLOSE_BRACE:
       name = "SYM_CLOSE_BRACE";
       break;
-    case token::TokenType::SYM_SEMICOLON:
+    case SYM_SEMICOLON:
       name = "SYM_SEMICOLON";
       break;
     }

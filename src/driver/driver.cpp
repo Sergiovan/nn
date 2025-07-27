@@ -310,7 +310,7 @@ int Driver::run() {
 
   if (error_manager.has_errors()) {
     error_manager.print_all_simple();
-    return 2;
+    return lexer.had_error() ? 1 : 2;
   }
 
   if (get_option(Option::StopAfterParse)) {
