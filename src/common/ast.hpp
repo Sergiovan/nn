@@ -8,285 +8,191 @@
 #include "common/token.hpp"
 #include "util/assert.hpp"
 
+#include "util/self_referential_container.hpp"
+#include "util/tagged_union.hpp"
+
 namespace ast {
+enum class Tag {
+  NONE,
+  INTEGER,
+  IDENTIFIER,
+  RETURN,
+  LIST,
+  FUNCTION,
+
+  LAST,
+  FIRST = NONE
+};
+
+static_assert(constrained_enum<Tag>, "ast::Tag is not a constrained union");
+} // namespace ast
+
+template <>
+struct std::formatter<ast::Tag> {
+  constexpr auto parse(std::format_parse_context& ctx) {
+    return ctx.begin();
+  }
+
+  constexpr auto format(const ast::Tag& id, std::format_context& ctx) const {
+    switch (id) {
+    case ast::Tag::NONE:
+      return std::format_to(ctx.out(), "NONE");
+    case ast::Tag::INTEGER:
+      return std::format_to(ctx.out(), "INTEGER");
+    case ast::Tag::IDENTIFIER:
+      return std::format_to(ctx.out(), "IDENTIFIER");
+    case ast::Tag::RETURN:
+      return std::format_to(ctx.out(), "RETURN");
+    case ast::Tag::LIST:
+      return std::format_to(ctx.out(), "LIST");
+    case ast::Tag::FUNCTION:
+      return std::format_to(ctx.out(), "FUNCTION");
+    case ast::Tag::LAST:
+      return std::format_to(ctx.out(), "LAST");
+    }
+  }
+};
+
+namespace ast {
+
+template <Tag tag>
+struct Tagged {
+  constexpr static Tag union_tag() {
+    return tag;
+  }
+};
+
+struct AstIndexGuard {};
+
+using AstIndex = SRContainerIndex<AstIndexGuard>;
+
+/** Empty AST node */
+struct AstNone : Tagged<Tag::NONE> {
+  AstNone() {}
+};
+
+/** AST node that contains a token */
+struct AstToken {
+  AstToken(const token::Token& t) : t{t} {}
+  token::Token t;
+};
+
+/** AST node that contains a compile time integer */
+struct AstInteger : AstToken, Tagged<Tag::INTEGER> {
+  using AstToken::AstToken;
+};
+
+/** AST node that contains an nn identifier */
+struct AstIdentifier : AstToken, Tagged<Tag::IDENTIFIER> {
+  using AstToken::AstToken;
+};
+
+/** Base struct for AST nodes that contain one other AST node */
+struct AstUnary {
+  AstUnary(const token::Token& t, AstIndex idx) : t{t}, child{idx} {}
+  token::Token t;
+  AstIndex child;
+};
+
+/** AST node representing a return statement */
+struct AstReturn : AstUnary, Tagged<Tag::RETURN> {
+  using AstUnary::AstUnary;
+};
+
+/** Base struct for AST nodes that contain two other AST nodes */
+struct AstBinary {
+  AstBinary(const token::Token& t, AstIndex lhs, AstIndex rhs)
+      : t{t}, lhs{lhs}, rhs{rhs} {}
+
+  token::Token t;
+
+  AstIndex lhs;
+  AstIndex rhs;
+};
+
+/** Base struct for AST nodes that contain a list of other AST nodes */
+struct AstList : Tagged<Tag::LIST> {
+  AstList(const std::vector<AstIndex>& asts = {}) : asts{asts} {}
+
+  std::vector<AstIndex> asts;
+};
+
+/** AST node that represents a runnable function */
+struct AstFunction : Tagged<Tag::FUNCTION> {
+  AstFunction(const token::Token& t, AstIndex name, AstIndex body)
+      : t{t}, name{name}, body{body} {}
+
+  token::Token t;
+  AstIndex name;
+  AstIndex body;
+};
+
+/** Variant that contains all possible ASTs */
+using AstUnion = TaggedUnion<Tag, AstNone, AstInteger, AstIdentifier, AstReturn,
+                             AstList, AstFunction>;
 
 class Ast;
 
-using AstPtr = std::unique_ptr<Ast>;
-
-/** Base for all AST nodes */
-struct AstBase {};
-
-template <typename T>
-concept AstLike = std::is_base_of_v<AstBase, T> && requires(const T t) {
-  T::_name;
-  { t.get_name() } -> std::same_as<const char*>;
-  { t.main_token() } -> std::same_as<std::optional<token::Token>>;
-  { t.source_location() } -> std::same_as<source::SourceLocation>;
-};
-
-/** Empty AST node */
-struct AstNone : AstBase {
-  constexpr static const char* _name = "AstNone";
-  constexpr const char* get_name() const {
-    return _name;
-  }
-
-  std::optional<token::Token> main_token() const;
-  source::SourceLocation source_location() const;
-};
-static_assert(AstLike<AstNone>);
-static_assert(std::is_trivially_copy_constructible_v<AstNone>);
-static_assert(std::is_trivially_move_constructible_v<AstNone>);
-static_assert(std::is_trivially_copy_assignable_v<AstNone>);
-static_assert(std::is_trivially_move_assignable_v<AstNone>);
-static_assert(std::is_trivially_destructible_v<AstNone>);
-
-/** AST node that contains a token */
-struct AstToken : AstBase {
-  constexpr static const char* _name = "AstToken";
-  constexpr const char* get_name() const {
-    return _name;
-  }
-  AstToken(token::Token t);
-
-  std::optional<token::Token> main_token() const;
-  source::SourceLocation source_location() const;
-
-  token::Token t;
-};
-static_assert(AstLike<AstToken>);
-
-/** AST node that contains a compile time integer */
-struct AstInteger : AstToken {
-  constexpr static const char* _name = "AstInteger";
-  constexpr const char* get_name() const {
-    return _name;
-  }
-  using AstToken::AstToken;
-};
-static_assert(AstLike<AstInteger>);
-
-/** AST node that contains an nn identifier */
-struct AstIdentifier : AstToken {
-  constexpr static const char* _name = "AstIdentifier";
-  constexpr const char* get_name() const {
-    return _name;
-  }
-  using AstToken::AstToken;
-};
-static_assert(AstLike<AstIdentifier>);
-
-/** Base struct for AST nodes that contain one other AST node */
-struct AstUnary : AstBase {
-  constexpr static const char* _name = "AstUnary";
-  constexpr const char* get_name() const {
-    return _name;
-  }
-  AstUnary(token::Token t, Ast&& other);
-
-  std::optional<token::Token> main_token() const;
-  source::SourceLocation source_location() const;
-
-  token::Token t;
-  AstPtr child;
-};
-static_assert(AstLike<AstUnary>);
-
-/** AST node representing a return statement */
-struct AstReturn : AstUnary {
-  constexpr static const char* _name = "AstReturn";
-  constexpr const char* get_name() const {
-    return _name;
-  }
-  using AstUnary::AstUnary;
-};
-static_assert(AstLike<AstReturn>);
-
-/** Base struct for AST nodes that contain two other AST nodes */
-struct AstBinary : AstBase {
-  constexpr static const char* _name = "AstBinary";
-  constexpr const char* get_name() const {
-    return _name;
-  }
-  AstBinary(token::Token t, Ast&& lhs, Ast&& rhs);
-
-  std::optional<token::Token> main_token() const;
-  source::SourceLocation source_location() const;
-
-  token::Token t;
-
-  AstPtr lhs;
-  AstPtr rhs;
-};
-static_assert(AstLike<AstBinary>);
-
-/** Base struct for AST nodes that contain a list of other AST nodes */
-struct AstList : AstBase {
-  constexpr static const char* _name = "AstList";
-
-  AstList();
-  AstList(std::vector<AstPtr>&& asts);
-  constexpr const char* get_name() const {
-    return _name;
-  }
-
-  std::optional<token::Token> main_token() const;
-  source::SourceLocation source_location() const;
-  std::vector<AstPtr> asts;
-};
-static_assert(AstLike<AstList>);
-
-/** AST node that represents a runnable function */
-struct AstFunction : AstBase {
-  constexpr static const char* _name = "AstFunction";
-
-  AstFunction(token::Token t, Ast&& name, Ast&& body);
-
-  std::optional<token::Token> main_token() const;
-  source::SourceLocation source_location() const;
-
-  constexpr const char* get_name() const {
-    return _name;
-  }
-  token::Token t;
-  AstPtr name;
-  AstPtr body;
-};
-static_assert(AstLike<AstFunction>);
-
-/** Variant that contains all possible ASTs */
-using AstVariant =
-    std::variant<AstNone, AstToken, AstInteger, AstIdentifier, AstUnary,
-                 AstReturn, AstBinary, AstList, AstFunction>;
+using AstContainer = SelfReferentialContainer<Ast, AstIndexGuard>;
 
 /** Wraps over an AST node variant */
 class Ast {
 public:
+  using IndexGuard = AstIndexGuard;
+
   /** Default constructor is an AstNone */
   Ast();
 
-  Ast(const Ast&) = delete;
-  Ast& operator=(const Ast&) = delete;
-
-  Ast(Ast&&) = default;
-  Ast& operator=(Ast&&) = default;
-
-  template <AstLike T>
-  Ast(T&& other) : data{std::move(other)} {}
-
-  template <AstLike T>
-  Ast& operator=(T&& other) {
-    data = std::move(other);
-    return *this;
-  }
-
-  /** Gets the inner AST struct */
-  AstBase& get();
+  template <typename T>
+    requires(AstUnion::contains_type<T>())
+  Ast(const T& t) : data{t} {}
 
   /** Gets the display name of this AST node type */
-  const char* get_name();
+  const char* get_name() const;
   /** Returns the main token for this AST node */
-  std::optional<token::Token> main_token() const;
+  std::optional<token::Token> main_token(const AstContainer& container) const;
   /** Returns the source location for this AST node */
-  source::SourceLocation source_location() const;
+  source::SourceLocation source_location(const AstContainer& container) const;
 
-  template <AstLike T>
-  bool has() const {
-    return std::holds_alternative<T>(data);
+  Tag get_tag() const;
+
+  template <has_tag<Tag> T>
+  bool is_a() const {
+    return data.get_tag() == T::union_tag();
   }
 
-  template <AstLike T, AstLike U, AstLike... Vs>
-  bool has() const {
-    return has<T>() || has<U>() || (has<Vs> || ...);
-  }
+  bool is_a(Tag tag) const;
 
-  template <AstLike T>
+  template <has_tag<Tag> T>
   void require() const {
-    nn_assert(has<T>());
+    nn_assert(is_a<T>());
   }
 
-  template <AstLike T, AstLike U, AstLike... Vs>
-  void require() const {
-    nn_assert((has<T, U, Vs...>()));
+  void require(Tag tag) const;
+
+  template <typename T>
+  auto& get() {
+    return data.get<T>();
   }
 
-  /** Gets the inner AST struct with the proper type, if that is
-      the current AST struct */
-  template <AstLike T>
-  T& get() {
-    require<T>();
-
-    return std::get<T>(data);
+  template <Tag tag>
+  auto& get() {
+    return data.get<tag>();
   }
 
-  /** Gets the inner AST struct with the proper type, if that is
-      the current AST struct... but const */
-  template <AstLike T>
-  const T& get() const {
-    require<T>();
-
-    return std::get<T>(data);
+  template <typename T>
+  const auto& get() const {
+    return data.get<T>();
   }
 
-  /** Conditionally gets the inner AST struct if it is of a certain
-      type, otherwise nullopt */
-  template <AstLike T>
-  std::optional<T*> get_if() {
-    if (has<T>()) {
-      return &std::get<T>(data);
-    } else {
-      return std::nullopt;
-    }
+  template <Tag tag>
+  const auto& get() const {
+    return data.get<tag>();
   }
-
-  /** Conditionally gets the inner AST struct if it is of a certain
-      type, otherwise nullopt */
-  template <AstLike T>
-  std::optional<T const*> get_if() const {
-    if (has<T>()) {
-      return &std::get<T>(data);
-    } else {
-      return std::nullopt;
-    }
-  }
-
-  /** Invokes a function on the inner AST struct if it is of the 
-      proper type */
-  template <AstLike T, std::invocable<T&> F>
-  auto visit(F&& f) -> std::invoke_result_t<F, T&> {
-    require<T>();
-
-    return std::visit(std::forward<F>(f), data);
-  }
-
-  /** Invokes a function on the inner AST struct if it is of the 
-      proper type */
-  template <AstLike T, std::invocable<T&> F>
-  auto visit(F&& f) const -> std::invoke_result_t<F, const T&> {
-    require<T>();
-
-    return std::visit(std::forward<F>(f), data);
-  }
-
-  /** Invokes a function on the inner AST struct */
-  template <typename F>
-  auto visit(F&& f) -> std::invoke_result_t<F, AstNone&> {
-    return std::visit(std::forward<F>(f), data);
-  }
-
-  /** Invokes a function on the inner AST struct */
-  template <typename F>
-  auto visit(F&& f) const -> std::invoke_result_t<F, const AstNone&> {
-    return std::visit(std::forward<F>(f), data);
-  }
-
-  /* Converts this into an AstPtr */
-  AstPtr as_ptr() &&;
 
 private:
   /** Inner AST struct */
-  AstVariant data;
+  AstUnion data;
 };
 
 } // namespace ast

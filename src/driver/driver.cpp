@@ -15,43 +15,47 @@
 #include "frontend/parser.hpp"
 #include "transform/asm_parser.hpp"
 #include "util/format.hpp" // IWYU pragma: keep
+#include "util/scope_guard.hpp"
 
 using namespace driver;
 namespace fs = std::filesystem;
 
 /** Prints an AST `ast` into `ss`. Recursively prints all ASTs it finds inside */
-void ast_print_helper(ast::Ast& ast, std::stringstream& ss) {
+void ast_print_helper(const ast::Ast& ast, const ast::AstContainer& container,
+                      std::stringstream& ss) {
   using namespace ast;
   ss << "(" << ast.get_name() << " ";
-  ast.visit([&ss]<AstLike T>(T& ast) {
-    if constexpr (std::is_same_v<T, AstNone>) {
-      // Nothing
-    } else if constexpr (std::is_same_v<T, AstToken>) {
-      std::print(ss, "{}", ast.t);
-    } else if constexpr (std::is_same_v<T, AstInteger>) {
-      std::print(ss, "{}", ast.t);
-    } else if constexpr (std::is_same_v<T, AstIdentifier>) {
-      std::print(ss, "{}", ast.t);
-    } else if constexpr (std::is_same_v<T, AstUnary>) {
-      ast_print_helper(*ast.child, ss);
-    } else if constexpr (std::is_same_v<T, AstReturn>) {
-      ast_print_helper(*ast.child, ss);
-    } else if constexpr (std::is_same_v<T, AstBinary>) {
-      ast_print_helper(*ast.lhs, ss);
-      ast_print_helper(*ast.rhs, ss);
-    } else if constexpr (std::is_same_v<T, AstList>) {
-      for (auto& elem : ast.asts) {
-        ast_print_helper(*elem, ss);
-      }
-    } else if constexpr (std::is_same_v<T, AstFunction>) {
-      ast_print_helper(*ast.name, ss);
-      ast_print_helper(*ast.body, ss);
-    }
+  ScopeGuard sg = [&ss]() {
+    ss << ")";
+  };
 
-    // Comment
-    return 0;
-  });
-  ss << ")";
+  switch (ast.get_tag()) {
+    using enum ast::Tag;
+  case NONE: // Nothing;
+    return;
+  case INTEGER:
+    std::print(ss, "{}", ast.get<INTEGER>().t);
+    return;
+  case IDENTIFIER:
+    std::print(ss, "{}", ast.get<IDENTIFIER>().t);
+    return;
+  case RETURN:
+    ast_print_helper(container[ast.get<RETURN>().child], container, ss);
+    return;
+  case LIST:
+    for (const auto& elem : ast.get<LIST>().asts) {
+      ast_print_helper(container[elem], container, ss);
+    }
+    return;
+  case FUNCTION: {
+    auto& fn = ast.get<FUNCTION>();
+    ast_print_helper(container[fn.name], container, ss);
+    ast_print_helper(container[fn.body], container, ss);
+    return;
+  }
+  case LAST:
+  }
+  unreachable;
 }
 
 /** Prints the output of `ast_print_helper` in a "readable" manner */
@@ -133,10 +137,10 @@ std::string escape_dot(std::string in) {
 class DotWriter {
 public:
   /** Converts ast `ast` into a dot format string */
-  auto to_dot(ast::Ast& ast) {
+  auto to_dot(const ast::Ast& ast, const ast::AstContainer& container) {
     ss << "digraph AST {\n";
     ss << "node [shape=record];\n";
-    to_dot_helper(ast);
+    to_dot_helper(ast, container);
     ss << "}";
 
     return ss.str();
@@ -145,7 +149,7 @@ public:
 private:
   /** Recursively converst the given ast into dot format strings.
       Returns the dot ID of the ast it parsed */
-  u64 to_dot_helper(ast::Ast& ast) {
+  u64 to_dot_helper(const ast::Ast& ast, const ast::AstContainer& container) {
     using namespace ast;
 
     u64 elem_node = counter++;
@@ -154,48 +158,49 @@ private:
     label << "{";
     label << ast.get_name();
     label << "(" << elem_node << ")";
-    label << escape_dot(std::format("| {} ", ast.source_location().get()));
+    label << escape_dot(
+        std::format("| {} ", ast.source_location(container).get()));
 
-    ast.visit([this, &label, elem_node]<AstLike T>(T& ast) {
-      if constexpr (std::is_same_v<T, AstNone>) {
-        // Nothing
-      } else if constexpr (std::is_same_v<T, AstToken>) {
-        label << escape_dot(std::format("| {}", ast.t));
-      } else if constexpr (std::is_same_v<T, AstInteger>) {
-        label << escape_dot(std::format("| {}", ast.t));
-      } else if constexpr (std::is_same_v<T, AstIdentifier>) {
-        label << escape_dot(std::format("| {}", ast.t));
-      } else if constexpr (std::is_same_v<T, AstUnary>) {
-        u64 child = to_dot_helper(*ast.child);
-        std::println(ss, "{} -> {};", elem_node, child);
-      } else if constexpr (std::is_same_v<T, AstReturn>) {
-        u64 child = to_dot_helper(*ast.child);
-        std::println(ss, "{} -> {};", elem_node, child);
-      } else if constexpr (std::is_same_v<T, AstBinary>) {
-        u64 lhs = to_dot_helper(*ast.lhs);
-        u64 rhs = to_dot_helper(*ast.rhs);
+    ScopeGuard sg = [this, elem_node, &label]() {
+      std::println(ss, "{} [label=\"{}}}\"];", elem_node, label.str());
+    };
 
-        std::println(ss, "{} -> {};", elem_node, lhs);
-        std::println(ss, "{} -> {};", elem_node, rhs);
-      } else if constexpr (std::is_same_v<T, AstList>) {
-        for (auto& elem : ast.asts) {
-          u64 child = to_dot_helper(*elem);
-          std::println(ss, "{} -> {};", elem_node, child);
-        }
-      } else if constexpr (std::is_same_v<T, AstFunction>) {
-        u64 name = to_dot_helper(*ast.name);
-        u64 body = to_dot_helper(*ast.body);
-        std::println(ss, "{} -> {} [label=\"name\"];", elem_node, name);
-        std::println(ss, "{} -> {} [label=\"body\"];", name, body);
+    switch (ast.get_tag()) {
+      using enum ast::Tag;
+    case NONE: // Nothing
+      return elem_node;
+    case INTEGER:
+      label << escape_dot(std::format("| {}", ast.get<INTEGER>().t));
+      return elem_node;
+    case IDENTIFIER:
+      label << escape_dot(std::format("| {}", ast.get<IDENTIFIER>().t));
+      return elem_node;
+    case RETURN: {
+      auto& ret = ast.get<RETURN>();
+      u64 child = to_dot_helper(container[ret.child], container);
+      std::println(ss, "{} -> {};", elem_node, child);
+      return elem_node;
+    }
+    case LIST: {
+      auto& list = ast.get<LIST>();
+      for (auto& elem : list.asts) {
+        u64 child = to_dot_helper(container[elem], container);
+        std::println(ss, "{} -> {};", elem_node, child);
       }
+      return elem_node;
+    }
+    case FUNCTION: {
+      auto& fn = ast.get<FUNCTION>();
+      u64 name = to_dot_helper(container[fn.name], container);
+      u64 body = to_dot_helper(container[fn.body], container);
+      std::println(ss, "{} -> {} [label=\"name\"];", elem_node, name);
+      std::println(ss, "{} -> {} [label=\"body\"];", name, body);
+      return elem_node;
+    }
+    case LAST:
+    }
 
-      // Comment
-      return 0;
-    });
-
-    std::println(ss, "{} [label=\"{}}}\"];", elem_node, label.str());
-
-    return elem_node;
+    unreachable;
   }
 
   u64 counter{0};
@@ -262,15 +267,15 @@ int Driver::run() {
   if (get_option(Option::StopAfterLex)) {
     auto tokens = lexer.collect();
     if (!silent) {
-      std::println(std::cerr, "[  LEN: {}", tokens.size());
+      std::println(std::cerr, "[ LEN: {}", tokens.size());
       u64 padding = std::to_string(tokens.size() - 1).length();
       for (auto [i, tok] : std::views::enumerate(tokens)) {
         if (tok.tt == token::TokenType::WHITESPACE) {
           continue;
         }
 
-        std::cerr << "  " << std::setw(static_cast<int>(padding)) << std::left
-                  << i << "# " << std::format("{}", tok) << ",";
+        std::cerr << "  " << std::setw(static_cast<int>(padding)) << std::right
+                  << i << "# " << std::format("{}", tok) << ",\n";
         // See assert.hpp for why this line is off
         // std::println(std::cerr, "  {:>{}}# {},", i, padding, tok);
       }
@@ -287,17 +292,17 @@ int Driver::run() {
 
   parser::Parser p{lexer, error_manager};
 
-  auto r = p.parse();
+  auto [ast, container] = p.parse();
 
   if (get_option(Option::StopAfterParse)) {
     if (!silent) {
       if (get_option(Option::ParseShowDot)) {
         DotWriter dw{};
 
-        std::print(std::cerr, "{}", dw.to_dot(r));
+        std::print(std::cerr, "{}", dw.to_dot(ast, container));
       } else {
         std::stringstream ss{};
-        ast_print_helper(r, ss);
+        ast_print_helper(ast, container, ss);
         lispy_print(std::cerr, ss.str());
       }
     }
@@ -312,7 +317,7 @@ int Driver::run() {
     return 0;
   }
 
-  asm_parser::AsmParser ap{r};
+  asm_parser::AsmParser ap{ast, container};
 
   auto& asm_output = ap.get();
 

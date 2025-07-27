@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "common/source.hpp"
 
 using namespace ast;
 
@@ -7,101 +8,92 @@ using token::Token;
 
 Ast::Ast() : data{AstNone{}} {}
 
-AstBase& Ast::get() {
-  return visit([](AstBase& s) -> auto& {
-    return s;
-  });
-}
-
-const char* Ast::get_name() {
-  return visit([](AstLike auto& ast) -> const char* {
-    return ast.get_name();
-  });
-}
-
-std::optional<Token> Ast::main_token() const {
-  return visit([](AstLike auto& ast) -> std::optional<Token> {
-    return ast.main_token();
-  });
-}
-
-SourceLocation Ast::source_location() const {
-  return visit([](AstLike auto& ast) -> SourceLocation {
-    auto res = ast.source_location();
-    return res;
-  });
-}
-
-AstPtr Ast::as_ptr() && {
-  return std::make_unique<Ast>(std::move(*this));
-}
-
-std::optional<Token> AstNone::main_token() const {
-  return std::nullopt;
-}
-
-SourceLocation AstNone::source_location() const {
-  return source::nullloc;
-}
-
-AstToken::AstToken(Token t) : t{t} {}
-
-std::optional<Token> AstToken::main_token() const {
-  return t;
-}
-
-SourceLocation AstToken::source_location() const {
-  return t.loc;
-}
-
-AstUnary::AstUnary(Token t, Ast&& other)
-    : t{t}, child{std::move(other).as_ptr()} {}
-
-std::optional<Token> AstUnary::main_token() const {
-  return t;
-}
-
-SourceLocation AstUnary::source_location() const {
-  return t.loc + child->source_location();
-}
-
-AstBinary::AstBinary(Token t, Ast&& lhs, Ast&& rhs)
-    : t{t}, lhs{std::move(lhs).as_ptr()}, rhs{std::move(rhs).as_ptr()} {}
-
-std::optional<Token> AstBinary::main_token() const {
-  return t;
-}
-
-SourceLocation AstBinary::source_location() const {
-  return lhs->source_location() + rhs->source_location(); // TODO + t.loc?
-}
-
-AstList::AstList() : asts{} {}
-
-AstList::AstList(std::vector<AstPtr>&& asts) : asts{std::move(asts)} {}
-
-std::optional<Token> AstList::main_token() const {
-  return std::nullopt;
-}
-
-SourceLocation AstList::source_location() const {
-  if (asts.empty()) {
-    return source::nullloc;
-  } else if (asts.size() == 1) {
-    return asts.front()->source_location();
-  } else {
-    // The idea is that all AST lists usually just go back to front
-    return asts.front()->source_location() + asts.back()->source_location();
+const char* Ast::get_name() const {
+  switch (data.get_tag()) {
+    using enum Tag;
+  case NONE:
+    return "AstNone";
+  case INTEGER:
+    return "AstInteger";
+  case IDENTIFIER:
+    return "AstIdentifier";
+  case RETURN:
+    return "AstReturn";
+  case LIST:
+    return "AstList";
+  case FUNCTION:
+    return "AstFunction";
+  case LAST:
+    return "AstInvalid";
   }
+  unreachable;
 }
 
-AstFunction::AstFunction(Token t, Ast&& name, Ast&& body)
-    : t{t}, name{std::move(name).as_ptr()}, body{std::move(body).as_ptr()} {}
-
-std::optional<Token> AstFunction::main_token() const {
-  return name->main_token().value_or(t);
+std::optional<Token> Ast::main_token(const AstContainer& container) const {
+  switch (data.get_tag()) {
+    using enum Tag;
+  case NONE:
+    return std::nullopt;
+  case INTEGER:
+    return data.get<INTEGER>().t;
+  case IDENTIFIER:
+    return data.get<IDENTIFIER>().t;
+  case RETURN:
+    return data.get<RETURN>().t;
+  case LIST:
+    return std::nullopt;
+  case FUNCTION: {
+    auto& fn = data.get<FUNCTION>();
+    return container[fn.name].main_token(container).value_or(fn.t);
+  }
+  case LAST:
+    return std::nullopt;
+  }
+  unreachable;
 }
 
-SourceLocation AstFunction::source_location() const {
-  return t.loc + body->source_location();
+SourceLocation Ast::source_location(const AstContainer& container) const {
+  switch (data.get_tag()) {
+    using enum Tag;
+  case NONE:
+    return source::nullloc;
+  case INTEGER:
+    return data.get<INTEGER>().t.loc;
+  case IDENTIFIER:
+    return data.get<IDENTIFIER>().t.loc;
+  case RETURN: {
+    auto& ret = data.get<RETURN>();
+    return ret.t.loc + container[ret.child].source_location(container);
+  }
+  case LIST: {
+    auto& list = data.get<LIST>();
+    if (list.asts.empty()) {
+      return source::nullloc;
+    } else if (list.asts.size() == 1) {
+      return container[list.asts.front()].source_location(container);
+    } else {
+      return container[list.asts.front()].source_location(container) +
+             container[list.asts.back()].source_location(container);
+    }
+  }
+  case FUNCTION: {
+    auto& fn = data.get<FUNCTION>();
+    return fn.t.loc + container[fn.body].source_location(container);
+  }
+  case LAST:
+    return source::nullloc;
+  }
+  unreachable;
+}
+
+Tag Ast::get_tag() const {
+  return data.get_tag();
+}
+
+bool Ast::is_a(Tag tag) const {
+  return data.get_tag() == tag;
+}
+
+void Ast::require(Tag tag) const {
+  nn_assert(is_a(tag));
 }

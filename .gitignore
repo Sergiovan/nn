@@ -13,8 +13,15 @@ output/
 
 # Program output
 *.dot
+*.o
+*.elf
+*.bin
+valgrind-*
 
 # Python
 .venv
 past_runs.toml
 __pycache__
+
+# Other
+workspace.zsh

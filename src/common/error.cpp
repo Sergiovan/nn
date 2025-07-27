@@ -102,16 +102,19 @@ u16 ErrorManager::get_terminal_width() {
   return w.ws_col;
 }
 
-Error::Error() : source{source::nullloc}, error_msg{} {}
+Error::Error(const source::SourceLocation loc, const std::string& msg)
+    : source{loc}, error_msg{msg} {}
 
-Error::Error(const std::string& msg)
-    : source{source::nullloc}, error_msg{msg} {}
+Error::Error() : Error{source::nullloc, {}} {}
+
+Error::Error(const std::string& msg) : Error{source::nullloc, msg} {}
 
 Error::Error(const token::Token& token, const std::string& msg)
-    : source{token.loc}, error_msg{msg} {}
+    : Error{token.loc, msg} {}
 
-Error::Error(const ast::Ast& ast, const std::string& msg)
-    : source{ast.source_location()}, error_msg{msg} {}
+Error::Error(const ast::Ast& ast, const ast::AstContainer& container,
+             const std::string& msg)
+    : Error{ast.source_location(container), msg} {}
 
 void Error::link_to(Error& root) {
   linked = &root;

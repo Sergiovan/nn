@@ -1,7 +1,5 @@
 #include "frontend/parser.hpp"
 
-#include <print>
-
 #include "common/ast.hpp"
 #include "common/token.hpp"
 #include "util/assert.hpp"
@@ -9,7 +7,7 @@
 using namespace parser;
 
 using ast::Ast;
-using ast::AstPtr;
+using ast::AstIndex;
 
 using lexer::Lexer;
 
@@ -20,17 +18,17 @@ using enum TokenType;
 Parser::Parser(Lexer& lexer, error::ErrorManager& error_manager)
     : lexer{lexer}, error_manager{error_manager}, current{std::nullopt} {}
 
-Ast Parser::parse() {
-  std::vector<AstPtr> asts{};
+std::pair<ast::Ast, const ast::AstContainer&> Parser::parse() {
+  std::vector<AstIndex> asts{};
 
   while (!is(END)) {
-    asts.push_back(top_level_statement().as_ptr());
+    asts.push_back(top_level_statement());
   }
 
-  return ast::AstList{std::move(asts)};
+  return {ast::AstList{asts}, container};
 }
 
-Ast Parser::top_level_statement() {
+AstIndex Parser::top_level_statement() {
   Token t = peek();
 
   switch (t.tt) {
@@ -42,7 +40,7 @@ Ast Parser::top_level_statement() {
   }
 }
 
-Ast Parser::def_statement() {
+AstIndex Parser::def_statement() {
   consume_require<KW_DEF>();
 
   Token t = peek();
@@ -56,10 +54,10 @@ Ast Parser::def_statement() {
   }
 }
 
-Ast Parser::function_definition() {
+AstIndex Parser::function_definition() {
   Token fun = consume_require<KW_FUN>();
 
-  Ast name = identifier();
+  AstIndex name = identifier();
   consume_expect<SYM_OPEN_PAREN>();
   consume_expect<SYM_CLOSE_PAREN>();
 
@@ -68,74 +66,77 @@ Ast Parser::function_definition() {
   switch (t.tt) {
   case SYM_STRONG_ARROW_RIGHT: {
     Token arrow = consume_require<SYM_STRONG_ARROW_RIGHT>(); // =>
-    Ast ret = expression();
+    AstIndex ret = expression();
     consume_expect<SYM_SEMICOLON>();
 
     ast::AstList body = ast::AstList{};
-    body.asts.push_back(Ast{ast::AstReturn{arrow, std::move(ret)}}.as_ptr());
+    body.asts.push_back(add_ast({ast::AstReturn{arrow, ret}}));
 
-    return ast::AstFunction{
+    Ast body_ast{body};
+    AstIndex body_idx = add_ast(body_ast);
+
+    return add_ast(ast::AstFunction{
         fun,
-        std::move(name),
-        std::move(body),
-    };
+        name,
+        body_idx,
+    });
   }
   case SYM_OPEN_BRACE:
-    return ast::AstFunction{
+    return add_ast(ast::AstFunction{
         fun,
-        std::move(name),
+        name,
         block(),
-    };
+    });
   default:
     t = consume(); // ?
-    return ast::AstFunction{
+    return add_ast(ast::AstFunction{
         fun,
-        std::move(name),
+        name,
         error_token_expected<SYM_STRONG_ARROW_RIGHT, SYM_OPEN_BRACE>(t.tt, t),
-    };
+    });
   }
 }
 
-Ast Parser::block() {
+AstIndex Parser::block() {
   consume_require<SYM_OPEN_BRACE>();
 
   ast::AstList body = ast::AstList{};
 
   while (!is<END, SYM_CLOSE_BRACE>()) {
-    body.asts.push_back(statement().as_ptr());
+    body.asts.push_back(statement());
   }
 
   consume_expect<SYM_CLOSE_BRACE>();
 
-  return body;
+  return add_ast(body);
 }
 
-Ast Parser::statement() {
+AstIndex Parser::statement() {
   switch (peek().tt) {
   case KW_RETURN:
     return return_statement();
   default: {
-    Ast ret = expression_or_assignment();
+    AstIndex ret = expression_or_assignment();
     consume_expect<SYM_SEMICOLON>();
     return ret;
   }
   }
 }
 
-Ast Parser::return_statement() {
+AstIndex Parser::return_statement() {
   Token l_return = consume_require<KW_RETURN>();
 
-  Ast expr = expression();
+  AstIndex expr = expression();
   consume_expect<SYM_SEMICOLON>();
 
-  return ast::AstReturn{l_return, std::move(expr)};
+  return add_ast(ast::AstReturn{l_return, std::move(expr)});
 }
 
-Ast Parser::expression_or_assignment() {
+AstIndex Parser::expression_or_assignment() {
   return expression(); // :)
 }
 
-Ast Parser::expression() {
+AstIndex Parser::expression() {
   Token t = peek();
 
   switch (t.tt) {
@@ -147,28 +148,28 @@ Ast Parser::expression() {
   }
 }
 
-Ast Parser::identifier() {
+AstIndex Parser::identifier() {
   if (is<IDENTIFIER>()) {
-    return ast::AstIdentifier{consume_require<IDENTIFIER>()};
+    return add_ast(ast::AstIdentifier{consume_require<IDENTIFIER>()});
   } else {
     Token t = consume(); // ?
     return error_token_expected<IDENTIFIER>(t.tt, t);
   }
 }
 
-Ast Parser::integer() {
+AstIndex Parser::integer() {
   if (is<INTEGER>()) {
-    return ast::AstInteger{consume_require<INTEGER>()};
+    return add_ast(ast::AstInteger{consume_require<INTEGER>()});
   } else {
     Token t = consume(); // ?
     return error_token_expected<INTEGER>(t.tt, t);
   }
 }
 
-Ast Parser::error(const std::string& str) {
+AstIndex Parser::error(const std::string& str) {
   error_manager.add_error(error::Error{str});
 
-  return Ast{};
+  return add_ast({});
 }
 
 Token Parser::peek() {
@@ -198,6 +199,14 @@ Token Parser::consume() {
     }
     t = lexer.next();
   } while (true);
+}
+
+AstIndex Parser::add_ast(const ast::Ast& ast) {
+  return container.push_back(ast);
+}
+
+Ast& Parser::get(AstIndex idx) {
+  return container[idx];
 }
 
 bool Parser::is(TokenType tt) {

@@ -110,6 +110,8 @@ private:
 /** Represents a compilation error */
 class Error {
 public:
+  /** Creates an error from a source location, with a string message */
+  Error(const source::SourceLocation loc, const std::string& msg);
   /** Creates an empty error */
   Error();
   /** Creates an error from a string, without source location */
@@ -117,7 +119,8 @@ public:
   /** Creates an error from a token, with a string message */
   Error(const token::Token& token, const std::string& msg);
   /** Creates an error from an ast node, with a string message */
-  Error(const ast::Ast& ast, const std::string& msg);
+  Error(const ast::Ast& ast, const ast::AstContainer& container,
+        const std::string& msg);
 
   /** Links this error cause to another error */
   void link_to(Error& root);

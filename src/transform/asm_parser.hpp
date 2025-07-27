@@ -17,7 +17,7 @@ struct AsmBlock {
 
 class AsmParser {
 public:
-  AsmParser(const ast::Ast& ast_in);
+  AsmParser(const ast::Ast& ast_in, const ast::AstContainer& ast_container);
 
   const asm_ast::AstProgram& get();
 
@@ -45,6 +45,8 @@ private:
   void add_to_block(std::unique_ptr<asm_ast::AstInstruction> inst);
 
   const ast::Ast& ast_in;
+  const ast::AstContainer& ast_container;
+
   std::optional<asm_ast::AstProgram> head{std::nullopt};
   std::optional<AsmBlock> current_block{std::nullopt};
 };

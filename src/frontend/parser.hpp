@@ -17,7 +17,7 @@ public:
   Parser(lexer::Lexer& lexer, error::ErrorManager& error_manager);
 
   /* Parse all tokens from the given lexer and create an ast from it */
-  ast::Ast parse();
+  std::pair<ast::Ast, const ast::AstContainer&> parse();
 
 private:
   /* Recursive descent. Each function corresponds with a grammar
@@ -25,24 +25,24 @@ private:
      construct, and returns an ast for it */
 
   /* Top level statement */
-  ast::Ast top_level_statement();
-  ast::Ast def_statement();
+  ast::AstIndex top_level_statement();
+  ast::AstIndex def_statement();
 
-  ast::Ast function_definition();
+  ast::AstIndex function_definition();
 
-  ast::Ast block();
+  ast::AstIndex block();
 
-  ast::Ast statement();
-  ast::Ast return_statement();
+  ast::AstIndex statement();
+  ast::AstIndex return_statement();
 
   /* Disambiguates expressions from assignments, since assignments are not 
      expressions in nn. It parses an expression until it finds an `=`, then it 
      turns into an assignment */
-  ast::Ast expression_or_assignment();
-  ast::Ast expression();
+  ast::AstIndex expression_or_assignment();
+  ast::AstIndex expression();
 
-  ast::Ast identifier();
-  ast::Ast integer();
+  ast::AstIndex identifier();
+  ast::AstIndex integer();
 
   // Other functions
   /* Looks at the current token without consuming it, that is, without advancing 
@@ -50,6 +50,11 @@ private:
   token::Token peek();
   /* Gets the current token and advances the lexer state */
   token::Token consume();
+
+  /* Adds an AST to the list to be able to reference it */
+  ast::AstIndex add_ast(const ast::Ast& ast);
+  /* Gets an AST object from its index */
+  ast::Ast& get(ast::AstIndex idx);
 
   /* Consumes a token, expecting something specific. Will generate an error if 
      the token consumed is not as expected */
@@ -68,12 +73,12 @@ private:
   }
 
   /* Adds an error to the error manager and generates an empty ast node */
-  ast::Ast error(const std::string& str);
+  ast::AstIndex error(const std::string& str);
 
   /* Adds an error from the given format to the error manager and generates
      an empty ast node */
   template <typename... Args>
-  ast::Ast error(std::format_string<Args...> fmt, Args&&... args) {
+  ast::AstIndex error(std::format_string<Args...> fmt, Args&&... args) {
     std::string err = std::format(fmt, std::forward<Args>(args)...);
     return error(err);
   }
@@ -81,7 +86,7 @@ private:
   /* Adds an unexpected token type error to the error manager and returns an
      empty ast node */
   template <token::TokenType T, token::TokenType... Ts>
-  ast::Ast
+  ast::AstIndex
   error_token_expected(token::TokenType tt,
                        const std::optional<token::Token>& t = std::nullopt) {
     std::stringstream ss;
@@ -90,7 +95,7 @@ private:
     error_manager.add_error(error::Error{
         t.value_or(peek()),
         std::format("Expected one of {}, but got {} instead", ss.str(), tt)});
-    return ast::Ast{};
+    return add_ast(ast::Ast{}); // TODO Better error
   }
 
   /* Returns true if the current token is of the given type, false otherwise */
@@ -133,6 +138,8 @@ private:
   error::ErrorManager& error_manager;
   /* Current token being parsed */
   std::optional<token::Token> current;
+  /* Container for Asts */
+  ast::AstContainer container;
 };
 
 } // namespace parser
