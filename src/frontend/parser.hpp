@@ -24,25 +24,30 @@ private:
      construct. It consumes tokens expecting to find that grammar 
      construct, and returns an ast for it */
 
-  /* Top level statement */
+  /* Numbers */
+  ast::AstIndex integer();
+
+  /* Identifiers */
+  ast::AstIndex identifier();
+
+  /* Program */
+  ast::AstIndex program();
   ast::AstIndex top_level_statement();
   ast::AstIndex def_statement();
+
+  ast::AstIndex statement();
+  ast::AstIndex return_statement();
+  ast::AstIndex expression_or_assignment_statement();
 
   ast::AstIndex function_definition();
 
   ast::AstIndex block();
-
-  ast::AstIndex statement();
-  ast::AstIndex return_statement();
 
   /* Disambiguates expressions from assignments, since assignments are not 
      expressions in nn. It parses an expression until it finds an `=`, then it 
      turns into an assignment */
   ast::AstIndex expression_or_assignment();
   ast::AstIndex expression();
-
-  ast::AstIndex identifier();
-  ast::AstIndex integer();
 
   // Other functions
   /* Looks at the current token without consuming it, that is, without advancing 

@@ -19,13 +19,37 @@ Parser::Parser(Lexer& lexer, error::ErrorManager& error_manager)
     : lexer{lexer}, error_manager{error_manager}, current{std::nullopt} {}
 
 std::pair<ast::Ast, const ast::AstContainer&> Parser::parse() {
+  AstIndex res = program();
+
+  return {res.from(container), container};
+}
+
+AstIndex Parser::integer() {
+  if (is<INTEGER>()) {
+    return add_ast(ast::AstInteger{consume_require<INTEGER>()});
+  } else {
+    Token t = consume(); // ?
+    return error_token_expected<INTEGER>(t.tt, t);
+  }
+}
+
+AstIndex Parser::identifier() {
+  if (is<IDENTIFIER>()) {
+    return add_ast(ast::AstIdentifier{consume_require<IDENTIFIER>()});
+  } else {
+    Token t = consume(); // ?
+    return error_token_expected<IDENTIFIER>(t.tt, t);
+  }
+}
+
+AstIndex Parser::program() {
   std::vector<AstIndex> asts{};
 
   while (!is(END)) {
     asts.push_back(top_level_statement());
   }
 
-  return {ast::AstList{asts}, container};
+  return add_ast(ast::AstList{asts});
 }
 
 AstIndex Parser::top_level_statement() {
@@ -52,6 +76,31 @@ AstIndex Parser::def_statement() {
     t = consume(); // ?
     return error_token_expected<KW_FUN>(t.tt, t);
   }
+}
+
+AstIndex Parser::statement() {
+  switch (peek().tt) {
+  case KW_RETURN:
+    return return_statement();
+  default: {
+    return expression_or_assignment_statement();
+  }
+  }
+}
+
+AstIndex Parser::return_statement() {
+  Token l_return = consume_require<KW_RETURN>();
+
+  AstIndex expr = expression();
+  consume_expect<SYM_SEMICOLON>();
+
+  return add_ast(ast::AstReturn{l_return, std::move(expr)});
+}
+
+ast::AstIndex Parser::expression_or_assignment_statement() {
+  AstIndex ret = expression_or_assignment();
+  consume_expect<SYM_SEMICOLON>();
+  return ret;
 }
 
 AstIndex Parser::function_definition() {
@@ -111,27 +160,6 @@ AstIndex Parser::block() {
   return add_ast(body);
 }
 
-AstIndex Parser::statement() {
-  switch (peek().tt) {
-  case KW_RETURN:
-    return return_statement();
-  default: {
-    AstIndex ret = expression_or_assignment();
-    consume_expect<SYM_SEMICOLON>();
-    return ret;
-  }
-  }
-}
-
-AstIndex Parser::return_statement() {
-  Token l_return = consume_require<KW_RETURN>();
-
-  AstIndex expr = expression();
-  consume_expect<SYM_SEMICOLON>();
-
-  return add_ast(ast::AstReturn{l_return, std::move(expr)});
-}
-
 AstIndex Parser::expression_or_assignment() {
   return expression(); // :)
 }
@@ -144,24 +172,6 @@ AstIndex Parser::expression() {
     return integer(); // TODO Operators and all that
   default:
     t = consume(); // ?
-    return error_token_expected<INTEGER>(t.tt, t);
-  }
-}
-
-AstIndex Parser::identifier() {
-  if (is<IDENTIFIER>()) {
-    return add_ast(ast::AstIdentifier{consume_require<IDENTIFIER>()});
-  } else {
-    Token t = consume(); // ?
-    return error_token_expected<IDENTIFIER>(t.tt, t);
-  }
-}
-
-AstIndex Parser::integer() {
-  if (is<INTEGER>()) {
-    return add_ast(ast::AstInteger{consume_require<INTEGER>()});
-  } else {
-    Token t = consume(); // ?
     return error_token_expected<INTEGER>(t.tt, t);
   }
 }

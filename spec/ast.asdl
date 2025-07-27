@@ -4,4 +4,5 @@
 program = List(function_definition* definitions) -- Should be top level statements
 function_definition = Function(identifier name, statement* body)
 statement = Return(expression expr)
-expression = Integer(int constant)
+expression = Integer(int constant) | UnaryOp(unary_op op, expression expr)
+unary_op = Negate | BitwiseNot

@@ -1,0 +1,52 @@
+(* Keywords and symbols *)
+open_paren = "(";
+close_paren = ")";
+open_brace = "{";
+close_brace = "}";
+semicolon = ";";
+
+strong_arrow_right = "=>";
+
+def = "def";
+fun = "fun";
+return = "return";
+
+all_keywords = def | fun | return;
+
+(* Numbers *)
+zero = "0";
+decimal_number = "0".."9";
+
+decimal_literal = decimal_number, {decimal_number};
+
+integer = decimal_literal;
+
+(* identifiers *)
+anonymous = "_";
+valid = '_' | 'a'..'z' | 'A'..'Z' | decimal_number;
+valid_first = valid - decimal_number;
+
+identifier = (valid_first, {valid}) - (anonymous | all_keywords);
+
+(* program *)
+
+program = { top_level_statement };
+
+top_level_statement = def_statement;
+def_statement = def, function_definition;
+
+statement = return_statement | expression_or_assignment_statement;
+(* In the final grammar, return is an expression, not a statement *)
+return_statement = return, expression, semicolon;
+expression_or_assignment_statement = expression_or_assignment, semicolon;
+
+(* In the final grammar, functions are much more complicated *)
+function_definition = fun, identifier, open_paren, close_paren, (
+  strong_arrow_right, expression, semicolon | 
+  block
+);
+
+block = open_brace, {statement}, close_brace;
+
+expression_or_assignment = expression;
+expression = integer;
