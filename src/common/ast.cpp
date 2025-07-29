@@ -19,6 +19,8 @@ const char* Ast::get_name() const {
     return "AstIdentifier";
   case RETURN:
     return "AstReturn";
+  case PRE_OP:
+    return "AstPreOp";
   case LIST:
     return "AstList";
   case FUNCTION:
@@ -40,6 +42,8 @@ std::optional<Token> Ast::main_token(const AstContainer& container) const {
     return data.get<IDENTIFIER>().t;
   case RETURN:
     return data.get<RETURN>().t;
+  case PRE_OP:
+    return data.get<PRE_OP>().t;
   case LIST:
     return std::nullopt;
   case FUNCTION: {
@@ -64,6 +68,11 @@ SourceLocation Ast::source_location(const AstContainer& container) const {
   case RETURN: {
     auto& ret = data.get<RETURN>();
     return ret.t.loc + ret.child.from(container).source_location(container);
+  }
+  case PRE_OP: {
+    auto& pre_op = data.get<PRE_OP>();
+    return pre_op.t.loc +
+           pre_op.child.from(container).source_location(container);
   }
   case LIST: {
     auto& list = data.get<LIST>();

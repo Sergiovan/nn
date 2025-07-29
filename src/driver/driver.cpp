@@ -42,6 +42,12 @@ void ast_print_helper(const ast::Ast& ast, const ast::AstContainer& container,
   case RETURN:
     ast_print_helper(ast.get<RETURN>().child.from(container), container, ss);
     return;
+  case PRE_OP: {
+    auto& pre_op = ast.get<PRE_OP>();
+    std::print(ss, "{} ", pre_op.t);
+    ast_print_helper(pre_op.child.from(container), container, ss);
+    return;
+  }
   case LIST:
     for (const auto& elem : ast.get<LIST>().asts) {
       ast_print_helper(elem.from(container), container, ss);
@@ -178,6 +184,12 @@ private:
     case RETURN: {
       auto& ret = ast.get<RETURN>();
       u64 child = to_dot_helper(ret.child.from(container), container);
+      std::println(ss, "{} -> {};", elem_node, child);
+      return elem_node;
+    }
+    case PRE_OP: {
+      auto& pre_op = ast.get<PRE_OP>();
+      u64 child = to_dot_helper(pre_op.child.from(container), container);
       std::println(ss, "{} -> {};", elem_node, child);
       return elem_node;
     }

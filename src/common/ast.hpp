@@ -14,6 +14,7 @@ enum class Tag {
   INTEGER,
   IDENTIFIER,
   RETURN,
+  PRE_OP,
   LIST,
   FUNCTION,
 
@@ -32,19 +33,22 @@ struct std::formatter<ast::Tag> {
 
   constexpr auto format(const ast::Tag& id, std::format_context& ctx) const {
     switch (id) {
-    case ast::Tag::NONE:
+      using enum ast::Tag;
+    case NONE:
       return std::format_to(ctx.out(), "NONE");
-    case ast::Tag::INTEGER:
+    case INTEGER:
       return std::format_to(ctx.out(), "INTEGER");
-    case ast::Tag::IDENTIFIER:
+    case IDENTIFIER:
       return std::format_to(ctx.out(), "IDENTIFIER");
-    case ast::Tag::RETURN:
+    case RETURN:
       return std::format_to(ctx.out(), "RETURN");
-    case ast::Tag::LIST:
+    case PRE_OP:
+      return std::format_to(ctx.out(), "PRE_OP");
+    case LIST:
       return std::format_to(ctx.out(), "LIST");
-    case ast::Tag::FUNCTION:
+    case FUNCTION:
       return std::format_to(ctx.out(), "FUNCTION");
-    case ast::Tag::LAST:
+    case LAST:
       return std::format_to(ctx.out(), "LAST");
     }
   }
@@ -97,6 +101,10 @@ struct AstReturn : AstUnary, Tagged<Tag::RETURN> {
   using AstUnary::AstUnary;
 };
 
+struct AstPreOp : AstUnary, Tagged<Tag::PRE_OP> {
+  using AstUnary::AstUnary;
+};
+
 /** Base struct for AST nodes that contain two other AST nodes */
 struct AstBinary {
   AstBinary(const token::Token& t, AstIndex lhs, AstIndex rhs)
@@ -127,7 +135,7 @@ struct AstFunction : Tagged<Tag::FUNCTION> {
 
 /** Variant that contains all possible ASTs */
 using AstUnion = TaggedUnion<Tag, AstNone, AstInteger, AstIdentifier, AstReturn,
-                             AstList, AstFunction>;
+                             AstPreOp, AstList, AstFunction>;
 
 /** Wraps over an AST node variant */
 class Ast {

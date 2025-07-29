@@ -213,7 +213,9 @@ class SingleFileTest:
             f'Expected {"exactly" if self.test_expectations.stdout_exact else "to find"} "{self.test_expectations.stdout}"'
           )
       else:
-        print(f"Program return: Expected 0, got {self.compiled_program_output.retcode}")
+        print(
+          f"Program return: Expected {self.test_expectations.retcode}, got {self.compiled_program_output.retcode}"
+        )
         print("Program stdout:")
         if self.compiled_program_output.stdout:
           print("\t" + self.compiled_program_output.stdout.replace("\n", "\n\t"))

@@ -167,13 +167,38 @@ AstIndex Parser::expression_or_assignment() {
 AstIndex Parser::expression() {
   Token t = peek();
 
+  if (is_prefix_operator()) {
+    return pre_expression();
+  } else {
+    return expression_atom();
+  }
+}
+
+ast::AstIndex Parser::expression_atom() {
+  Token t = peek();
+
   switch (t.tt) {
+  case SYM_OPEN_PAREN: {
+    consume_require<SYM_OPEN_PAREN>(); // (
+    AstIndex ret = expression();
+    consume_expect<SYM_CLOSE_PAREN>(); // )
+    return ret;
+  }
   case INTEGER:
-    return integer(); // TODO Operators and all that
+    return integer();
   default:
     t = consume(); // ?
-    return error_token_expected<INTEGER>(t.tt, t);
+    return error_token_expected<INTEGER, SYM_OPEN_PAREN>(t.tt, t);
   }
+}
+
+ast::AstIndex Parser::pre_expression() {
+  nn_assert(is_prefix_operator());
+
+  Token pre_op = consume(); // Prefix operator
+  AstIndex expr = expression();
+
+  return add_ast(ast::AstPreOp{pre_op, expr});
 }
 
 AstIndex Parser::error(const std::string& str) {
@@ -209,6 +234,22 @@ Token Parser::consume() {
     }
     t = lexer.next();
   } while (true);
+}
+
+bool Parser::is_prefix_operator(std::optional<token::Token> tok) {
+  auto token = tok.or_else([this]() -> std::optional<token::Token> {
+                    return peek();
+                  })
+                   .value();
+  switch (token.tt) {
+    using enum token::TokenType;
+  case SYM_MINUS:
+    [[fallthrough]];
+  case SYM_BANG:
+    return true;
+  default:
+    return false;
+  }
 }
 
 AstIndex Parser::add_ast(const ast::Ast& ast) {

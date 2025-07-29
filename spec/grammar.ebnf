@@ -1,12 +1,24 @@
-(* Keywords and symbols *)
+(* symbols *)
 open_paren = "(";
 close_paren = ")";
 open_brace = "{";
 close_brace = "}";
 semicolon = ";";
+minus = "-";
+bang = "!";
 
 strong_arrow_right = "=>";
 
+symbols = open_paren | close_paren | open_brace | close_brace | semicolon | strong_arrow_right
+        | minus | bang;
+
+(* symbols with meaning*)
+negate = minus;
+bit_not = bang;
+
+pre_op = minus | bang;
+
+(* keywords *)
 def = "def";
 fun = "fun";
 return = "return";
@@ -49,4 +61,10 @@ function_definition = fun, identifier, open_paren, close_paren, (
 block = open_brace, {statement}, close_brace;
 
 expression_or_assignment = expression;
-expression = integer;
+expression = expression_atom 
+           | pre_expression;
+
+expression_atom = open_paren, expression, close_paren
+                | integer;
+
+pre_expression = pre_op, expression;

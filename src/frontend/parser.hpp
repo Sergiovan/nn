@@ -32,6 +32,7 @@ private:
 
   /* Program */
   ast::AstIndex program();
+
   ast::AstIndex top_level_statement();
   ast::AstIndex def_statement();
 
@@ -49,12 +50,19 @@ private:
   ast::AstIndex expression_or_assignment();
   ast::AstIndex expression();
 
+  ast::AstIndex expression_atom();
+
+  ast::AstIndex pre_expression();
+
   // Other functions
   /* Looks at the current token without consuming it, that is, without advancing 
      the lexer state again */
   token::Token peek();
   /* Gets the current token and advances the lexer state */
   token::Token consume();
+
+  // Functions that peek and get a general class of tokens
+  bool is_prefix_operator(std::optional<token::Token> tok = std::nullopt);
 
   /* Adds an AST to the list to be able to reference it */
   ast::AstIndex add_ast(const ast::Ast& ast);
