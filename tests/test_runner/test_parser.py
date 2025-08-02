@@ -51,14 +51,22 @@ class TestParser:
           case "LEX":
             self._verify_arg_count(fn, args, 0)
             self._set_stage_reached(CompilerPhase.LEX)
+            self.retcode = CompilerPhase.LEX.compiler_retcode()
             break
           case "PARSE":
             self._verify_arg_count(fn, args, 0)
             self._set_stage_reached(CompilerPhase.PARSE)
+            self.retcode = CompilerPhase.PARSE.compiler_retcode()
+            break
+          case "TAC":
+            self._verify_arg_count(fn, args, 0)
+            self._set_stage_reached(CompilerPhase.TAC)
+            self.retcode = CompilerPhase.TAC.compiler_retcode()
             break
           case "CODEGEN":
             self._verify_arg_count(fn, args, 0)
             self._set_stage_reached(CompilerPhase.CODEGEN)
+            self.retcode = CompilerPhase.CODEGEN.compiler_retcode()
             break
           case "RUN":
             self._verify_arg_count(fn, args, 1)

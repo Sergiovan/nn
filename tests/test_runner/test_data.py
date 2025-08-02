@@ -10,6 +10,8 @@ COLOR_PASS = "\x1b[38;2;34;181;115m"
 COLOR_SKIP = "\x1b[38;2;255;204;0m"
 COLOR_FAIL = "\x1b[38;2;204;51;0m"
 
+COLOR_END = "\x1b[0m"
+
 LOADING_CHARS = ["⠇", "⠋", "⠙", "⠸", "⢰", "⣠", "⣄", "⡆"]
 
 
@@ -21,6 +23,7 @@ class SkipTest(Exception):
 class TestrunData:
   compiler_path: Path
   temp_directory: Path | None = serde_field(skip=True, default=None)
+  stop_after: CompilerPhase | None = None
 
 
 @dataclass
@@ -55,8 +58,8 @@ class TestResult(Enum):
   FAIL = auto()
   ERROR = auto()
   SKIP = auto()
-  XFAIL = auto()
-  XPASS = auto()
+  XFAIL = auto()  # Expected failure = It's a pass
+  XPASS = auto()  # Expected failure = Failed to fail
   UNKNOWN = auto()
 
   def small_repr(self, color: bool = True) -> str:
@@ -111,6 +114,7 @@ class TestResult(Enum):
 class CompilerPhase(Enum):
   LEX = auto()
   PARSE = auto()
+  TAC = auto()
   CODEGEN = auto()
   RUN = auto()
 
@@ -120,10 +124,25 @@ class CompilerPhase(Enum):
         return 1
       case CompilerPhase.PARSE:
         return 2
-      case CompilerPhase.CODEGEN:
+      case CompilerPhase.TAC:
         return 3
+      case CompilerPhase.CODEGEN:
+        return 4
       case CompilerPhase.RUN:
         return 0
+
+  def compiler_param(self) -> str:
+    match self:
+      case CompilerPhase.LEX:
+        return "--lex"
+      case CompilerPhase.PARSE:
+        return "--parse"
+      case CompilerPhase.TAC:
+        return "--tac"
+      case CompilerPhase.CODEGEN:
+        return "--codegen"
+      case CompilerPhase.RUN:
+        return ""
 
   def __str__(self) -> str:
     return self.name

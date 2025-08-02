@@ -42,6 +42,7 @@ class SingleFileTest:
 
     self.compiler_output = ProgramOutput()
     self.compiled_program_output = ProgramOutput()
+    self.original_test_expectations = TestExpectations()
     self.test_expectations = TestExpectations()
 
     self.error: Exception | None = None
@@ -67,16 +68,22 @@ class SingleFileTest:
         str(self.file),
         "--silent",  # Please no extraneous output
       ]
-      match self.test_expectations.stage_reached:
-        case CompilerPhase.LEX:
-          compilation_params.append("--lex")
-        case CompilerPhase.PARSE:
-          compilation_params.append("--parse")
-        case CompilerPhase.CODEGEN:
-          compilation_params.append("--codegen")
-        case CompilerPhase.RUN:
-          os.makedirs(self.output_dir, exist_ok=True)
-          compilation_params += ["-o", str(self.output_bin.parent / self.output_bin.stem)]
+
+      if (
+        self.testrun_data.stop_after
+        and self.test_expectations.stage_reached.value > self.testrun_data.stop_after.value
+      ):
+        self.test_expectations = TestExpectations()
+        self.test_expectations.stage_reached = self.testrun_data.stop_after
+        self.test_expectations.retcode = 0
+        self.test_expectations.stdout = None
+        self.test_expectations.xfail = False
+
+      if self.test_expectations.stage_reached == CompilerPhase.RUN:
+        os.makedirs(self.output_dir, exist_ok=True)
+        compilation_params += ["-o", str(self.output_bin.parent / self.output_bin.stem)]
+      else:
+        compilation_params.append(self.test_expectations.stage_reached.compiler_param())
 
       self.compilation_command = " ".join(compilation_params)
       timeout = 5
@@ -124,7 +131,8 @@ class SingleFileTest:
 
   def parse_test_data(self, lines: list[str]):
     parser = TestParser(lines, self.file)
-    self.test_expectations = parser.parse()
+    self.original_test_expectations = parser.parse()
+    self.test_expectations = self.original_test_expectations
     self.description = parser.description or ""
 
   def check_compiler_expectations(self):
@@ -132,7 +140,7 @@ class SingleFileTest:
       if self.compiler_output.retcode != 0:
         self.result = TestResult.FAIL
     else:
-      if self.compiler_output.retcode != self.test_expectations.stage_reached.compiler_retcode():
+      if self.compiler_output.retcode != self.test_expectations.retcode:
         self.result = TestResult.FAIL
       elif self.test_expectations.stdout is not None:
         if self.test_expectations.stdout_exact:
@@ -170,62 +178,6 @@ class SingleFileTest:
       elif self.result == TestResult.PASS:
         self.result = TestResult.XPASS
 
-  def print(self):
-    import traceback
-
-    print(f"===== \x1b[1m{self.file.name}\x1b[0m =====")
-    if self.description:
-      print(self.description)
-    print(f"Ran in \x1b[1m{(self.end_time - self.start_time) / 1_000_000_000:.3f}\x1b[0ms")
-    print(f"Result: \x1b[1m{self.result.repr()}\x1b[0m")
-
-    if self.result == TestResult.SKIP:
-      assert self.error is not None
-      print(f"Reason: \x1b[1m{self.error.args[0]}\x1b[0m")
-      return
-    if self.result.is_pass():
-      return
-
-    print(f"Command executed: {self.compilation_command or '<NO COMMAND EXECUTED>'}")
-    if self.result == TestResult.ERROR:
-      assert self.error is not None
-      error_text = traceback.format_exception(self.error)
-      for line in error_text:
-        print(f"{line}", end="")
-      if self.compiler_output.stdout:
-        print("Compiler stdout:")
-        print("\t" + self.compiler_output.stdout.replace("\n", "\n\t"))
-      if self.compiled_program_output.stdout:
-        print("Program stdout:")
-        print("\t" + self.compiled_program_output.stdout.replace("\n", "\n\t"))
-    else:
-      if self.compiled_program_output.retcode == -1:  # Didn't run
-        print(
-          f"Compiler return: Expected {self.test_expectations.stage_reached.compiler_retcode()}, got {self.compiler_output.retcode}"
-        )
-        print("Compiler stdout:")
-        if self.compiler_output.stdout:
-          print("\t" + self.compiler_output.stdout.replace("\n", "\n\t"))
-        else:
-          print("\t <BLANK>")
-        if self.test_expectations.stdout is not None:
-          print(
-            f'Expected {"exactly" if self.test_expectations.stdout_exact else "to find"} "{self.test_expectations.stdout}"'
-          )
-      else:
-        print(
-          f"Program return: Expected {self.test_expectations.retcode}, got {self.compiled_program_output.retcode}"
-        )
-        print("Program stdout:")
-        if self.compiled_program_output.stdout:
-          print("\t" + self.compiled_program_output.stdout.replace("\n", "\n\t"))
-        else:
-          print("\t <BLANK>")
-        if self.test_expectations.stdout is not None:
-          print(
-            f'Expected {"exactly" if self.test_expectations.stdout_exact else "to find"} "{self.test_expectations.stdout}"'
-          )
-
   def archive(self) -> PastSingleFileTest:
     return PastSingleFileTest(
       self.file,
@@ -233,8 +185,9 @@ class SingleFileTest:
       self.result,
       self.start_date,
       self.end_time - self.start_time,
+      self.compilation_command,
       self.compiler_output,
       self.compiled_program_output,
-      self.test_expectations,
+      self.original_test_expectations,
       str(self.error),
     )

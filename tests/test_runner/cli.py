@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from . import TEST_DIR, THIS_DIR
+from .test_data import CompilerPhase
 
 from dataclasses import field
 from enum import Enum, auto
@@ -40,14 +41,18 @@ def past_runs_toml_path_factory() -> Path:
 
 @serde
 class Arguments:
-  show_passes: bool = False
   test_filter: list[str] = field(default_factory=list[str])
   test_files: list[Path] = field(default_factory=list[Path])
   compiler_path: Path = field(default_factory=compiler_path_factory)
+  show_passes: bool = False
+  print_last_run: bool = False
   past_runs_toml_path: Path = field(default_factory=past_runs_toml_path_factory)
   past_runs_limit: int = 100
   rerun_previous: RerunType = serde_field(
     default=RerunType.NO_RERUN, serializer=RerunType.__str__, deserializer=RerunType.from_str
+  )
+  stop_after: CompilerPhase = serde_field(
+    default=CompilerPhase.RUN, serializer=CompilerPhase.__str__, deserializer=CompilerPhase.from_str
   )
 
   @staticmethod
@@ -72,14 +77,6 @@ class Arguments:
       type=str,
       help="Filters for tests to run. All tests that include any of the text in any of the filters in their path will be run",
     )
-    # Show tests that were successful in the output
-    p.add_argument(
-      "--show-passes",
-      dest="show_passes",
-      action="store_true",
-      default=False,
-      help="Show passed tests in addition to failures",
-    )
     # Test one or more files directly instead of globbing
     p.add_argument(
       "--test-file",
@@ -95,6 +92,22 @@ class Arguments:
       type=path_from_this_dir,
       default=compiler_path_factory(),
       help="Path to compiler to use",
+    )
+    # Show tests that were successful in the output
+    p.add_argument(
+      "--show-passes",
+      dest="show_passes",
+      action="store_true",
+      default=False,
+      help="Show passed tests in addition to failures",
+    )
+    # Show tests that were successful in the output
+    p.add_argument(
+      "--print-last-run",
+      dest="print_last_run",
+      action="store_true",
+      default=False,
+      help="Print last run's output",
     )
     # Where to store data about previous runs, and how many to keep
     p.add_argument(
@@ -119,6 +132,14 @@ class Arguments:
       choices=RerunType,
       default=RerunType.NO_RERUN,
       help="If previous run should be done",
+    )
+    p.add_argument(
+      "--stop-after",
+      dest="stop_after",
+      type=CompilerPhase.from_str,
+      choices=CompilerPhase,
+      default=CompilerPhase.RUN,
+      help="Stop all test cases after the given compiler phase",
     )
 
     args = p.parse_args(namespace=Arguments())

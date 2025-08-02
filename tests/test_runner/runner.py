@@ -3,6 +3,7 @@ import tempfile
 import glob
 import os
 import shutil
+from typing import cast
 import serde
 import sys
 import termios
@@ -14,9 +15,17 @@ from pathlib import Path
 from . import TEST_DIR, THIS_DIR
 
 from .cli import Arguments, RerunType
-from .past_runs import PastRuns, PastRun
+from .past_runs import PastRuns, PastRun, PastSingleFileTest
 from .test import SingleFileTest
-from .test_data import TestrunData, TestResult, ProcessingData
+from .test_data import (
+  COLOR_PASS,
+  COLOR_SKIP,
+  COLOR_FAIL,
+  COLOR_END,
+  TestrunData,
+  TestResult,
+  ProcessingData,
+)
 
 
 def set_echo(enabled: bool):
@@ -57,13 +66,17 @@ class TestRunner:
           raise ValueError("No past runs to rerun")
         self.test_files = [x.file for x in self.past_runs.runs[-1].file_tests]
 
-    self.test_data = TestrunData(compiler_path=self.arguments.compiler_path)
+    self.stop_after = self.arguments.stop_after
+
+    self.test_data = TestrunData(
+      compiler_path=self.arguments.compiler_path, stop_after=self.stop_after
+    )
 
     terminal_size = shutil.get_terminal_size()
     cpu_count = os.cpu_count() or 1
 
     self.task_limit = min(cpu_count // 2, max(len(self.test_files), 1))
-    self.column_limit = terminal_size.columns - 1
+    self.column_limit = min(terminal_size.columns - 1, 30)
 
     self.result_line = 0
     self.result_column = 0
@@ -77,37 +90,37 @@ class TestRunner:
     self.processing_lines = [ProcessingData() for _ in range(self.task_limit)]
 
   def run(self) -> int:
+    if self.arguments.print_last_run:
+      if len(self.past_runs.runs) == 0:
+        raise ValueError("Cannot print last run: There is no last run")
+
+      last_run = self.past_runs.runs.pop()
+      self.test_time = last_run.runtime
+
+      self._print_full_run(0, [(x, x) for x in last_run.file_tests])
+
+      return 0
+
     self.test_data.temp_directory = Path(tempfile.mkdtemp(prefix="nn_test_")).resolve()
 
     start_time = time.perf_counter_ns()
     res = asyncio.run(self._run())
     end_time = time.perf_counter_ns()
 
-    shown_tests = self.file_tests[:]
-    shown_tests.sort(key=lambda t: not t.result.is_pass())
-    if not self.arguments.show_passes:
-      shown_tests = [test for test in shown_tests if not test.result.is_pass()]
+    archives: list[tuple[SingleFileTest, PastSingleFileTest]] = []
 
-    for test in shown_tests:
-      test.print()
+    for test in self.file_tests:
+      archives.append((test, test.archive()))
       self.test_time += test.end_time - test.start_time
 
-    def count(x: TestResult) -> int:
-      return sum(1 for test in self.file_tests if test.result == x)
-
-    if skipped := count(TestResult.SKIP):
-      print(f"SKIPPED: {skipped}")
-    if failures := count(TestResult.FAIL):
-      print(f"FAILURES: {failures}")
-    if errors := count(TestResult.ERROR):
-      print(f"ERRORS: {errors}")
-    if xpasses := count(TestResult.XPASS):
-      print(f"Unexpected passes: {xpasses}")
-    print(
-      f"Finished in {(end_time - start_time) / 1_000_000_000:.3f}s, real test time was {self.test_time / 1_000_000_000:.3f}s"
+    self._print_full_run(
+      end_time - start_time,
+      cast(list[tuple[SingleFileTest | PastSingleFileTest, PastSingleFileTest]], archives),
     )
 
-    this_run = PastRun(self.test_date, self.arguments, [test.archive() for test in self.file_tests])
+    this_run = PastRun(
+      self.test_date, self.test_time, self.arguments, [archive for (_, archive) in archives]
+    )
     self.past_runs.runs.append(this_run)
     self.past_runs.store(self.arguments.past_runs_toml_path, self.arguments.past_runs_limit)
 
@@ -160,6 +173,107 @@ class TestRunner:
       set_echo(True)
 
     return 0 if all(test.result.is_pass() for test in self.file_tests) else 1
+
+  def _print_full_run(
+    self,
+    time_elapsed: int,
+    archives: list[tuple[SingleFileTest | PastSingleFileTest, PastSingleFileTest]],
+  ):
+    shown_tests = archives[:]
+    shown_tests.sort(key=lambda t: not t[0].result.is_pass())
+    if not self.arguments.show_passes:
+      shown_tests = [test for test in shown_tests if not test[0].result.is_pass()]
+
+    print()
+    for test, archived in shown_tests:
+      archived.print(with_error=test.error if isinstance(test, SingleFileTest) else None)
+
+    print()
+
+    passes: list[str] = []
+    xfails: list[str] = []
+    xpasses: list[str] = []
+    skipped: list[str] = []
+    failures: list[str] = []
+    errors: list[str] = []
+
+    test_files_dir = (TEST_DIR / "test_files").relative_to(THIS_DIR)
+
+    try:
+      previous_run: list[PastSingleFileTest] = self.past_runs.runs[-1].file_tests
+    except IndexError:
+      previous_run = []
+
+    for test, archived in archives:
+      is_new = False
+      try:
+        in_past_run = next(run for run in previous_run if run.file.resolve() == test.file.resolve())
+      except StopIteration:
+        in_past_run = archived
+        is_new = bool(previous_run)
+
+      test_name = test.file.relative_to(test_files_dir)
+      test_name = str(test_name) + (" (NEW)" if is_new else "")
+
+      match test.result:
+        case TestResult.PASS:
+          if not in_past_run.result.is_pass():
+            passes.append(f"{test_name} (FIXED)")
+          else:
+            passes.append(f"{test_name}")
+        case TestResult.FAIL:
+          if in_past_run.result.is_pass():
+            failures.append(f"{test_name} (BROKEN)")
+          else:
+            failures.append(f"{test_name}")
+        case TestResult.ERROR:
+          errors.append(f"{test_name}")
+        case TestResult.SKIP:
+          skipped.append(f"{test_name}")
+        case TestResult.XFAIL:
+          if not in_past_run.result.is_pass():
+            xfails.append(f"{test_name} (FIXED)")
+          else:
+            xfails.append(f"{test_name}")
+        case TestResult.XPASS:
+          if in_past_run.result.is_pass():
+            xpasses.append(f"{test_name} (BROKEN)")
+          else:
+            xpasses.append(f"{test_name}")
+        case _:
+          errors.append(f"{test_name} ({test.result})")
+
+    print(f"TESTS RUN: {len(archives)}")
+    if passes:
+      print(f"{COLOR_PASS}PASSES{COLOR_END}: {len(passes)}")
+      for pass_ in passes:
+        if self.arguments.show_passes or pass_.endswith(")"):
+          print(f"  {pass_}")
+    if xfails:
+      print(f"{COLOR_PASS}XFAILS{COLOR_END}: {len(xfails)}")
+      for xfail in xfails:
+        if self.arguments.show_passes or xfail.endswith(")"):
+          print(f"  {xfail}")
+    if skipped:
+      print(f"{COLOR_SKIP}SKIPS{COLOR_END}: {len(skipped)}")
+      for skip in skipped:
+        print(f"  {skip}")
+    if failures:
+      print(f"{COLOR_FAIL}FAILURES{COLOR_END}: {len(failures)}")
+      for error in failures:
+        print(f"  {error}")
+    if xpasses:
+      print(f"{COLOR_FAIL}UNEXPECTED PASSES{COLOR_END}: {len(xpasses)}")
+      for xpass in xpasses:
+        print(f"  {xpass}")
+    if errors:
+      print(f"{COLOR_FAIL}ERRORS{COLOR_END}: {len(errors)}")
+      for error in errors:
+        print(f"  {error}")
+
+    print(
+      f"Finished in {(time_elapsed) / 1_000_000_000:.3f}s, real test time was {self.test_time / 1_000_000_000:.3f}s"
+    )
 
   def _finish_test(self):
     self.finished_tests += 1
