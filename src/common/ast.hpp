@@ -56,13 +56,6 @@ struct std::formatter<ast::Tag> {
 
 namespace ast {
 
-template <Tag tag>
-struct Tagged {
-  constexpr static Tag union_tag() {
-    return tag;
-  }
-};
-
 class Ast;
 
 using AstIndex = SRContainerIndex<Ast>;
@@ -138,14 +131,12 @@ using AstUnion = TaggedUnion<Tag, AstNone, AstInteger, AstIdentifier, AstReturn,
                              AstPreOp, AstList, AstFunction>;
 
 /** Wraps over an AST node variant */
-class Ast {
+class Ast : public AstUnion {
 public:
   /** Default constructor is an AstNone */
-  Ast();
+  Ast() : AstUnion{AstNone{}} {};
 
-  template <typename T>
-    requires(AstUnion::contains_type<T>())
-  Ast(const T& t) : data{t} {}
+  using AstUnion::AstUnion;
 
   /** Gets the display name of this AST node type */
   const char* get_name() const;
@@ -154,45 +145,12 @@ public:
   /** Returns the source location for this AST node */
   source::SourceLocation source_location(const AstContainer& container) const;
 
-  Tag get_tag() const;
-
-  template <has_tag<Tag> T>
-  bool is_a() const {
-    return data.get_tag() == T::union_tag();
-  }
-
-  bool is_a(Tag tag) const;
-
   template <has_tag<Tag> T>
   void require() const {
     nn_assert(is_a<T>());
   }
 
   void require(Tag tag) const;
-
-  template <typename T>
-  auto& get() {
-    return data.get<T>();
-  }
-
-  template <Tag tag>
-  auto& get() {
-    return data.get<tag>();
-  }
-
-  template <typename T>
-  const auto& get() const {
-    return data.get<T>();
-  }
-
-  template <Tag tag>
-  const auto& get() const {
-    return data.get<tag>();
-  }
-
-private:
-  /** Inner AST struct */
-  AstUnion data;
 };
 
 } // namespace ast

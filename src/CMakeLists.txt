@@ -7,6 +7,7 @@ list(APPEND CORE_HEADERS
   "common/asm_ast.hpp"
   "common/error.hpp"
   "common/source.hpp"
+  "common/tac.hpp"
   "common/token.hpp"
 
   "driver/driver.hpp"
@@ -15,6 +16,7 @@ list(APPEND CORE_HEADERS
   "frontend/parser.hpp"
 
   "transform/asm_parser.hpp"
+  "transform/tac_parser.hpp"
 
   "util/assert.hpp"
   "util/enum_map.hpp"
@@ -30,6 +32,8 @@ list(APPEND CORE_SOURCES
   "common/asm_ast.cpp"
   "common/error.cpp"
   "common/source.cpp"
+  "common/tac.cpp"
+  "common/token.cpp"
 
   "driver/driver.cpp"
 
@@ -37,6 +41,7 @@ list(APPEND CORE_SOURCES
   "frontend/parser.cpp"
 
   "transform/asm_parser.cpp"
+  "transform/tac_parser.cpp"
 
   "util/string.cpp"
 )

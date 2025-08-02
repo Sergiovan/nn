@@ -17,6 +17,14 @@ struct SRContainerIndex {
 };
 
 template <typename T>
+struct std::formatter<SRContainerIndex<T>> : std::formatter<std::size_t> {
+  auto format(const SRContainerIndex<T>& idx, std::format_context& ctx) const {
+    std::format_to(ctx.out(), "$");
+    return std::formatter<std::size_t>::format(idx.idx, ctx);
+  }
+};
+
+template <typename T>
 struct SelfReferentialContainer {
   using Index = SRContainerIndex<T>;
 
@@ -48,6 +56,10 @@ struct SelfReferentialContainer {
     contents.emplace_back(std::forward<Args>(args)...);
   }
 
+  std::size_t size() const {
+    return contents.size();
+  }
+
   template <std::ranges::view R>
     requires std::same_as<std::ranges::range_value_t<R>, Index>
   auto iterate_content(R&& r) {
@@ -74,6 +86,30 @@ struct SelfReferentialContainer {
     requires std::same_as<std::ranges::range_value_t<R>, Index>
   auto iterate_content(R&& r) const {
     return iterate_content(std::span{std::forward<R>(r)});
+  }
+
+  auto begin() {
+    return contents.begin();
+  }
+
+  auto end() {
+    return contents.end();
+  }
+
+  auto begin() const {
+    return contents.cbegin();
+  }
+
+  auto end() const {
+    return contents.cend();
+  }
+
+  auto cbegin() const {
+    return contents.cbegin();
+  }
+
+  auto cend() const {
+    return contents.cend();
   }
 
   std::vector<T> contents{};
@@ -89,3 +125,6 @@ const T&
 SRContainerIndex<T>::from(const SelfReferentialContainer<T>& container) const {
   return container[*this];
 }
+
+static_assert(std::ranges::range<const SelfReferentialContainer<int>>);
+static_assert(std::ranges::viewable_range<SelfReferentialContainer<int>>);

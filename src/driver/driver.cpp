@@ -6,14 +6,18 @@
 #include <fstream>
 #include <ios>
 #include <iostream>
+#include <ranges>
 
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include "common/asm_ast.hpp"
+#include "common/ast.hpp"
 #include "common/error.hpp"
+#include "common/tac.hpp"
 #include "frontend/parser.hpp"
 #include "transform/asm_parser.hpp"
+#include "transform/tac_parser.hpp"
 #include "util/format.hpp" // IWYU pragma: keep
 #include "util/scope_guard.hpp"
 
@@ -219,6 +223,66 @@ private:
   std::stringstream ss{};
 };
 
+void print_tac_helper(std::ostringstream& ss, tac::TacIndex idx,
+                      const tac::Tac& tac, const tac::TacContainer& container);
+
+void print_tac_helper(std::ostringstream& ss, tac::TacIndex index,
+                      const tac::TacContainer& container) {
+  print_tac_helper(ss, index, index.from(container), container);
+}
+
+void print_tac_helper(std::ostringstream& ss, tac::TacIndex idx,
+                      const tac::Tac& tac, const tac::TacContainer& container) {
+  switch (tac.get_tag()) {
+    using enum tac::Tag;
+  case PROGRAM: {
+    const auto& prog = tac.get<PROGRAM>();
+    std::println(ss, "{} = PROGRAM", idx);
+    print_tac_helper(ss, prog.function, container);
+  } break;
+  case FUNCTION: {
+    const auto& fn = tac.get<FUNCTION>();
+    std::println(ss, "{} = BEGIN FUNCTION {}", idx, fn.name);
+    for (auto& inst : fn.instructions) {
+      print_tac_helper(ss, inst, container);
+    }
+    std::println(ss, "END FUNCTION {}", fn.name);
+  } break;
+  case RETURN: {
+    const auto& ret = tac.get<RETURN>();
+    print_tac_helper(ss, ret.value, container);
+    std::println(ss, "{} = return {}", idx, ret.value);
+  } break;
+  case UNARY: {
+    const auto& un = tac.get<UNARY>();
+    print_tac_helper(ss, un.source, container);
+    std::println(ss, "{} = {:source} {}", idx, un.op, un.source);
+  } break;
+  case CONSTANT: {
+    const auto& constant = tac.get<CONSTANT>();
+    std::println(ss, "{} = CONSTANT {}", idx, constant.value);
+  } break;
+  case VAR: {
+    // Purposefully empty: vars are just the number
+  } break;
+  case IDENTIFIER: {
+    const auto& iden = tac.get<IDENTIFIER>();
+    std::println(ss, "{} = IDENTIFIER {}", idx, iden.iden);
+  } break;
+  case LAST:
+    std::println(ss, "{} = INVALID (LAST)", idx);
+    break;
+  }
+}
+
+void print_tac(tac_parser::ParseResult tac) {
+  std::ostringstream ss;
+
+  print_tac_helper(ss, {tac.container.size() - 1}, tac.top, tac.container);
+
+  std::print(std::cerr, "{}", ss.str());
+}
+
 Driver::Driver(int argc, char** argv) {
   std::vector<std::string_view> args =
       std::span{argv + 1, argv + argc} |
@@ -238,6 +302,8 @@ Driver::Driver(int argc, char** argv) {
       set_option(Option::StopAfterParse, true);
     } else if (arg == "--dot") {
       set_option(Option::ParseShowDot, true);
+    } else if (arg == "--tac") {
+      set_option(Option::StopAfterTac, true);
     } else if (arg == "--codegen") {
       set_option(Option::StopAfterCodegen, true);
     } else if (arg == "--silent") {
@@ -304,19 +370,18 @@ int Driver::run() {
 
   parser::Parser p{lexer, error_manager};
 
-  auto [ast, container] = p.parse();
+  auto parse_result = p.parse();
+  auto [ast, container] = parse_result;
 
-  if (get_option(Option::StopAfterParse)) {
-    if (!silent) {
-      if (get_option(Option::ParseShowDot)) {
-        DotWriter dw{};
+  if (get_option(Option::StopAfterParse) && !silent) {
+    if (get_option(Option::ParseShowDot)) {
+      DotWriter dw{};
 
-        std::print(std::cerr, "{}", dw.to_dot(ast, container));
-      } else {
-        std::stringstream ss{};
-        ast_print_helper(ast, container, ss);
-        lispy_print(std::cerr, ss.str());
-      }
+      std::print(std::cerr, "{}", dw.to_dot(ast, container));
+    } else {
+      std::stringstream ss{};
+      ast_print_helper(ast, container, ss);
+      lispy_print(std::cerr, ss.str());
     }
   }
 
@@ -326,6 +391,22 @@ int Driver::run() {
   }
 
   if (get_option(Option::StopAfterParse)) {
+    return 0;
+  }
+
+  tac_parser::TacParser tp{parse_result, error_manager};
+
+  auto tac_result = tp.parse();
+
+  if (get_option(Option::StopAfterTac)) {
+    print_tac(tac_result);
+  }
+
+  if (error_manager.has_errors()) {
+    return 3;
+  }
+
+  if (get_option(Option::StopAfterTac)) {
     return 0;
   }
 
@@ -588,7 +669,7 @@ R"(nn : Compiler for the nn language
 Compiles .nn files into RISC-V binary blobs, or RISC-V assembly files.
 Currently requires riscv64-elf-{as, ld, objcopy} to be installed on the system.
 
-USAGE: nn <FILE> [--help] [--lex] [--parse] [--codegen] [--dot] [--silent] [--output <PATH>] [-S]
+USAGE: nn <FILE> [--help] [--lex] [--parse [--dot]] [--tac] [--codegen] [--silent] [-o|--output <PATH>] [-S]
 
 OPTIONAL PARAMETERS
   -o, --output: Path to output file, without extension
@@ -597,8 +678,9 @@ OPTIONAL PARAMETERS
   --help: Show this help
   --lex: Only go up to lexing, then print the tokens
   --parse: Only go up to parsing, then print the asts
+    --dot: Show parse output as a dot file instead
+  --tac: Only go up to parsing, then print the asts
   --codegen: Only go up to codegen, then print the program
-  --dot: Show parse output as a dot file instead
   --silent: Do not output to stdout after finishing phases
 )";
   // clang-format on

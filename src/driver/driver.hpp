@@ -12,6 +12,8 @@ enum class Option {
   StopAfterLex,
   /** Stop processing the source after the parsing phase */
   StopAfterParse,
+  /** Stop processing the source after the tac phase */
+  StopAfterTac,
   /** Stop processing the source after the codegen phase */
   StopAfterCodegen,
   /** Instead of assmbling and linking an executable,  */

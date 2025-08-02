@@ -221,6 +221,15 @@ public:
     install(t);
   }
 
+  template <has_tag<Tag> T>
+  bool is_a() const {
+    return TaggedUnion::tag == T::union_tag();
+  }
+
+  bool is_a(Tag tag) const {
+    return TaggedUnion::tag == tag;
+  }
+
 private:
   const Placeholder* get_placeholder() const {
     return std::launder(reinterpret_cast<const Placeholder*>(&mem[0]));
@@ -255,3 +264,11 @@ private:
 using tagged_union_impl::constrained_enum;
 using tagged_union_impl::has_tag;
 using tagged_union_impl::TaggedUnion;
+
+template <auto tag>
+  requires(constrained_enum<decltype(tag)>)
+struct Tagged {
+  constexpr static decltype(tag) union_tag() {
+    return tag;
+  }
+};

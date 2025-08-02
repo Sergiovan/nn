@@ -18,7 +18,7 @@ using enum TokenType;
 Parser::Parser(Lexer& lexer, error::ErrorManager& error_manager)
     : lexer{lexer}, error_manager{error_manager}, current{std::nullopt} {}
 
-std::pair<ast::Ast, const ast::AstContainer&> Parser::parse() {
+ParseResult Parser::parse() {
   AstIndex res = program();
 
   return {res.from(container), container};

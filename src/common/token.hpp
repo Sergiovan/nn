@@ -58,6 +58,9 @@ enum class TokenType : u16 {
 
   /* Symbol token `;` */
   SYM_SEMICOLON,
+
+  /* LAST */
+  LAST,
 };
 
 /** Represents a single token of the source code */
@@ -66,77 +69,47 @@ struct Token {
   source::SourceLocation loc;
 };
 
+const char* name(TokenType tt);
+const char* as_source(TokenType tt);
+
 } // namespace token
 
 template <>
-struct std::formatter<token::TokenType> : std::formatter<std::string_view> {
+struct std::formatter<token::TokenType>
+    : std::formatter<std::string_view>,
+      std::formatter<std::underlying_type_t<token::TokenType>> {
+
+  using Underlying = std::underlying_type_t<token::TokenType>;
+  bool as_number = false;
+  bool as_source = false;
+
+  constexpr auto parse(std::format_parse_context& ctx) {
+    constexpr const char AS_SOURCE[] = "source";
+    constexpr const char AS_NUMBER[] = "number";
+    std::string_view ctx_str{ctx};
+
+    if (ctx_str.starts_with(AS_SOURCE)) {
+      as_source = true;
+      ctx.advance_to(ctx.begin() + sizeof(AS_SOURCE) - 1);
+      return std::formatter<std::string_view>::parse(ctx);
+
+    } else if (ctx_str.starts_with(AS_NUMBER)) {
+      as_number = true;
+      ctx.advance_to(ctx.begin() + sizeof(AS_NUMBER) - 1);
+      return std::formatter<Underlying>::parse(ctx);
+    } else {
+      return std::formatter<std::string_view>::parse(ctx);
+    }
+  }
+
   auto format(const token::TokenType& tok, std::format_context& ctx) const {
-    std::string name = "UNKNOWN_UNKNOWN";
-    switch (tok) {
-      using enum token::TokenType;
-    case UNKNOWN:
-      name = "KNOWN_UNKNOWN";
-      break;
-    case POISON:
-      name = "POISON";
-      break;
-    case END:
-      name = "END";
-      break;
-    case WHITESPACE:
-      name = "WHITESPACE";
-      break;
-    case COMMENT:
-      name = "COMMENT";
-      break;
-    case IDENTIFIER:
-      name = "IDENTIFIER";
-      break;
-    case INTEGER:
-      name = "INTEGER";
-      break;
-    case KW_DEF:
-      name = "KW_DEF";
-      break;
-    case KW_FUN:
-      name = "KW_FUN";
-      break;
-    case KW_RETURN:
-      name = "KW_RETURN";
-      break;
-    case SYM_MINUS:
-      name = "SYM_MINUS";
-      break;
-    case SYM_MINUS_MINUS:
-      name = "SYM_MINUS_MINUS";
-      break;
-    case SYM_BANG:
-      name = "SYM_BANG";
-      break;
-    case SYM_BANG_BANG:
-      name = "SYM_BANG_BANG";
-      break;
-    case SYM_STRONG_ARROW_RIGHT:
-      name = "SYM_STRONG_ARROW_RIGHT";
-      break;
-    case SYM_OPEN_PAREN:
-      name = "SYM_OPEN_PAREN";
-      break;
-    case SYM_CLOSE_PAREN:
-      name = "SYM_CLOSE_PAREN";
-      break;
-    case SYM_OPEN_BRACE:
-      name = "SYM_OPEN_BRACE";
-      break;
-    case SYM_CLOSE_BRACE:
-      name = "SYM_CLOSE_BRACE";
-      break;
-    case SYM_SEMICOLON:
-      name = "SYM_SEMICOLON";
-      break;
+    if (as_number) {
+      return std::formatter<Underlying>::format(static_cast<Underlying>(tok),
+                                                ctx);
     }
 
-    return std::formatter<std::string_view>::format(name, ctx);
+    return std::formatter<std::string_view>::format(
+        as_source ? token::as_source(tok) : token::name(tok), ctx);
   }
 };
 
@@ -147,9 +120,7 @@ struct std::formatter<token::Token> {
   }
 
   auto format(const token::Token& tok, std::format_context& ctx) const {
-    std::format_to(
-        ctx.out(), "{} [{}]: ", tok.tt,
-        static_cast<std::underlying_type_t<decltype(tok.tt)>>(tok.tt));
+    std::format_to(ctx.out(), "{} [{:number}]: ", tok.tt, tok.tt);
 
     std::string value = tok.loc.get();
 

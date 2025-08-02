@@ -9,6 +9,11 @@
 
 namespace parser {
 
+struct ParseResult {
+  ast::Ast top;
+  const ast::AstContainer& container;
+};
+
 /* Converts a token stream into an ast */
 class Parser {
 public:
@@ -17,7 +22,7 @@ public:
   Parser(lexer::Lexer& lexer, error::ErrorManager& error_manager);
 
   /* Parse all tokens from the given lexer and create an ast from it */
-  std::pair<ast::Ast, const ast::AstContainer&> parse();
+  ParseResult parse();
 
 private:
   /* Recursive descent. Each function corresponds with a grammar

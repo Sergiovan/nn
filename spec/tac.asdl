@@ -1,0 +1,5 @@
+program = Program(function_definition func)
+function_definition = Function(identifier iden, instruction* body)
+instruction = Return(val v) | Unary(unary_operator op, val src, val dst)
+val = Constant(int i) | Var(identifier i)
+unary_operator = Complement | Negate 
