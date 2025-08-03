@@ -2,6 +2,8 @@ BasedOnStyle: LLVM
 
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortLambdasOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
+
 AlwaysBreakTemplateDeclarations: Yes
 PointerAlignment: Left
 ReflowComments: false

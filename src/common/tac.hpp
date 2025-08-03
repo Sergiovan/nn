@@ -18,6 +18,7 @@ enum class Tag {
   LAST,
   FIRST = PROGRAM,
 };
+
 }
 
 template <>
@@ -29,22 +30,14 @@ struct std::formatter<tac::Tag> {
   constexpr auto format(const tac::Tag& id, std::format_context& ctx) const {
     switch (id) {
       using enum tac::Tag;
-    case PROGRAM:
-      return std::format_to(ctx.out(), "PROGRAM");
-    case FUNCTION:
-      return std::format_to(ctx.out(), "FUNCTION");
-    case RETURN:
-      return std::format_to(ctx.out(), "RETURN");
-    case UNARY:
-      return std::format_to(ctx.out(), "UNARY");
-    case CONSTANT:
-      return std::format_to(ctx.out(), "CONSTANT");
-    case VAR:
-      return std::format_to(ctx.out(), "VAR");
-    case IDENTIFIER:
-      return std::format_to(ctx.out(), "IDENTIFIER");
-    case LAST:
-      return std::format_to(ctx.out(), "LAST");
+    case PROGRAM: return std::format_to(ctx.out(), "PROGRAM");
+    case FUNCTION: return std::format_to(ctx.out(), "FUNCTION");
+    case RETURN: return std::format_to(ctx.out(), "RETURN");
+    case UNARY: return std::format_to(ctx.out(), "UNARY");
+    case CONSTANT: return std::format_to(ctx.out(), "CONSTANT");
+    case VAR: return std::format_to(ctx.out(), "VAR");
+    case IDENTIFIER: return std::format_to(ctx.out(), "IDENTIFIER");
+    case LAST: return std::format_to(ctx.out(), "LAST");
     }
   }
 };

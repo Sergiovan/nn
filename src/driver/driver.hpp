@@ -40,7 +40,7 @@ public:
   bool get_option(Option option);
 
 private:
-  int32_t finish_compilation(const asm_ast::AstProgram& program);
+  int32_t finish_compilation(const asm_ast::Program& program);
 
   /** Creates a lexer from a filename and error manager. Will open and read the file */
   lexer::Lexer get_lexer(const std::string& filename,

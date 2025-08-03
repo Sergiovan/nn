@@ -3,7 +3,14 @@
 
 program = Program(function fn)
 function = Function(string name, instruction* instructions)
-instruction = Li(immediate src, register dest) | Ret
-immediate = Immediate(int value)
-register = Register
-operand = Register | Immediate(int value)
+instruction = Load(operand src, operand dest)  -- Book has Mov, but we have Load and Store
+            | Store(operand src, operand dest)
+            | Unary(unary_operator op, operand arg, operand destination) -- In the book, unaries don't have a destination
+            | AllocateStack(int bytes)
+            | Ret
+unary_operator = BinaryNot | Negation
+operand = Immediate(int value)
+        | Register(register reg)
+        | Pseudo(identifier iden)
+        | StackAddress(int value)
+register = A0 | T0

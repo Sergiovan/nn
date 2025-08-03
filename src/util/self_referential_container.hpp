@@ -63,7 +63,7 @@ struct SelfReferentialContainer {
   template <std::ranges::view R>
     requires std::same_as<std::ranges::range_value_t<R>, Index>
   auto iterate_content(R&& r) {
-    return r | std::views::transform([this](const Index& idx) {
+    return r | std::views::transform([this](const Index& idx) -> T& {
              return at(idx);
            });
   }
@@ -71,7 +71,7 @@ struct SelfReferentialContainer {
   template <std::ranges::view R>
     requires std::same_as<std::ranges::range_value_t<R>, Index>
   auto iterate_content(R&& r) const {
-    return r | std::views::transform([this](const Index& idx) {
+    return r | std::views::transform([this](const Index& idx) -> const T& {
              return at(idx);
            });
   }

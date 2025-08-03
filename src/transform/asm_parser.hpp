@@ -1,53 +1,57 @@
 #pragma once
 
-#include <memory>
-#include <optional>
-
 #include "common/asm_ast.hpp"
-#include "common/ast.hpp"
+#include "common/tac.hpp"
 
 namespace asm_parser {
-/* Converts AST into ASM-AST */
+struct ParseResult {
+  asm_ast::Program program;
 
-struct AsmBlock {
-  std::vector<std::unique_ptr<asm_ast::AstInstruction>>* instructions;
-
-  void add(std::unique_ptr<asm_ast::AstInstruction> instruction);
+  const asm_ast::InstructionContainer& instructions;
+  const asm_ast::OperandContainer& operands;
 };
 
+/* Converts TAC into ASM-AST */
 class AsmParser {
 public:
-  AsmParser(const ast::Ast& ast_in, const ast::AstContainer& ast_container);
+  AsmParser(const tac::Tac& tac_in, const tac::TacContainer& tac_container);
 
-  const asm_ast::AstProgram& get();
+  ParseResult parse();
 
 private:
-  /* We recurse descentively, again */
-  /* parse_ functions take in an ast of the given type */
-  /* gen_ functions generate an asm ast of the given type */
-  asm_ast::AstProgram program(const ast::Ast& ast);
-  asm_ast::AstFunctionDef parse_function_definition(const ast::Ast& ast);
-  void parse_list(const ast::Ast& ast);
-  void parse_return(const ast::Ast& ast);
+  asm_ast::Program program(const tac::Tac& tac);
+  asm_ast::Function function(const tac::Tac& tac);
 
-  std::unique_ptr<asm_ast::AstInstructionMov>
-  gen_mov(std::unique_ptr<asm_ast::AstOperandRegister> src,
-          std::unique_ptr<asm_ast::AstOperandRegister> dst);
-  std::unique_ptr<asm_ast::AstInstructionLi>
-  gen_li(std::unique_ptr<asm_ast::AstOperandImmediate> src,
-         std::unique_ptr<asm_ast::AstOperandRegister> dst);
-  std::unique_ptr<asm_ast::AstOperandImmediate>
-  gen_integer(const ast::Ast& ast);
+  /* Returns the stack usage in bytes */
+  uint64_t fix_pseudos(asm_ast::Function& fn);
+  /* Function prologue */
+  void add_scaffolding(asm_ast::Function& fn, uint64_t stack_size);
+  /* Makes sure operands on instructions are valid */
+  void fix_operands(asm_ast::Function& fn);
 
-  std::optional<AsmBlock> add_block(
-      std::vector<std::unique_ptr<asm_ast::AstInstruction>>& instructions);
-  std::optional<AsmBlock> add_block(std::optional<AsmBlock>& block);
-  void add_to_block(std::unique_ptr<asm_ast::AstInstruction> inst);
+  bool suitable_instruction(tac::Tag tag);
+  asm_ast::InstructionIndex
+  instruction(const tac::Tac& tac, std::vector<asm_ast::InstructionIndex>& loc);
 
-  const ast::Ast& ast_in;
-  const ast::AstContainer& ast_container;
+  asm_ast::OperandIndex get_operand(asm_ast::InstructionIndex idx);
 
-  std::optional<asm_ast::AstProgram> head{std::nullopt};
-  std::optional<AsmBlock> current_block{std::nullopt};
+  bool suitable_operand(tac::Tag tag);
+  asm_ast::OperandIndex operand(const tac::Tac& tac);
+
+  /* Takes a TAC that could be instruction or operand. If operand, returns that. Otherwise
+     adds the instructions and returns an operand for whatever the last instruction's
+     result corresponds to */
+  asm_ast::OperandIndex
+  forced_operand(const tac::Tac& tac,
+                 std::vector<asm_ast::InstructionIndex>& loc);
+
+  asm_ast::InstructionIndex add_instruction(const asm_ast::Instruction& inst);
+  asm_ast::OperandIndex add_operand(const asm_ast::Operand& op);
+
+  tac::Tac tac_top;
+  const tac::TacContainer& tac_container;
+
+  asm_ast::InstructionContainer instructions;
+  asm_ast::OperandContainer operands;
 };
 } // namespace asm_parser

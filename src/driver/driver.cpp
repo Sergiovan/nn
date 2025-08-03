@@ -37,12 +37,8 @@ void ast_print_helper(const ast::Ast& ast, const ast::AstContainer& container,
     using enum ast::Tag;
   case NONE: // Nothing;
     return;
-  case INTEGER:
-    std::print(ss, "{}", ast.get<INTEGER>().t);
-    return;
-  case IDENTIFIER:
-    std::print(ss, "{}", ast.get<IDENTIFIER>().t);
-    return;
+  case INTEGER: std::print(ss, "{}", ast.get<INTEGER>().t); return;
+  case IDENTIFIER: std::print(ss, "{}", ast.get<IDENTIFIER>().t); return;
   case RETURN:
     ast_print_helper(ast.get<RETURN>().child.from(container), container, ss);
     return;
@@ -120,24 +116,12 @@ std::string escape_dot(std::string in) {
   std::stringstream out;
   for (char c : in) {
     switch (c) {
-    case '\"':
-      out << "\\\"";
-      break;
-    case '>':
-      out << "\\>";
-      break;
-    case '{':
-      out << "\\{";
-      break;
-    case '}':
-      out << "\\}";
-      break;
-    case '\n':
-      out << "\\n";
-      break;
-    default:
-      out << c;
-      break;
+    case '\"': out << "\\\""; break;
+    case '>': out << "\\>"; break;
+    case '{': out << "\\{"; break;
+    case '}': out << "\\}"; break;
+    case '\n': out << "\\n"; break;
+    default: out << c; break;
     }
   }
   return out.str();
@@ -269,9 +253,7 @@ void print_tac_helper(std::ostringstream& ss, tac::TacIndex idx,
     const auto& iden = tac.get<IDENTIFIER>();
     std::println(ss, "{} = IDENTIFIER {}", idx, iden.iden);
   } break;
-  case LAST:
-    std::println(ss, "{} = INVALID (LAST)", idx);
-    break;
+  case LAST: std::println(ss, "{} = INVALID (LAST)", idx); break;
   }
 }
 
@@ -281,6 +263,54 @@ void print_tac(tac_parser::ParseResult tac) {
   print_tac_helper(ss, {tac.container.size() - 1}, tac.top, tac.container);
 
   std::print(std::cerr, "{}", ss.str());
+}
+
+std::string print_op(const asm_ast::Operand& op) {
+  switch (op.get_tag()) {
+    using enum asm_ast::OperandTag;
+  case IMMEDIATE: return std::format("{:X}", op.get<IMMEDIATE>().value);
+  case REGISTER: return std::format("{}", op.get<REGISTER>().reg);
+  case PSEUDO: return std::format("PSEUDO {}", op.get<PSEUDO>().pseudo_value);
+  case STACK_ADDR: {
+    auto& stck = op.get<STACK_ADDR>();
+    if (stck.offset) {
+      return std::format("{:X}({})", op.get<STACK_ADDR>().offset,
+                         asm_ast::Register::SP);
+    } else {
+      return std::format("({})", asm_ast::Register::SP);
+    }
+  }
+  case LAST: return "OPERAND LAST (?\?)";
+  }
+}
+
+std::string print_instruction(const asm_ast::Instruction& instr,
+                              const asm_ast::OperandContainer& ops) {
+  switch (instr.get_tag()) {
+    using enum asm_ast::InstructionTag;
+  case LOAD: {
+    const auto& ld = instr.get<LOAD>();
+    return std::format("{} {} <- {}", LOAD, print_op(ld.destination.from(ops)),
+                       print_op(ld.source.from(ops)));
+  }
+  case STORE: {
+    const auto& st = instr.get<STORE>();
+    return std::format("{} {} <- {}", STORE, print_op(st.destination.from(ops)),
+                       print_op(st.source.from(ops)));
+  }
+  case UNARY: {
+    const auto& un = instr.get<UNARY>();
+    return std::format("{} {} <- {}", un.op, print_op(un.destination.from(ops)),
+                       print_op(un.arg.from(ops)));
+  }
+  case ALLOCA: {
+    return std::format("STACK ALLOC {:X}", instr.get<ALLOCA>().bytes);
+  }
+  case RET: {
+    return "RET";
+  }
+  case LAST: return "INSTRUCTION LAST (?\?)";
+  }
 }
 
 Driver::Driver(int argc, char** argv) {
@@ -313,9 +343,7 @@ Driver::Driver(int argc, char** argv) {
       option_state = OptionState::OUTPUT;
     } else {
       switch (option_state) {
-      case OptionState::NONE:
-        entry_point = arg;
-        break;
+      case OptionState::NONE: entry_point = arg; break;
       case OptionState::OUTPUT:
         output_file = arg;
         option_state = OptionState::NONE;
@@ -410,13 +438,20 @@ int Driver::run() {
     return 0;
   }
 
-  asm_parser::AsmParser ap{ast, container};
+  auto [tac, tac_container] = tac_result;
 
-  auto& asm_output = ap.get();
+  asm_parser::AsmParser ap{tac, tac_container};
+
+  auto asm_result = ap.parse();
+  auto [asm_, asm_instructions, asm_operands] = asm_result;
 
   if (get_option(Option::StopAfterCodegen)) {
     if (!silent) {
-      std::cerr << asm_output;
+      std::println("{}:", asm_.fn.name);
+      for (const auto [idx, instr] : std::views::enumerate(
+               asm_instructions.iterate_content(asm_.fn.instructions))) {
+        std::println("#{}: {}", idx, print_instruction(instr, asm_operands));
+      }
     }
   }
 
@@ -429,18 +464,18 @@ int Driver::run() {
     return 0;
   }
 
-  if (get_option(Option::EmitAsmFile)) {
-    std::string output_file_asm = std::format("{}.S", output_file);
-    std::ofstream output{output_file_asm, std::ios_base::out};
-    output << asm_output << "\n";
+  // if (get_option(Option::EmitAsmFile)) {
+  //   std::string output_file_asm = std::format("{}.S", output_file);
+  //   std::ofstream output{output_file_asm, std::ios_base::out};
+  //   output << asm_output << "\n";
 
-    if (output.bad()) {
-      std::print("Writing to {} failed!", output_file_asm);
-    }
-    return 5;
-  } else {
-    return finish_compilation(asm_output);
-  }
+  //   if (output.bad()) {
+  //     std::print("Writing to {} failed!", output_file_asm);
+  //   }
+  //   return 5;
+  // } else {
+  //   return finish_compilation(asm_output);
+  // }
 
   return 0;
 }
@@ -590,7 +625,7 @@ bool run_with_arguments(const std::string& program, const Ts&... args) {
   }
 }
 
-int32_t Driver::finish_compilation(const asm_ast::AstProgram& asm_output) {
+int32_t Driver::finish_compilation(const asm_ast::Program& asm_output) {
   using namespace std::string_literals;
   constexpr const char PROGRAM_AS[] = "riscv64-elf-as";
   constexpr const char PROGRAM_LD[] = "riscv64-elf-ld";
@@ -604,7 +639,7 @@ int32_t Driver::finish_compilation(const asm_ast::AstProgram& asm_output) {
   /* Output to temporary file */
   std::string asm_file = std::format("{}.S", tmp_name);
   std::ofstream asm_out_file{asm_file, std::ios_base::out};
-  asm_out_file << asm_output;
+  asm_out_file << ""; // asm_output;
   asm_out_file.close();
 
   /* Verify programs are installed */
