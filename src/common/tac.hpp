@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "common/token.hpp"
 #include "util/self_referential_container.hpp"
 #include "util/tagged_union.hpp"
 
@@ -73,8 +74,9 @@ struct TacUnary : Tagged<Tag::UNARY> {
 };
 
 struct TacConstant : Tagged<Tag::CONSTANT> {
-  TacConstant(int64_t value) : value{value} {}
-  int64_t value;
+  TacConstant(u64 value) : value{value} {}
+  TacConstant(s64 value) : value{std::bit_cast<u64>(value)} {}
+  u64 value;
 };
 
 struct TacVar : Tagged<Tag::VAR> {

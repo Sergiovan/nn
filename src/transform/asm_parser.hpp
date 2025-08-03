@@ -14,6 +14,8 @@ struct ParseResult {
 /* Converts TAC into ASM-AST */
 class AsmParser {
 public:
+  static constexpr u64 DEFAULT_STACK = 8; // 8 bytes for RA
+
   AsmParser(const tac::Tac& tac_in, const tac::TacContainer& tac_container);
 
   ParseResult parse();

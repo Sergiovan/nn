@@ -268,13 +268,13 @@ void print_tac(tac_parser::ParseResult tac) {
 std::string print_op(const asm_ast::Operand& op) {
   switch (op.get_tag()) {
     using enum asm_ast::OperandTag;
-  case IMMEDIATE: return std::format("{:X}", op.get<IMMEDIATE>().value);
+  case IMMEDIATE: return std::format("{:#x}", op.get<IMMEDIATE>().value);
   case REGISTER: return std::format("{}", op.get<REGISTER>().reg);
   case PSEUDO: return std::format("PSEUDO {}", op.get<PSEUDO>().pseudo_value);
   case STACK_ADDR: {
     auto& stck = op.get<STACK_ADDR>();
     if (stck.offset) {
-      return std::format("{:X}({})", op.get<STACK_ADDR>().offset,
+      return std::format("{:#x}({})", op.get<STACK_ADDR>().offset,
                          asm_ast::Register::SP);
     } else {
       return std::format("({})", asm_ast::Register::SP);
@@ -304,7 +304,7 @@ std::string print_instruction(const asm_ast::Instruction& instr,
                        print_op(un.arg.from(ops)));
   }
   case ALLOCA: {
-    return std::format("STACK ALLOC {:X}", instr.get<ALLOCA>().bytes);
+    return std::format("STACK ALLOC {:#x}", instr.get<ALLOCA>().bytes);
   }
   case RET: {
     return "RET";
@@ -336,6 +336,8 @@ Driver::Driver(int argc, char** argv) {
       set_option(Option::StopAfterTac, true);
     } else if (arg == "--codegen") {
       set_option(Option::StopAfterCodegen, true);
+    } else if (arg == "--asm") {
+      set_option(Option::PrintAsmFile, true);
     } else if (arg == "--silent") {
       set_option(Option::Silent, true);
     } else if (arg == "--output" || arg == "-o") {
@@ -464,18 +466,22 @@ int Driver::run() {
     return 0;
   }
 
-  // if (get_option(Option::EmitAsmFile)) {
-  //   std::string output_file_asm = std::format("{}.S", output_file);
-  //   std::ofstream output{output_file_asm, std::ios_base::out};
-  //   output << asm_output << "\n";
+  if (get_option(Option::EmitAsmFile)) {
+    std::string output_file_asm = std::format("{}.S", output_file);
+    std::ofstream output{output_file_asm, std::ios_base::out};
+    output << to_gnu_as(asm_result) << "\n";
 
-  //   if (output.bad()) {
-  //     std::print("Writing to {} failed!", output_file_asm);
-  //   }
-  //   return 5;
-  // } else {
-  //   return finish_compilation(asm_output);
-  // }
+    if (output.bad()) {
+      std::print("Writing to {} failed!", output_file_asm);
+      return 5;
+    }
+  } else if (get_option(Option::PrintAsmFile)) {
+    std::println("{}", to_gnu_as(asm_result));
+
+    return 0;
+  } else {
+    return finish_compilation(asm_result);
+  }
 
   return 0;
 }
@@ -625,7 +631,7 @@ bool run_with_arguments(const std::string& program, const Ts&... args) {
   }
 }
 
-int32_t Driver::finish_compilation(const asm_ast::Program& asm_output) {
+int32_t Driver::finish_compilation(asm_parser::ParseResult asm_output) {
   using namespace std::string_literals;
   constexpr const char PROGRAM_AS[] = "riscv64-elf-as";
   constexpr const char PROGRAM_LD[] = "riscv64-elf-ld";
@@ -639,7 +645,7 @@ int32_t Driver::finish_compilation(const asm_ast::Program& asm_output) {
   /* Output to temporary file */
   std::string asm_file = std::format("{}.S", tmp_name);
   std::ofstream asm_out_file{asm_file, std::ios_base::out};
-  asm_out_file << ""; // asm_output;
+  asm_out_file << to_gnu_as(asm_output);
   asm_out_file.close();
 
   /* Verify programs are installed */
@@ -704,7 +710,7 @@ R"(nn : Compiler for the nn language
 Compiles .nn files into RISC-V binary blobs, or RISC-V assembly files.
 Currently requires riscv64-elf-{as, ld, objcopy} to be installed on the system.
 
-USAGE: nn <FILE> [--help] [--lex] [--parse [--dot]] [--tac] [--codegen] [--silent] [-o|--output <PATH>] [-S]
+USAGE: nn <FILE> [--help] [--lex] [--parse [--dot]] [--tac] [--codegen] [--asm] [--silent] [-o|--output <PATH>] [-S]
 
 OPTIONAL PARAMETERS
   -o, --output: Path to output file, without extension
@@ -716,6 +722,7 @@ OPTIONAL PARAMETERS
     --dot: Show parse output as a dot file instead
   --tac: Only go up to parsing, then print the asts
   --codegen: Only go up to codegen, then print the program
+  --asm: Instead of linking a binary, print the asm to stdout
   --silent: Do not output to stdout after finishing phases
 )";
   // clang-format on

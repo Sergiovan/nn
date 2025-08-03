@@ -60,7 +60,7 @@ class PastSingleFileTest:
         print("Program stdout:")
         print("\t" + self.compiled_program_output.stdout.replace("\n", "\n\t"))
     else:
-      if self.compiled_program_output.retcode == -1:  # Didn't run
+      if self.compiled_program_output.retcode == -(1 << 65):  # Didn't run
         print(
           f"Compiler return: Expected {self.test_expectation.stage_reached.compiler_retcode()}, got {self.compiler_output.retcode}"
         )

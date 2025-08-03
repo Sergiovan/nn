@@ -158,7 +158,7 @@ class CompilerPhase(Enum):
 
 @dataclass
 class ProgramOutput:
-  retcode: int = -1
+  retcode: int = -(1 << 65)
   stdout: str = ""
   stderr: str = ""
 

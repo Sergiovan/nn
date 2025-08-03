@@ -101,14 +101,24 @@ uint64_t AsmParser::fix_pseudos(Function& fn) {
     }
   }
 
-  return total_stack;
+  return total_stack + DEFAULT_STACK;
 }
 
 void AsmParser::add_scaffolding(Function& fn, uint64_t stack_size) {
-  fn.instructions.insert(fn.instructions.begin(),
-                         add_instruction(InstructionAllocateStack{stack_size}));
+  auto& instrs = fn.instructions;
+  instrs.insert(instrs.begin(),
+                add_instruction(InstructionAllocateStack{stack_size}));
 
-  // No cleanup of stack...
+  // This is wasteful, we're going over it twice
+  // That's okay for now though
+  for (std::size_t i = 0; i < instrs.size(); ++i) {
+    auto& instr = instrs[i].from(instructions);
+    if (instr.is_a(InstructionTag::RET)) {
+      instrs.insert(instrs.begin() + i,
+                    add_instruction(InstructionAllocateStack{-stack_size}));
+      ++i;
+    }
+  }
 }
 
 void AsmParser::fix_operands(Function& fn) {
@@ -141,26 +151,34 @@ void AsmParser::fix_operands(Function& fn) {
       }
     } break;
     case UNARY: {
-      auto& un = instr.get<UNARY>();
-      auto& arg = un.arg.from(operands);
-      auto& dest = un.destination.from(operands);
+      {
+        auto& un = instr.get<UNARY>();
+        auto& arg = un.arg.from(operands);
 
-      if (arg.is_a(OperandTag::STACK_ADDR) || arg.is_a(OperandTag::IMMEDIATE)) {
-        OperandIndex arg = un.arg;
-        un.arg = add_operand(OperandRegister{Register::T0});
-        instrs.insert(instrs.begin() + i,
-                      add_instruction(InstructionLoad{arg, un.arg}));
-        ++i; // skip over just created
+        if (arg.is_a(OperandTag::STACK_ADDR) ||
+            arg.is_a(OperandTag::IMMEDIATE)) {
+          OperandIndex arg = un.arg;
+          un.arg = add_operand(OperandRegister{Register::T0});
+          instrs.insert(instrs.begin() + i,
+                        add_instruction(InstructionLoad{arg, un.arg}));
+          ++i; // skip over just created
+        }
       }
 
-      if (dest.is_a(OperandTag::STACK_ADDR)) {
-        OperandIndex dest = un.destination;
-        un.destination = add_operand(OperandRegister{Register::T0});
-        instrs.insert(instrs.begin() + (i + 1),
-                      add_instruction(InstructionStore{un.destination, dest}));
-        ++i; // skip over just created
-      }
+      { // Open new because we may have inserted into instrs, which invalidates instr
+        auto& instr = instrs[i].from(instructions);
+        auto& un = instr.get<UNARY>();
+        auto& dest = un.destination.from(operands);
 
+        if (dest.is_a(OperandTag::STACK_ADDR)) {
+          OperandIndex dest = un.destination;
+          un.destination = add_operand(OperandRegister{Register::T0});
+          instrs.insert(
+              instrs.begin() + (i + 1),
+              add_instruction(InstructionStore{un.destination, dest}));
+          ++i; // skip over just created
+        }
+      }
     } break;
     case ALLOCA: [[fallthrough]];
     case RET: [[fallthrough]];

@@ -1,5 +1,5 @@
-//! RUN(1)
+//! RUN(9223372036854775806)
 //! DESC(Take bitwise not of minimum possible value)
 def fun main() {
-  return !-2147483647; // Not 2147483648 because that's not a valid positive int32
+  return !-9223372036854775807; // Not 9223372036854775808 because that's not a valid positive int32
 }

@@ -114,48 +114,61 @@ struct std::formatter<asm_ast::UnaryOp> {
 };
 
 template <>
-struct std::formatter<asm_ast::Register> {
+struct std::formatter<asm_ast::Register> : std::formatter<std::string_view> {
+  bool as_source = false;
+
   constexpr auto parse(std::format_parse_context& ctx) {
-    return ctx.begin();
+    constexpr const char AS_SOURCE[] = "source";
+
+    std::string_view ctx_str{ctx};
+    if (ctx_str.starts_with(AS_SOURCE)) {
+      as_source = true;
+      ctx.advance_to(ctx.begin() + sizeof(AS_SOURCE) - 1);
+    }
+    return std::formatter<std::string_view>::parse(ctx);
   }
 
   constexpr auto format(const asm_ast::Register& id,
                         std::format_context& ctx) const {
+    const char* res = "LAST";
     switch (id) {
       using enum asm_ast::Register;
-    case ZERO: return std::format_to(ctx.out(), "$ZERO");
-    case RA: return std::format_to(ctx.out(), "$RA");
-    case SP: return std::format_to(ctx.out(), "$SP");
-    case X3: return std::format_to(ctx.out(), "$X3");
-    case X4: return std::format_to(ctx.out(), "$X4");
-    case T0: return std::format_to(ctx.out(), "$T0");
-    case X6: return std::format_to(ctx.out(), "$X6");
-    case X7: return std::format_to(ctx.out(), "$X7");
-    case X8: return std::format_to(ctx.out(), "$X8");
-    case X9: return std::format_to(ctx.out(), "$X9");
-    case A0: return std::format_to(ctx.out(), "$A0");
-    case X12: return std::format_to(ctx.out(), "$X12");
-    case X13: return std::format_to(ctx.out(), "$X13");
-    case X14: return std::format_to(ctx.out(), "$X14");
-    case X15: return std::format_to(ctx.out(), "$X15");
-    case X16: return std::format_to(ctx.out(), "$X16");
-    case X17: return std::format_to(ctx.out(), "$X17");
-    case X18: return std::format_to(ctx.out(), "$X18");
-    case X19: return std::format_to(ctx.out(), "$X19");
-    case X20: return std::format_to(ctx.out(), "$X20");
-    case X21: return std::format_to(ctx.out(), "$X21");
-    case X22: return std::format_to(ctx.out(), "$X22");
-    case X23: return std::format_to(ctx.out(), "$X23");
-    case X24: return std::format_to(ctx.out(), "$X24");
-    case X25: return std::format_to(ctx.out(), "$X25");
-    case X26: return std::format_to(ctx.out(), "$X26");
-    case X27: return std::format_to(ctx.out(), "$X27");
-    case X28: return std::format_to(ctx.out(), "$X28");
-    case X29: return std::format_to(ctx.out(), "$X29");
-    case X30: return std::format_to(ctx.out(), "$X30");
-    case X31: return std::format_to(ctx.out(), "$X31");
-    case LAST: return std::format_to(ctx.out(), "LAST");
+      // clang-format off
+    case ZERO: res = as_source ? "zero" : "$ZERO"; break;
+    case RA  : res = as_source ? "ra"   : "$RA";   break;
+    case SP  : res = as_source ? "sp"   : "$SP";   break;
+    case X3  : res = as_source ? "x3"   : "$X3";   break;
+    case X4  : res = as_source ? "x4"   : "$X4";   break;
+    case T0  : res = as_source ? "t0"   : "$T0";   break;
+    case X6  : res = as_source ? "x6"   : "$X6";   break;
+    case X7  : res = as_source ? "x7"   : "$X7";   break;
+    case X8  : res = as_source ? "x8"   : "$X8";   break;
+    case X9  : res = as_source ? "x9"   : "$X9";   break;
+    case A0  : res = as_source ? "a0"   : "$A0";   break;
+    case X12 : res = as_source ? "x12"  : "$X12";  break;
+    case X13 : res = as_source ? "x13"  : "$X13";  break;
+    case X14 : res = as_source ? "x14"  : "$X14";  break;
+    case X15 : res = as_source ? "x15"  : "$X15";  break;
+    case X16 : res = as_source ? "x16"  : "$X16";  break;
+    case X17 : res = as_source ? "x17"  : "$X17";  break;
+    case X18 : res = as_source ? "x18"  : "$X18";  break;
+    case X19 : res = as_source ? "x19"  : "$X19";  break;
+    case X20 : res = as_source ? "x20"  : "$X20";  break;
+    case X21 : res = as_source ? "x21"  : "$X21";  break;
+    case X22 : res = as_source ? "x22"  : "$X22";  break;
+    case X23 : res = as_source ? "x23"  : "$X23";  break;
+    case X24 : res = as_source ? "x24"  : "$X24";  break;
+    case X25 : res = as_source ? "x25"  : "$X25";  break;
+    case X26 : res = as_source ? "x26"  : "$X26";  break;
+    case X27 : res = as_source ? "x27"  : "$X27";  break;
+    case X28 : res = as_source ? "x28"  : "$X28";  break;
+    case X29 : res = as_source ? "x29"  : "$X29";  break;
+    case X30 : res = as_source ? "x30"  : "$X30";  break;
+    case X31 : res = as_source ? "x31"  : "$X31";  break;
+    case LAST: res = "LAST";
+      // clang-format on
     }
+    return std::formatter<std::string_view>::format(res, ctx);
   }
 };
 

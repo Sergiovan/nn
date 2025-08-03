@@ -56,6 +56,8 @@ class MonitoredQemu:
           if registers["mscratch"] == 1:
             # We're done. Output is in a0
             self.program_ret = registers["a0"]
+            if self.program_ret & (1 << 63) != 0:
+              self.program_ret = self.program_ret - (1 << 64)  # negate that bastard
             break
           await asyncio.sleep(0.1)
           timeout -= time.time() - loop_start

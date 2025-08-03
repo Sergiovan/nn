@@ -90,6 +90,9 @@ class TestRunner:
     self.processing_lines = [ProcessingData() for _ in range(self.task_limit)]
 
   def run(self) -> int:
+    self.past_runs.runs = [
+      run for run in self.past_runs.runs if run.run_args.stop_after == self.arguments.stop_after
+    ]
     if self.arguments.print_last_run:
       if len(self.past_runs.runs) == 0:
         raise ValueError("Cannot print last run: There is no last run")

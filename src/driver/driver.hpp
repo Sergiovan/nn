@@ -1,6 +1,7 @@
 #pragma once
 
 #include "frontend/lexer.hpp"
+#include "transform/asm_parser.hpp"
 #include "util/enum_map.hpp"
 
 namespace driver {
@@ -16,8 +17,11 @@ enum class Option {
   StopAfterTac,
   /** Stop processing the source after the codegen phase */
   StopAfterCodegen,
-  /** Instead of assmbling and linking an executable,  */
+  /** Instead of assmbling and linking an executable, dump a file
+      with the generated assembly */
   EmitAsmFile,
+  /** Instead of assembling and linking an executable, print asm to stdout */
+  PrintAsmFile,
   /** Show dotfile syntax of the AST parsed */
   ParseShowDot,
   /** Do not print secondary output to stdout */
@@ -40,7 +44,7 @@ public:
   bool get_option(Option option);
 
 private:
-  int32_t finish_compilation(const asm_ast::Program& program);
+  int32_t finish_compilation(asm_parser::ParseResult program);
 
   /** Creates a lexer from a filename and error manager. Will open and read the file */
   lexer::Lexer get_lexer(const std::string& filename,
