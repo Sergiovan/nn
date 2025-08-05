@@ -1,0 +1,5 @@
+//! RUN(76)
+//! DESC(Shifting by non-constant works)
+def fun main() {
+  return (4 << (2 * 2)) + (100 >> (1 + 2));
+}

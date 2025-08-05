@@ -1,0 +1,3 @@
+//! RUN(132)
+//! DESC(Bitwise shift is left-associative)
+def fun main() => 33 << 4 >> 2;

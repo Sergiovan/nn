@@ -1,0 +1,5 @@
+//! RUN(3)
+//! DESC(Bitwise or works properly)
+def fun main() {
+  return 1 | 2;
+}

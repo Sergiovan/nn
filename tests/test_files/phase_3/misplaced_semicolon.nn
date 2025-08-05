@@ -1,0 +1,5 @@
+//! PARSE
+//! DESC(Semicolons cannot exist within parenthesis)
+def fun main() {
+  return 1 + (2;)
+}

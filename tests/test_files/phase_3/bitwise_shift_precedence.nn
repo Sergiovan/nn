@@ -1,0 +1,3 @@
+//! RUN(646)
+//! DESC(Precedence rules puts shifts above arithmetic)
+def fun main() => 40 << 4 + 12 >> 1;

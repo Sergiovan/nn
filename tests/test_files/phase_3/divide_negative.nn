@@ -1,0 +1,5 @@
+//! RUN(-3)
+//! DESC(Division with negative numbers works)
+def fun main() {
+  return -12 / 5;
+}

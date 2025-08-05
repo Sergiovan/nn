@@ -1,0 +1,5 @@
+//! RUN(10)
+//! DESC(Associativity and precedence work together)
+def fun main() {
+  return 5 * 4 / 2 - 3 % (2 + 1);
+}

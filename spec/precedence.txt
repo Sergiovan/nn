@@ -1,0 +1,11 @@
+Pre Unary
+- !
+Bit
+>> << 
+| & ^
+Arithmetic
+* / %
++ -
+Relational
+< > <= >=
+== != 

@@ -1,0 +1,3 @@
+//! RUN(1)
+//! DESC(Bitwise and works properly)
+def fun main() => 3 & 5;

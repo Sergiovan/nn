@@ -1,0 +1,3 @@
+//! PARSE
+//! DESC(Binary operations must start outside parenthesis)
+def fun main() => 2 (* 3);

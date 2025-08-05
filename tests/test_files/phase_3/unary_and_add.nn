@@ -1,0 +1,5 @@
+//! RUN(1)
+//! DESC(Unary pre-operators work with binary operators too)
+def fun main() {
+  return !2 + 4;
+}

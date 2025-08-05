@@ -1,0 +1,3 @@
+//! PARSE
+//! DESC(Binary operators must have an operand left of the operator)
+def fun main() => /3;

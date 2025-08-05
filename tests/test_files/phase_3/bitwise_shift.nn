@@ -1,0 +1,5 @@
+//! RUN(140)
+//! DESC(Bitwise shift left works as expected)
+def fun main() {
+  return 35 << 2;
+}

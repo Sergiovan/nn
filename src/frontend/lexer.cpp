@@ -100,14 +100,17 @@ Token Lexer::next() {
           tt = TokenType::SYM_BANG;
         } else if (keyword == "!!") {
           tt = TokenType::SYM_BANG_BANG;
+        } else {
+          _had_error = true;
+          error_manager.add_error(
+              Error{{tt, token_loc}, "Unknown symbol found"});
         }
 
         reset_state();
         return {tt, token_loc};
       }
       break;
-    case NUMBER:
-      [[fallthrough]];
+    case NUMBER: [[fallthrough]];
     case INTEGER:
       if (!handle_number(current_char)) {
         reset_state();
@@ -115,15 +118,14 @@ Token Lexer::next() {
       }
       break;
     case ERROR: {
+      _had_error = true;
       advance_char();
       Token res{TokenType::UNKNOWN, current_loc()};
       error_manager.add_error(Error{res, "Unknown token found"});
       reset_state();
       return res;
     }
-    case END:
-      finished = true;
-      return {TokenType::END, {.source = source}};
+    case END: finished = true; return {TokenType::END, {.source = source}};
     }
 
     advance_char();
@@ -150,9 +152,7 @@ void Lexer::handle_find(c8 c) {
   case ' ':
   case '\t':
   case '\n':
-  case '\r':
-    state = WHITESPACE;
-    break;
+  case '\r': state = WHITESPACE; break;
   case '0':
   case '1':
   case '2':
@@ -162,9 +162,7 @@ void Lexer::handle_find(c8 c) {
   case '6':
   case '7':
   case '8':
-  case '9':
-    state = NUMBER;
-    break;
+  case '9': state = NUMBER; break;
   // case '+':
   case '(':
   case ')':
@@ -174,18 +172,13 @@ void Lexer::handle_find(c8 c) {
   case '=':
   case '/':
   case '-':
-  case '!':
-    state = SYMBOL;
-    break;
-  case '\0':
-    state = END;
-    break;
+  case '!': state = SYMBOL; break;
+  case '\0': state = END; break;
   default:
     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
       state = IDENTIFIER;
     } else {
       state = ERROR;
-      _had_error = true;
     }
   }
 }
@@ -195,20 +188,16 @@ bool Lexer::handle_whitespace(c8 c) {
   case ' ':
   case '\t':
   case '\n':
-  case '\r':
-    return true;
-  default:
-    return false;
+  case '\r': return true;
+  default: return false;
   }
 }
 
 bool Lexer::handle_comment(c8 c) {
   switch (c) {
   case '\0':
-  case '\n':
-    return false;
-  default:
-    return true;
+  case '\n': return false;
+  default: return true;
   }
 }
 
@@ -225,52 +214,48 @@ bool Lexer::handle_symbol(c8 c) {
     case ')':
     case '{':
     case '}':
-    case ';':
-      substate = SYMBOL_DONE;
-      return true;
-    case '=':
-      substate = SYMBOL_EQUAL;
-      return true;
-    case '/':
-      substate = SYMBOL_FORWARD_SLASH;
-      return true;
-    case '-':
-      substate = SYMBOL_MINUS;
-      return true;
-    case '!':
-      substate = SYMBOL_BANG;
-      return true;
-    default:
-      return false;
+    case ';': substate = SYMBOL_DONE; return true;
+    case '=': substate = SYMBOL_EQUAL; return true;
+    case '/': substate = SYMBOL_FORWARD_SLASH; return true;
+    case '-': substate = SYMBOL_MINUS; return true;
+    case '!': substate = SYMBOL_BANG; return true;
+    default: return false;
     }
   case SYMBOL_EQUAL:
     substate = SYMBOL_DONE;
     if (c == '>') {
+      // =>
       return true;
     }
+    // >
     return false;
   case SYMBOL_FORWARD_SLASH:
     substate = SYMBOL_DONE;
     if (c == '/') {
+      // //
       state = LexerState::COMMENT;
       return true;
     }
-
-    return true;
+    // /
+    state = LexerState::ERROR;
+    return false;
   case SYMBOL_MINUS:
     substate = SYMBOL_DONE;
     if (c == '-') {
+      // --
       return true;
     }
+    // -
     return false;
   case SYMBOL_BANG:
     substate = SYMBOL_DONE;
     if (c == '!') {
+      // !!
       return true;
     }
+    // !
     return false;
-  case SYMBOL_DONE:
-    return false;
+  case SYMBOL_DONE: return false;
   }
 }
 

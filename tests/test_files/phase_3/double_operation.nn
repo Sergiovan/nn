@@ -1,0 +1,3 @@
+//! PARSE
+//! DESC(Cannot have 2 binary operators after each other)
+def fun main() => 1 * / 2;

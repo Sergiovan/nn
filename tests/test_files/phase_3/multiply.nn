@@ -1,0 +1,5 @@
+//! RUN(6)
+//! DESC(Multiplication works)
+def fun main() {
+  return 2 * 3;
+}

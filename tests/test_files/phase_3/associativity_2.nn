@@ -1,0 +1,3 @@
+//! RUN(1)
+//! DESC(Left associativity works for division)
+def fun main() => 6 / 3 / 2;

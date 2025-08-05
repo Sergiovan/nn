@@ -1,0 +1,5 @@
+//! RUN(14)
+//! DESC(Parens trump over associativity)
+def fun main() {
+  return 2 * (3 + 4);
+}

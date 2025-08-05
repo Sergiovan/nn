@@ -1,0 +1,5 @@
+//! PARSE
+//! DESC(Statements must end in a semicolon)
+def fun main() {
+  return 2 * 2
+}

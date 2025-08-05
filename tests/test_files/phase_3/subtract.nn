@@ -1,0 +1,5 @@
+//! RUN(-1)
+//! DESC(Subtraction works)
+def fun main() {
+  return 1 - 2;
+}
