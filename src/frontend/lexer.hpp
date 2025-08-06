@@ -57,22 +57,6 @@ private:
     END,
   };
 
-  /* Current substate of the lexer. Meaning varies depending on the state */
-  enum class LexerSubState {
-    NONE,
-
-    /* While lexing a symbol the first character was an = */
-    SYMBOL_EQUAL,
-    /* While lexing a symbol the first character was a / */
-    SYMBOL_FORWARD_SLASH,
-    /* While lexing a symbol the first character was a - */
-    SYMBOL_MINUS,
-    /* While lexing a symbol the first character was a ! */
-    SYMBOL_BANG,
-    /* Lexing a symbol finished */
-    SYMBOL_DONE,
-  };
-
   /* The handle_ family of functions handles a specific state of the lexer. 
      As input they take the current character being read. Internally they change the
      state and substate of the lexer. The return value is true if the end of the state
@@ -134,7 +118,7 @@ private:
   /* Current lexer state */
   LexerState state = LexerState::FIND;
   /* Current lexer substate */
-  LexerSubState substate = LexerSubState::NONE;
+  token::TokenType token_substate = token::TokenType::UNKNOWN;
   /* Level of block comment recursion */
   u32 comment_recursion = 0;
 

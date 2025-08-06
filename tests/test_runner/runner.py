@@ -93,7 +93,9 @@ class TestRunner:
     self.past_runs.runs = [
       run
       for run in self.past_runs.runs
-      if run.run_args.stop_after == self.arguments.stop_after and run.run_args.test_files == []
+      if run.run_args.stop_after == self.arguments.stop_after
+      and run.run_args.test_files == []
+      and run.run_args.rerun_previous == RerunType.NO_RERUN
     ]
     if self.arguments.print_last_run:
       if len(self.past_runs.runs) == 0:

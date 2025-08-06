@@ -5,6 +5,7 @@
 
 #include "common/ast.hpp"
 #include "common/error.hpp"
+#include "common/token.hpp"
 #include "frontend/lexer.hpp"
 
 namespace parser {
@@ -107,12 +108,17 @@ private:
   ast::AstIndex
   error_token_expected(token::TokenType tt,
                        const std::optional<token::Token>& t = std::nullopt) {
+    if (tt == token::TokenType::UNKNOWN || tt == token::TokenType::POISON) {
+      return add_ast(
+          ast::Ast{}); // No new error, lexer has already dealt with it
+    }
     std::stringstream ss;
-    std::print(ss, "{}", T);
-    (std::print(ss, ", {}", Ts), ...);
+    std::print(ss, "'{:source}'", T);
+    (std::print(ss, ", '{:source}'", Ts), ...);
     error_manager.add_error(error::Error{
         t.value_or(peek()),
-        std::format("Expected one of {}, but got {} instead", ss.str(), tt)});
+        std::format("Expected {}{}, but got '{:source}' instead",
+                    sizeof...(Ts) ? "one of " : "", ss.str(), tt)});
     return add_ast(ast::Ast{}); // TODO Better error
   }
 

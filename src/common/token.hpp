@@ -35,18 +35,6 @@ enum class TokenType : u16 {
   /* Keywork token `return` */
   KW_RETURN,
 
-  /* Symbol token `+` */
-  // SYM_PLUS,
-  /* Symbol token `-` */
-  SYM_MINUS,
-  /* Symbol token `--` */
-  SYM_MINUS_MINUS,
-  /* Symbol token `!` */
-  SYM_BANG,
-  /* Symbol token `!!` */
-  SYM_BANG_BANG,
-  /* Symbol token `=>` */
-  SYM_STRONG_ARROW_RIGHT,
   /* Symbol token `(` */
   SYM_OPEN_PAREN,
   /* Symbol token `)` */
@@ -55,9 +43,48 @@ enum class TokenType : u16 {
   SYM_OPEN_BRACE,
   /* Symbol token `}` */
   SYM_CLOSE_BRACE,
-
   /* Symbol token `;` */
   SYM_SEMICOLON,
+  /* Symbol token `=` */
+  SYM_EQUAL,
+  /* Symbol token `=>` */
+  SYM_STRONG_ARROW_RIGHT,
+  /* Symbol token `+` */
+  SYM_PLUS,
+  /* Symbol token `++` */
+  SYM_PLUS_PLUS,
+  /* Symbol token `-` */
+  SYM_MINUS,
+  /* Symbol token `--` */
+  SYM_MINUS_MINUS,
+  /* Symbol token `*` */
+  SYM_ASTERISK,
+  /* Symbol token `/` */
+  SYM_SLASH,
+  /* Symbol percent `%` */
+  SYM_PERCENT,
+  /* Symbol token `!` */
+  SYM_BANG,
+  /* Symbol token `!!` */
+  SYM_BANG_BANG,
+  /* Symbol token `>` */
+  SYM_GREATER_THAN,
+  /* Symbol token `>>` */
+  SYM_GREATER_THAN_GREATER_THAN,
+  /* Symbol token `>=` */
+  SYM_GREATER_THAN_EQUAL,
+  /* Symbol token `<` */
+  SYM_LESS_THAN,
+  /* Symbol token `<<` */
+  SYM_LESS_THAN_LESS_THAN,
+  /* Symbol token `<=` */
+  SYM_LESS_THAN_EQUAL,
+  /* Symbol token `&` */
+  SYM_AMPERSAND,
+  /* Symbol token `|` */
+  SYM_PIPE,
+  /* Symbol token `^` */
+  SYM_CARET,
 
   /* LAST */
   LAST,

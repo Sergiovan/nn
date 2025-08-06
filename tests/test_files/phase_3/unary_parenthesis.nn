@@ -1,5 +1,5 @@
 //! RUN(-3)
 //! DESC(Unary operation on parenthesised expression works)
 def fun main() {
-  return ~(1 + 1);
+  return !(1 + 1);
 }

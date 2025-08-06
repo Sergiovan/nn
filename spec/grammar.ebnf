@@ -4,19 +4,42 @@ close_paren = ")";
 open_brace = "{";
 close_brace = "}";
 semicolon = ";";
+equal = "=";
+plus = "+";
 minus = "-";
+asterisk = "*";
+slash = "/";
+percent = "%";
 bang = "!";
+greater_than = ">";
+less_than = "<";
+ampersand = "&";
+pipe = "|";
+caret = "^";
 
-strong_arrow_right = "=>";
-
-symbols = open_paren | close_paren | open_brace | close_brace | semicolon | strong_arrow_right
-        | minus | bang;
+symbols = open_paren | close_paren | open_brace | close_brace | semicolon
+        | equal | plus | minus | asterisk | slash | percent | bang 
+        | greater_than | less_than | ampersand | pipe | caret;
 
 (* symbols with meaning*)
+add = plus;
+subtract = minus;
 negate = minus;
+multiply = asterisk;
+divide = slash;
+remainder = percent;
 bit_not = bang;
+shift_right = greater_than, greater_than;
+shift_left = less_than, less_than;
+bit_and = ampersand;
+bit_or = pipe;
+bit_xor = caret;
 
-pre_op = minus | bang;
+strong_arrow_right = equal, greater_than;
+
+pre_op = negate | bit_not;
+binary_op = add | subtract | multiply | divide | remainder 
+          | shift_right | shift_left | bit_and | bit_or | bit_xor;
 
 (* keywords *)
 def = "def";
