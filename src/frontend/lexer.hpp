@@ -120,7 +120,7 @@ private:
   /* Current lexer substate */
   token::TokenType token_substate = token::TokenType::UNKNOWN;
   /* Level of block comment recursion */
-  u32 comment_recursion = 0;
+  [[maybe_unused]] u32 comment_recursion = 0;
 
   /* If any error has occurred while lexing this source file */
   bool _had_error = false;

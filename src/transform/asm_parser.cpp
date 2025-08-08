@@ -224,6 +224,7 @@ AsmParser::instruction(const Tac& tac,
     switch (unary.op) {
     case token::TokenType::SYM_MINUS: op = UnaryOp::NEGATION; break;
     case token::TokenType::SYM_BANG: op = UnaryOp::BINARY_NOT; break;
+
     case token::TokenType::UNKNOWN: [[fallthrough]];
     case token::TokenType::POISON: [[fallthrough]];
     case token::TokenType::END: [[fallthrough]];
@@ -242,6 +243,21 @@ AsmParser::instruction(const Tac& tac,
     case token::TokenType::SYM_OPEN_BRACE: [[fallthrough]];
     case token::TokenType::SYM_CLOSE_BRACE: [[fallthrough]];
     case token::TokenType::SYM_SEMICOLON: [[fallthrough]];
+    case token::TokenType::SYM_EQUAL: [[fallthrough]];
+    case token::TokenType::SYM_PLUS: [[fallthrough]];
+    case token::TokenType::SYM_PLUS_PLUS: [[fallthrough]];
+    case token::TokenType::SYM_ASTERISK: [[fallthrough]];
+    case token::TokenType::SYM_SLASH: [[fallthrough]];
+    case token::TokenType::SYM_PERCENT: [[fallthrough]];
+    case token::TokenType::SYM_GREATER_THAN: [[fallthrough]];
+    case token::TokenType::SYM_GREATER_THAN_GREATER_THAN: [[fallthrough]];
+    case token::TokenType::SYM_GREATER_THAN_EQUAL: [[fallthrough]];
+    case token::TokenType::SYM_LESS_THAN: [[fallthrough]];
+    case token::TokenType::SYM_LESS_THAN_LESS_THAN: [[fallthrough]];
+    case token::TokenType::SYM_LESS_THAN_EQUAL: [[fallthrough]];
+    case token::TokenType::SYM_AMPERSAND: [[fallthrough]];
+    case token::TokenType::SYM_PIPE: [[fallthrough]];
+    case token::TokenType::SYM_CARET: [[fallthrough]];
     case token::TokenType::LAST: unreachable;
     }
     Operand dest = OperandPseudo{std::format("asm.{}", operands.size())};

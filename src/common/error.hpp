@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/ast.hpp"
 #include "common/source.hpp"
 
 namespace ast {

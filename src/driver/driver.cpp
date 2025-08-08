@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "backend/output_gnu_as.hpp"
 #include "common/asm_ast.hpp"
 #include "common/ast.hpp"
 #include "common/error.hpp"

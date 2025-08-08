@@ -1,20 +1,11 @@
 #pragma once
 
-#include <type_traits>
 #include <utility>
 
 #include "util/assert.hpp"
+#include "util/enum.hpp"
 
 namespace tagged_union_impl {
-
-template <typename T>
-concept constrained_enum = std::is_enum_v<T> && requires {
-  { T::FIRST } -> std::same_as<T>;
-  { T::LAST } -> std::same_as<T>;
-
-  static_cast<std::underlying_type_t<T>>(T::LAST) >
-      static_cast<std::underlying_type_t<T>>(T::FIRST);
-};
 
 template <typename T, typename Tag>
 concept has_tag = constrained_enum<Tag> && requires {
@@ -260,7 +251,6 @@ private:
 
 } // namespace tagged_union_impl
 
-using tagged_union_impl::constrained_enum;
 using tagged_union_impl::has_tag;
 using tagged_union_impl::TaggedUnion;
 

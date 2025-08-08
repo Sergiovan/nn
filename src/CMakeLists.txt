@@ -1,30 +1,5 @@
 cmake_minimum_required(VERSION 3.29)
 
-list(APPEND CORE_HEADERS
-  "backend/output_gnu_as.hpp"
-
-  "common/ast.hpp"
-  "common/asm_ast.hpp"
-  "common/error.hpp"
-  "common/source.hpp"
-  "common/tac.hpp"
-  "common/token.hpp"
-
-  "driver/driver.hpp"
-
-  "frontend/lexer.hpp"
-  "frontend/parser.hpp"
-
-  "transform/asm_parser.hpp"
-  "transform/tac_parser.hpp"
-
-  "util/assert.hpp"
-  "util/enum_map.hpp"
-  "util/format.hpp"
-  "util/string.hpp"
-  "util/types.hpp"
-)
-
 list(APPEND CORE_SOURCES
   "backend/output_gnu_as.cpp"
 
@@ -66,8 +41,12 @@ target_include_directories(core
 
 target_precompile_headers(core
   PUBLIC
-  ${CORE_HEADERS}
+
+  "<print>"
   "<string>"
+  "<sstream>"
+  "<type_traits>"
+  "<utility>"
   "<vector>"
 )
 

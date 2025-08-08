@@ -1,5 +1,7 @@
 #include "util/string.hpp"
 
+#include <sstream>
+
 std::string util::replace(const std::string& original,
                           const std::string& substr,
                           const std::string& replacement) {

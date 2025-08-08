@@ -30,6 +30,7 @@ private:
   const ast::Ast ast_in;
   const ast::AstContainer& ast_container;
 
+  [[maybe_unused]]
   error::ErrorManager& errors;
   tac::TacContainer container;
 };
