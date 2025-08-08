@@ -42,10 +42,12 @@ target_include_directories(core
 target_precompile_headers(core
   PUBLIC
 
+  "<array>"
   "<print>"
   "<string>"
   "<sstream>"
   "<type_traits>"
+  "<unordered_map>"
   "<utility>"
   "<vector>"
 )

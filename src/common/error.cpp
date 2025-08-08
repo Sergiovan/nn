@@ -1,14 +1,12 @@
-#include <iostream>
-
-#include <sys/ioctl.h>
-#include <unistd.h>
-
 #include "common/error.hpp"
 
 #include "common/ast.hpp"
 #include "common/token.hpp"
-
 #include "util/string.hpp"
+
+#include <iostream>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 using namespace error;
 

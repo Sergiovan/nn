@@ -1,4 +1,5 @@
 #include "ast.hpp"
+
 #include "common/source.hpp"
 
 using namespace ast;
@@ -9,22 +10,14 @@ using token::Token;
 const char* Ast::get_name() const {
   switch (get_tag()) {
     using enum Tag;
-  case NONE:
-    return "AstNone";
-  case INTEGER:
-    return "AstInteger";
-  case IDENTIFIER:
-    return "AstIdentifier";
-  case RETURN:
-    return "AstReturn";
-  case PRE_OP:
-    return "AstPreOp";
-  case LIST:
-    return "AstList";
-  case FUNCTION:
-    return "AstFunction";
-  case LAST:
-    return "AstInvalid";
+  case NONE: return "AstNone";
+  case INTEGER: return "AstInteger";
+  case IDENTIFIER: return "AstIdentifier";
+  case RETURN: return "AstReturn";
+  case PRE_OP: return "AstPreOp";
+  case LIST: return "AstList";
+  case FUNCTION: return "AstFunction";
+  case LAST: return "AstInvalid";
   }
   unreachable;
 }
@@ -32,24 +25,17 @@ const char* Ast::get_name() const {
 std::optional<Token> Ast::main_token(const AstContainer& container) const {
   switch (get_tag()) {
     using enum Tag;
-  case NONE:
-    return std::nullopt;
-  case INTEGER:
-    return get<INTEGER>().t;
-  case IDENTIFIER:
-    return get<IDENTIFIER>().t;
-  case RETURN:
-    return get<RETURN>().t;
-  case PRE_OP:
-    return get<PRE_OP>().t;
-  case LIST:
-    return std::nullopt;
+  case NONE: return std::nullopt;
+  case INTEGER: return get<INTEGER>().t;
+  case IDENTIFIER: return get<IDENTIFIER>().t;
+  case RETURN: return get<RETURN>().t;
+  case PRE_OP: return get<PRE_OP>().t;
+  case LIST: return std::nullopt;
   case FUNCTION: {
     auto& fn = get<FUNCTION>();
     return fn.name.from(container).main_token(container).value_or(fn.t);
   }
-  case LAST:
-    return std::nullopt;
+  case LAST: return std::nullopt;
   }
   unreachable;
 }
@@ -57,12 +43,9 @@ std::optional<Token> Ast::main_token(const AstContainer& container) const {
 SourceLocation Ast::source_location(const AstContainer& container) const {
   switch (get_tag()) {
     using enum Tag;
-  case NONE:
-    return source::nullloc;
-  case INTEGER:
-    return get<INTEGER>().t.loc;
-  case IDENTIFIER:
-    return get<IDENTIFIER>().t.loc;
+  case NONE: return source::nullloc;
+  case INTEGER: return get<INTEGER>().t.loc;
+  case IDENTIFIER: return get<IDENTIFIER>().t.loc;
   case RETURN: {
     auto& ret = get<RETURN>();
     return ret.t.loc + ret.child.from(container).source_location(container);
@@ -87,8 +70,7 @@ SourceLocation Ast::source_location(const AstContainer& container) const {
     auto& fn = get<FUNCTION>();
     return fn.t.loc + fn.body.from(container).source_location(container);
   }
-  case LAST:
-    return source::nullloc;
+  case LAST: return source::nullloc;
   }
   unreachable;
 }

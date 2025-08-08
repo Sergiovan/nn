@@ -1,9 +1,9 @@
 #pragma once
 
-#include <utility>
-
 #include "util/assert.hpp"
 #include "util/enum.hpp"
+
+#include <utility>
 
 namespace tagged_union_impl {
 

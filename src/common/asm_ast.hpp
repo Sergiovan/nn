@@ -2,6 +2,7 @@
 
 #include "util/self_referential_container.hpp"
 #include "util/tagged_union.hpp"
+
 #include <string>
 
 namespace asm_ast {

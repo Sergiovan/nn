@@ -3,7 +3,8 @@
 #include <print>
 #include <vector>
 
-template <typename T> struct std::formatter<std::vector<T>> {
+template <typename T>
+struct std::formatter<std::vector<T>> {
   constexpr auto parse(std::format_parse_context& ctx) {
     return ctx.begin();
   }

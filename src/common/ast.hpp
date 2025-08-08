@@ -1,12 +1,11 @@
 #pragma once
 
-#include <vector>
-
 #include "common/token.hpp"
 #include "util/assert.hpp"
-
 #include "util/self_referential_container.hpp"
 #include "util/tagged_union.hpp"
+
+#include <vector>
 
 namespace ast {
 enum class Tag {
@@ -34,22 +33,14 @@ struct std::formatter<ast::Tag> {
   constexpr auto format(const ast::Tag& id, std::format_context& ctx) const {
     switch (id) {
       using enum ast::Tag;
-    case NONE:
-      return std::format_to(ctx.out(), "NONE");
-    case INTEGER:
-      return std::format_to(ctx.out(), "INTEGER");
-    case IDENTIFIER:
-      return std::format_to(ctx.out(), "IDENTIFIER");
-    case RETURN:
-      return std::format_to(ctx.out(), "RETURN");
-    case PRE_OP:
-      return std::format_to(ctx.out(), "PRE_OP");
-    case LIST:
-      return std::format_to(ctx.out(), "LIST");
-    case FUNCTION:
-      return std::format_to(ctx.out(), "FUNCTION");
-    case LAST:
-      return std::format_to(ctx.out(), "LAST");
+    case NONE: return std::format_to(ctx.out(), "NONE");
+    case INTEGER: return std::format_to(ctx.out(), "INTEGER");
+    case IDENTIFIER: return std::format_to(ctx.out(), "IDENTIFIER");
+    case RETURN: return std::format_to(ctx.out(), "RETURN");
+    case PRE_OP: return std::format_to(ctx.out(), "PRE_OP");
+    case LIST: return std::format_to(ctx.out(), "LIST");
+    case FUNCTION: return std::format_to(ctx.out(), "FUNCTION");
+    case LAST: return std::format_to(ctx.out(), "LAST");
     }
   }
 };

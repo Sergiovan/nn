@@ -1,4 +1,5 @@
 #include "tac_parser.hpp"
+
 #include "common/tac.hpp"
 #include "frontend/parser.hpp"
 #include "util/assert.hpp"
@@ -27,10 +28,8 @@ TacIndex TacParser::program(const ast::Ast& ast) {
   for (const auto& fn : ast_container.iterate_content(list.asts)) {
     switch (fn.get_tag()) {
       using enum ast::Tag;
-    case FUNCTION:
-      return add_tac(tac::TacProgram{function_definition(fn)});
-    default:
-      unreachable;
+    case FUNCTION: return add_tac(tac::TacProgram{function_definition(fn)});
+    default: unreachable;
     }
   }
   unreachable;
@@ -60,8 +59,7 @@ TacIndex TacParser::instruction(const ast::Ast& ast) {
     const auto& ret = ast.get<RETURN>();
     return add_tac(tac::TacReturn{val(ret.child.from(ast_container))});
   } break;
-  default:
-    unreachable;
+  default: unreachable;
   }
 }
 
@@ -82,8 +80,7 @@ TacIndex TacParser::val(const ast::Ast& ast) {
     return add_tac(
         tac::TacUnary(unary.t.tt, val(unary.child.from(ast_container))));
   } break;
-  default:
-    unreachable;
+  default: unreachable;
   }
 }
 

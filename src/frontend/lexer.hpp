@@ -1,13 +1,12 @@
 #pragma once
 
-#include <string_view>
-#include <vector>
-
 #include "common/error.hpp"
 #include "common/source.hpp"
 #include "common/token.hpp"
-
 #include "util/types.hpp"
+
+#include <string_view>
+#include <vector>
 
 namespace lexer {
 

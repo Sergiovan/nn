@@ -1,12 +1,12 @@
 #pragma once
 
-#include <format>
-#include <string>
-
 #include "common/ast.hpp"
 #include "common/error.hpp"
 #include "common/token.hpp"
 #include "frontend/lexer.hpp"
+
+#include <format>
+#include <string>
 
 namespace parser {
 

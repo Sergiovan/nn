@@ -1,10 +1,10 @@
 #pragma once
 
-#include <vector>
-
 #include "common/token.hpp"
 #include "util/self_referential_container.hpp"
 #include "util/tagged_union.hpp"
+
+#include <vector>
 
 namespace tac {
 enum class Tag {

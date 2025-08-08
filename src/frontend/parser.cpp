@@ -56,8 +56,7 @@ AstIndex Parser::top_level_statement() {
   Token t = peek();
 
   switch (t.tt) {
-  case KW_DEF:
-    return def_statement();
+  case KW_DEF: return def_statement();
   default:
     t = consume(); // ?
     return error_token_expected<KW_DEF>(t.tt, t);
@@ -70,8 +69,7 @@ AstIndex Parser::def_statement() {
   Token t = peek();
 
   switch (t.tt) {
-  case KW_FUN:
-    return function_definition();
+  case KW_FUN: return function_definition();
   default:
     t = consume(); // ?
     return error_token_expected<KW_FUN>(t.tt, t);
@@ -80,8 +78,7 @@ AstIndex Parser::def_statement() {
 
 AstIndex Parser::statement() {
   switch (peek().tt) {
-  case KW_RETURN:
-    return return_statement();
+  case KW_RETURN: return return_statement();
   default: {
     return expression_or_assignment_statement();
   }
@@ -184,8 +181,7 @@ ast::AstIndex Parser::expression_atom() {
     consume_expect<SYM_CLOSE_PAREN>(); // )
     return ret;
   }
-  case INTEGER:
-    return integer();
+  case INTEGER: return integer();
   default:
     t = consume(); // ?
     return error_token_expected<INTEGER, SYM_OPEN_PAREN>(t.tt, t);
@@ -225,12 +221,9 @@ Token Parser::consume() {
   Token t = lexer.next();
   do {
     switch (t.tt) {
-    case WHITESPACE:
-      [[fallthrough]];
-    case COMMENT:
-      break;
-    default:
-      return t;
+    case WHITESPACE: [[fallthrough]];
+    case COMMENT: break;
+    default: return t;
     }
     t = lexer.next();
   } while (true);
@@ -243,12 +236,9 @@ bool Parser::is_prefix_operator(std::optional<token::Token> tok) {
                    .value();
   switch (token.tt) {
     using enum token::TokenType;
-  case SYM_MINUS:
-    [[fallthrough]];
-  case SYM_BANG:
-    return true;
-  default:
-    return false;
+  case SYM_MINUS: [[fallthrough]];
+  case SYM_BANG: return true;
+  default: return false;
   }
 }
 

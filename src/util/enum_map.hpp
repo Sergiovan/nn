@@ -1,11 +1,10 @@
 #pragma once
 
-#include <array>
-#include <type_traits>
-#include <utility>
-
 #include "util/enum.hpp"
 #include "util/types.hpp"
+
+#include <array>
+#include <type_traits>
 
 namespace _enum_map_detail {
 

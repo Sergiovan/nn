@@ -1,16 +1,5 @@
 #include "driver.hpp"
 
-#include <cstdlib>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <ios>
-#include <iostream>
-#include <ranges>
-
-#include <sys/wait.h>
-#include <unistd.h>
-
 #include "backend/output_gnu_as.hpp"
 #include "common/asm_ast.hpp"
 #include "common/ast.hpp"
@@ -21,6 +10,16 @@
 #include "transform/tac_parser.hpp"
 #include "util/format.hpp" // IWYU pragma: keep
 #include "util/scope_guard.hpp"
+
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <ios>
+#include <iostream>
+#include <ranges>
+#include <sys/wait.h>
+#include <unistd.h>
 
 using namespace driver;
 namespace fs = std::filesystem;

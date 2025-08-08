@@ -1,9 +1,9 @@
 #pragma once
-#include <print> // IWYU pragma: keep
-#include <type_traits>
-
 #include "common/source.hpp"
 #include "util/types.hpp"
+
+#include <print> // IWYU pragma: keep
+#include <type_traits>
 
 namespace token {
 

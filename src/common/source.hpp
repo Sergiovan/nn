@@ -1,10 +1,10 @@
 #pragma once
 
+#include "util/types.hpp"
+
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "util/types.hpp"
 
 namespace source {
 

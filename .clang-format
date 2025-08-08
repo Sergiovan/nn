@@ -7,3 +7,6 @@ AllowShortCaseLabelsOnASingleLine: true
 AlwaysBreakTemplateDeclarations: Yes
 PointerAlignment: Left
 ReflowComments: false
+
+IncludeBlocks: Regroup
+SortIncludes: CaseInsensitive

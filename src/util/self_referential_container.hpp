@@ -1,9 +1,9 @@
 #pragma once
 
+#include "assert.hpp"
+
 #include <ranges>
 #include <vector>
-
-#include "assert.hpp"
 
 template <typename T>
 struct SelfReferentialContainer;

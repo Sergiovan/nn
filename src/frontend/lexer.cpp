@@ -1,9 +1,9 @@
 #include "lexer.hpp"
 
-#include <memory>
-
 #include "common/error.hpp"
 #include "common/token.hpp"
+
+#include <memory>
 
 using error::Error;
 using error::ErrorManager;
