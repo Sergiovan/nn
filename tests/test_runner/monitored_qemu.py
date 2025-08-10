@@ -27,7 +27,7 @@ class MonitoredQemu:
         "-smp",
         "1",
         "-cpu",
-        "rv64",
+        "rva23s64,sv48=on",
         "-serial",
         "stdio",
         "-nographic",

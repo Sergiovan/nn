@@ -27,8 +27,8 @@ enum class Option {
   /** Do not print secondary output to stdout */
   Silent,
 
-  FIRST = ShowHelp,
-  LAST
+  LAST,
+  FIRST = ShowHelp
 };
 
 class Driver {

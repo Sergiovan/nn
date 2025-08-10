@@ -147,7 +147,7 @@ def run_qemu(input: Path, monitor: str, graphical: bool) -> NoReturn:
     "-smp",
     "1",
     "-cpu",
-    "rv64",
+    "rva23s64,sv48=on",
     "-monitor",
     shlex.quote(monitor),
     "-device",
