@@ -54,6 +54,7 @@ class Arguments:
   stop_after: CompilerPhase = serde_field(
     default=CompilerPhase.RUN, serializer=CompilerPhase.__str__, deserializer=CompilerPhase.from_str
   )
+  simple_output: bool = False
 
   @staticmethod
   def parse_args() -> Arguments:
@@ -140,6 +141,13 @@ class Arguments:
       choices=CompilerPhase,
       default=CompilerPhase.RUN,
       help="Stop all test cases after the given compiler phase",
+    )
+    p.add_argument(
+      "--simple-output",
+      dest="simple_output",
+      action="store_true",
+      default=False,
+      help="Disables fancy output, specifically the loading icons and showing which tests are running",
     )
 
     args = p.parse_args(namespace=Arguments())

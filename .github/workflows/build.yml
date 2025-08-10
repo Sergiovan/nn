@@ -46,12 +46,13 @@ jobs:
         run: chmod +x output/Release/nn
       # Actual test run
       - name: Run tests
-        run: python3 tests/run.py --compiler output/Release/nn
-        continue-on-error: true
+        id: run_tests
+        run: python3 tests/run.py --compiler output/Release/nn --simple-output
       - name: Publish run toml
         uses: actions/upload-artifact@v4
+        if: success() || steps.run_tests.conclusion == 'failure'
         with:
-          name: Test result toml
+          name: Release test result toml
           path: tests/past_runs.toml
           if-no-files-found: warn
 
@@ -99,11 +100,12 @@ jobs:
         run: chmod +x output/Debug/nn
       # Actual test run
       - name: Run tests
-        run: python3 tests/run.py --compiler output/Debug/nn
-        continue-on-error: true
+        id: run_tests
+        run: python3 tests/run.py --compiler output/Debug/nn --simple-output
       - name: Publish run toml
         uses: actions/upload-artifact@v4
+        if: success() || steps.run_tests.conclusion == 'failure'
         with:
-          name: Test result toml
+          name: Debug test result toml
           path: tests/past_runs.toml
           if-no-files-found: warn
