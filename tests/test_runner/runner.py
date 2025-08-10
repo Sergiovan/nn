@@ -30,7 +30,10 @@ from .test_data import (
 
 def set_echo(enabled: bool):
   stdin = sys.stdin.fileno()
-  stdin_attr = termios.tcgetattr(stdin)
+  try:
+    stdin_attr = termios.tcgetattr(stdin)
+  except termios.error:
+    return  # Ignore
   if enabled:
     stdin_attr[3] |= termios.ECHO
   else:
