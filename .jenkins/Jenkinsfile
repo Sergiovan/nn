@@ -1,21 +1,108 @@
-pipeline {
-    agent any
+import groovy.time.*
 
-    stages {
-        stage('Build') {
-            steps {
-                echo 'Building..'
-            }
-        }
-        stage('Test') {
-            steps {
-                echo 'Testing..'
-            }
-        }
-        stage('Deploy') {
-            steps {
-                echo 'Deploying....'
-            }
-        }
+def python_env = "python3"
+
+def testData = [
+  //        Compile context    Test context    Build target     Build output/Test target
+  Debug:   ["compile debug",   "test debug",   'build/debug',   'output/Debug/nn'],
+  Release: ["compile release", "test release", 'build/release', 'output/Release/nn']  
+]
+
+startTimes = [:]
+
+void setBuildStatus(String message, String context, String state) {
+  if (state == "pending") {
+    startTimes[context] = new Date()
+  } else {
+    TimeDuration duration = TimeCategory.minus(new Date(), startTimes[context])
+    def prelude = state == 'success' ? 'Successful in' : 'Failing after'
+    message = "${prelude} ${duration}"
+  }
+  
+  // add a Github access token as a global 'secret text' credential on Jenkins with the id 'github-commit-status-token'
+  withCredentials([string(credentialsId: 'github-commit-status-token-nn', variable: 'TOKEN')]) {
+  // 'set -x' for debugging. Don't worry the access token won't be actually logged
+  // Also, the sh command actually executed is not properly logged, it will be further escaped when written to the log   
+    String header_auth = '\"Authorization: token $TOKEN\"'
+    
+    sh label: "Setting status '$context' for $GIT_COMMIT to '$state'", script: """
+        set -x
+        curl \"https://api.github.com/repos/sergiovan/nn/statuses/$GIT_COMMIT\" \
+            -X POST \
+            -H $header_auth \
+            -H \"Accept: application/vnd.github+json\" \
+            -H \"X-GitHub-Api-Version: 2022-11-28\" \
+            -d \"{\\\"description\\\": \\\"$message\\\", \\\"state\\\": \\\"$state\\\", \\\"context\\\": \\\"$context\\\", \\\"target_url\\\": \\\"$BUILD_URL\\\"}\"
+    """
+  } 
+}
+
+def compile_stage(String stage_name, String context, String target, String artifact) {
+  return stage ("Compile $stage_name") {
+    setBuildStatus("Compiling", context, "pending")
+    try {
+      sh label: "Compile $stage_name", script: "cmake --build $target"
+      setBuildStatus("", context, "success")
+    } catch (e) {
+      setBuildStatus("", context, "failure")
+      throw e
     }
+    sh label: "Compress executable for storage", script: "tar -cvzf ${artifact}_${stage_name}.tar.gz $artifact"
+    archiveArtifacts artifacts: "${artifact}_*.tar.gz", onlyIfSuccessful: true
+  }
+}
+
+def test_stage(String stage_name, String context, String target, String python_env) {
+  return stage ("Test $stage_name") {
+    echo "Testing $target"
+    setBuildStatus("Testing", context, "pending")
+    try {
+      withPythonEnv(python_env) {
+        sh label: "Run tests for $stage_name", script: "python3 tests/run.py --compile $target --simple-output --past-runs tests/past_runs_${stage_name}.toml"
+      }
+      setBuildStatus("", context, "success")
+    } catch (e) {
+      setBuildStatus("", context, "failure")
+      throw e
+    } finally {
+      archiveArtifacts artifacts: "tests/past_runs_${stage_name}.toml", onlyIfSuccessful: false
+    }
+  }
+}
+
+pipeline {
+  agent any
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '5'))
+    githubProjectProperty(displayName: 'nn compiler', projectUrlStr: 'https://github.com/Sergiovan/nn')
+  }
+
+  stages {
+    stage('Set up') {
+      steps {
+        sh label: 'Clean workspace', script: 'git clean -fdx'
+        sh label: 'Set up cmake', script: 'CC=clang CXX=clang++ bash setup.sh'
+        withPythonEnv(python_env) {
+          sh label: "Set up python env requirements", script: 'pip install -r tests/requirements.txt'
+        }
+      }
+    }
+    stage('Build and test') {
+      steps {
+        script {
+          def parallelStages = [:] 
+          testData.each { key, value ->
+            def (compile_ctx, test_ctx, compile_target, test_target) = value
+            def key_lower = key.toLowerCase()
+            parallelStages[key] = {
+              compile_stage(key_lower, compile_ctx, compile_target, test_target)
+              test_stage(key_lower, test_ctx, test_target, python_env)
+            }
+          }
+          parallel parallelStages
+        }
+      }
+    }
+  }
 }
