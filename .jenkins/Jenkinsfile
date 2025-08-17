@@ -75,7 +75,6 @@ pipeline {
 
   options {
     buildDiscarder(logRotator(numToKeepStr: '5'))
-    githubProjectProperty(displayName: 'nn compiler', projectUrlStr: 'https://github.com/Sergiovan/nn')
   }
 
   stages {
