@@ -30,7 +30,10 @@ from .test_data import (
 
 def set_echo(enabled: bool):
   stdin = sys.stdin.fileno()
-  stdin_attr = termios.tcgetattr(stdin)
+  try:
+    stdin_attr = termios.tcgetattr(stdin)
+  except termios.error:
+    return  # Ignore
   if enabled:
     stdin_attr[3] |= termios.ECHO
   else:
@@ -302,6 +305,8 @@ class TestRunner:
       await asyncio.sleep(0.1)
 
   def _setup_screen(self):
+    if self.arguments.simple_output:
+      return  # Do not
     print("=" * self.column_limit)
     for processing in self.processing_lines:
       processing.print()
@@ -310,6 +315,8 @@ class TestRunner:
     print("=" * self.column_limit, flush=True)  # And another newline
 
   def _update_screen(self):
+    if self.arguments.simple_output:
+      return  # No, bad
     backtrack_amount = 2 + self.result_line + len(self.processing_lines) - 1
     visible_lines = shutil.get_terminal_size().lines
     backtrack_miss = backtrack_amount - visible_lines
